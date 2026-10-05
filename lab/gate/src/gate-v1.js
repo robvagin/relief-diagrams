@@ -41,9 +41,7 @@
           // нити и коромысла: одна толщина, мягкие кривые, узлы подвеса кольцами (ни одного прямого угла)
           Lo.wires.forEach(function (w) {
             var pts = w.pts.map(scr);
-            if (w.el != null) { var e = Lo.els[w.el]; pts[0] = [e.sx + (pts[0][0] - scr([e.x, e.y])[0]), e.sy - e.half * V.k * Math.cos(e.rot || 0)];
-              if (e.st.flat) { var q = pts[pts.length - 1]; pts.splice(1, 0, [(pts[0][0] + q[0]) / 2 + 14 * ui, (pts[0][1] + q[1]) / 2 + 10 * ui]); } }
-            if (w.dec != null) { var d = Lo.els[w.dec]; pts[2] = [d.sx, d.sy - d.half * V.k]; }
+            if (w.el != null) { var e = Lo.els[w.el]; pts = O.threadTo(pts[0], e.sx, e.sy, e.half * V.k, e.st.flat, ui); }
             O.stem(g, F, pts, { tone: w.tone, alpha: w.a, t: 0.6 });
           });
           Lo.rings.forEach(function (r) { var q = scr(r); g.save(); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.8);

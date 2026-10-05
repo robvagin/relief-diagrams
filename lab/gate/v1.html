@@ -2387,43 +2387,45 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     var size = function (s) { return s.z(S); };
     var area = function (s) { var z = size(s); return z.kind === 'circle' ? Math.PI * z.w * z.w / 4 : z.w * z.h; };
     var rest = []; for (var i = n - 1, acc = 0; i >= 0; i--) { acc += area(items[i]); rest[i] = acc; }
-    var p = [W * (narrow ? 0.52 : 0.5), H * 0.2], side = -1, ang = 0;
+    var down = function (ang) { return [Math.sin(-ang), Math.cos(ang)]; };       // отвес, наклонённый качанием
     var els = [], wires = [], rings = [];
-    var ceil = [p[0] - S * 0.03, -4];
-    var prevEnd = ceil;
+    // точка подвеса у потолка и первая нить: прямая под тяжестью
+    var A = [W * (narrow ? 0.52 : 0.5), H * 0.2], side = -1, ang = 0;
+    wires.push({ pts: [[A[0], -4], A], tone: 'ink2', a: 0.7, kind: 'thread' });
     for (var k = 0; k < n; k++) {
       var s = items[k], z = size(s), last = k === n - 1, st = s.st;
-      ang += O.swing(ctx.seed, 'arm' + k, tsec, P, (2 + k * 0.7) * D2R * flt, still ? 0 : 1);
-      var ring = [p[0], p[1] - S * 0.035];
-      rings.push(ring);
-      // нить от предыдущего конца к кольцу этого коромысла: мягкий провис
-      if (k === 0) wires.push({ pts: [prevEnd, [(prevEnd[0] + ring[0]) / 2 + side * S * 0.012, (prevEnd[1] + ring[1]) / 2], ring], tone: 'ink2', a: 0.7 });
-      if (last) {
-        var top = [p[0], p[1] + S * 0.06];
-        var c = rot([p[0], top[1] + z.w / 2], ring, ang * 0.5);
-        els.push({ step: s, z: z, x: c[0], y: c[1], rot: 0, st: st, half: z.w / 2, top: rot(top, ring, ang * 0.5) });
-        wires.push({ pts: [ring, rot([p[0] + S * 0.01, p[1] + S * 0.02], ring, ang * 0.5), els[els.length - 1].top], tone: 'ink2', a: 0.7, dec: els.length - 1 });
+      var sw = O.swing(ctx.seed, 'arm' + k, tsec, P, (1.6 + k * 0.5) * D2R * flt, still ? 0 : 1);
+      ang = sw;                                                     // каждый узел качается около своего отвеса
+      rings.push(A);
+      var half = z.kind === 'circle' ? z.w / 2 : z.h / 2;
+      if (last) {                                                   // последний висит прямо на нити
+        var d0 = down(ang * 0.6), top = [A[0] + d0[0] * S * 0.06, A[1] + d0[1] * S * 0.06];
+        els.push({ step: s, z: z, x: top[0] + d0[0] * half, y: top[1] + d0[1] * half, rot: 0, st: st, half: half, top: top });
+        wires.push({ pts: [A, top], tone: 'ink2', a: 0.7, kind: 'thread', el: els.length - 1 });
         break;
       }
-      var L = S * (0.36 - k * 0.04) * gapK, we = area(s), ws = rest[k + 1];
-      var a = L * ws / (we + ws), b = L * we / (we + ws);           // тяжёлое ближе к оси (равновесие плеч)
-      var tilt = side * 9 * D2R + ang;                              // коромысло наклонено, не горизонталь
-      var endL = rot([p[0] + side * a, p[1]], p, tilt), endR = rot([p[0] - side * b, p[1]], p, tilt);
-      var peak = rot([p[0], p[1] - S * 0.02], p, tilt);
-      var drop = S * (0.09 + (k % 2) * 0.05), half = z.kind === 'circle' ? z.w / 2 : z.h / 2;
-      var sw = O.swing(ctx.seed, 'el' + k, tsec, P, 4 * D2R * flt, still ? 0 : 1);
-      var topE = [endL[0] + side * S * 0.01, endL[1] + drop];
-      topE = rot(topE, endL, sw);
-      var cE = rot([topE[0], topE[1] + half], endL, sw);
-      var tiltE = (side * (5 + (k % 3) * 1.5)) * D2R + sw * 1.4;    // лёгкий наклон листа ±4–8°
-      els.push({ step: s, z: z, x: cE[0], y: cE[1], rot: z.kind === 'rect' ? tiltE : 0, st: st, half: half, top: topE });
-      // коромысло одной непрерывной кривой: нить листа ↗ конец ↗ гребень ↘ конец ↘ к следующему кольцу
-      var nextP = rot([endR[0] - side * S * 0.02, endR[1] + S * (0.13 + (k % 2) * 0.03)], endR, ang * 0.5);
-      // одна кривая без изломов: нить листа → конец → гребень → конец → нить к кольцу следующего коромысла
-      var nr = [nextP[0], nextP[1] - S * 0.035];
-      wires.push({ pts: [topE, [endL[0], endL[1] + drop * 0.35], endL, peak, endR, [(endR[0] + nr[0]) / 2 - side * S * 0.01, (endR[1] + nr[1]) / 2], nr], tone: 'ink', a: 0.85, el: els.length - 1 });
-      prevEnd = endR;
-      p = nextP; side = -side;
+      // коромысло: пологая дуга, плечи по равновесию (тяжёлое ближе к точке подвеса)
+      var L = S * (0.38 - k * 0.04) * gapK, we = area(s), ws = rest[k + 1];
+      var a = L * ws / (we + ws), b = L * we / (we + ws), t = a / (a + b);
+      var tilt = side * 5 * D2R + ang * 0.6, ux = Math.cos(tilt), uy = Math.sin(tilt), vx = Math.sin(tilt), vy = -Math.cos(tilt);
+      var h = S * 0.035, bump = 2 * t * (1 - t) * h;                // дуга выгнута вверх; точка подвеса лежит на дуге
+      var base = [A[0] - vx * bump, A[1] - vy * bump];
+      var eL = [base[0] + side * a * ux, base[1] + side * a * uy], eR = [base[0] - side * b * ux, base[1] - side * b * uy];
+      var mid = [(eL[0] + eR[0]) / 2 + vx * h, (eL[1] + eR[1]) / 2 + vy * h];
+      var arc = [eL, [(eL[0] + mid[0]) / 2 + vx * h * 0.25, (eL[1] + mid[1]) / 2 + vy * h * 0.25], mid, [(eR[0] + mid[0]) / 2 + vx * h * 0.25, (eR[1] + mid[1]) / 2 + vy * h * 0.25], eR];
+      wires.push({ pts: arc, tone: 'ink', a: 0.85, kind: 'arm' });
+      rings.push(eL, eR);                                           // петли на концах проволоки, как у Калдера
+      // элемент на нити с левого конца: отвес вниз, длина по ритму
+      var ew = O.swing(ctx.seed, 'el' + k, tsec, P, 3 * D2R * flt, still ? 0 : 1), d1 = down(ew);
+      var drop = S * (0.08 + (k % 2) * 0.05), topE = [eL[0] + d1[0] * drop, eL[1] + d1[1] * drop];
+      var tiltE = (side * (5 + (k % 3) * 1.5)) * D2R + ew * 1.2;    // лёгкий наклон листа ±4–8°
+      els.push({ step: s, z: z, x: topE[0] + d1[0] * half, y: topE[1] + d1[1] * half, rot: z.kind === 'rect' ? tiltE : 0, st: st, half: half, top: topE });
+      wires.push({ pts: [eL, topE], tone: 'ink2', a: 0.75, kind: 'thread', el: els.length - 1 });
+      // с правого конца нить вниз к точке подвеса следующего коромысла
+      var d2 = down(ang * 0.5), len = S * (0.12 + (k % 2) * 0.03);
+      var nA = [eR[0] + d2[0] * len, eR[1] + d2[1] * len];
+      wires.push({ pts: [eR, nA], tone: 'ink2', a: 0.75, kind: 'thread' });
+      A = nA; side = -side;
     }
     return { els: els, wires: wires, rings: rings, S: S, ui: ui };
   };
@@ -2437,8 +2439,8 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
       y0 = Math.min(y0, e.y - hh); y1 = Math.max(y1, e.y + hh);
     });
     Lr.rings.forEach(function (r) { y0 = Math.min(y0, r[1]); });
-    var top = m + 70 * Lo.ui, bw = W - 2 * m, bh = H - top - m;
-    var k = Math.min(1, bw / (x1 - x0), bh / (y1 - y0));
+    var top = m + 70 * Lo.ui, bw = W - 2 * m, bh = H - top - m * 1.4;
+    var k = Math.min(1, bw / (x1 - x0), bh / (y1 - y0)) * 0.94;            // запас на качание
     var dx = m + (bw - (x1 - x0) * k) / 2 - x0 * k, dy = top + (bh - (y1 - y0) * k) / 2 - y0 * k;
     var T = function (p) { return [p[0] * k + dx, p[1] * k + dy]; };
     Lo.els.forEach(function (e) { var q = T([e.x, e.y]); e.x = q[0]; e.y = q[1]; e.top = T(e.top); e.half *= k;
@@ -2448,6 +2450,13 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     return Lo;
   };
 
+
+  /* нить к элементу: от точки подвеса до верхней кромки по направлению на центр; у опавшего — провис */
+  O.threadTo = function (a, cx, cy, half, flat, ui) {
+    var dx = cx - a[0], dy = cy - a[1], L = Math.hypot(dx, dy) || 1, top = [cx - dx / L * half, cy - dy / L * half];
+    if (!flat) return [a, top];
+    return [a, [(a[0] + top[0]) / 2 + 12 * ui, (a[1] + top[1]) / 2 + 14 * ui], top];
+  };
 
   O.label = function (g, F, x, y, title, sub, o) {
     o = o || {};
@@ -2687,9 +2696,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
           // нити и коромысла: одна толщина, мягкие кривые, узлы подвеса кольцами (ни одного прямого угла)
           Lo.wires.forEach(function (w) {
             var pts = w.pts.map(scr);
-            if (w.el != null) { var e = Lo.els[w.el]; pts[0] = [e.sx + (pts[0][0] - scr([e.x, e.y])[0]), e.sy - e.half * V.k * Math.cos(e.rot || 0)];
-              if (e.st.flat) { var q = pts[pts.length - 1]; pts.splice(1, 0, [(pts[0][0] + q[0]) / 2 + 14 * ui, (pts[0][1] + q[1]) / 2 + 10 * ui]); } }
-            if (w.dec != null) { var d = Lo.els[w.dec]; pts[2] = [d.sx, d.sy - d.half * V.k]; }
+            if (w.el != null) { var e = Lo.els[w.el]; pts = O.threadTo(pts[0], e.sx, e.sy, e.half * V.k, e.st.flat, ui); }
             O.stem(g, F, pts, { tone: w.tone, alpha: w.a, t: 0.6 });
           });
           Lo.rings.forEach(function (r) { var q = scr(r); g.save(); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.8);

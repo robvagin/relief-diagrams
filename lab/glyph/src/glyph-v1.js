@@ -46,8 +46,7 @@
           I.fictional(g, F);
           Lo.wires.forEach(function (w) {
             var pts = w.pts.map(function (p) { return V.pt(p, 0); });
-            if (w.el != null) { var e = Lo.els[w.el]; pts[0] = [e.sx + (pts[0][0] - V.pt([e.x, e.y], 0)[0]), e.sy - Math.max(e.z.w * V.k, e.step.q.size * 1.7) / 2]; }
-            if (w.dec != null) { var d = Lo.els[w.dec]; pts[2] = [d.sx, d.sy - Math.max(d.z.w * V.k, d.step.q.size * 1.7) / 2]; }
+            if (w.el != null) { var e = Lo.els[w.el]; pts = O.threadTo(pts[0], e.sx, e.sy, Math.max(e.z.w * V.k, e.step.q.size * 1.7) / 2, false, ui); }
             O.stem(g, F, pts, { tone: w.tone, alpha: w.a, t: 0.6 });
           });
           Lo.rings.forEach(function (r) { var c = V.pt(r, 0); g.save(); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.8);

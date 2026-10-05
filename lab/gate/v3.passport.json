@@ -3,7 +3,7 @@
   "title": "Gate · v3 Octopus",
   "blurb": "Check before action as a living organism of paper sheets and discs: a passed check lifts and settles, a blocked one lies flat on the floor.",
   "version": "0.3.0",
-  "engineHash": "e5b64658f09eaad773683f42c0d30c7dd9c77d21058715e29d8c1bcbf1714507",
+  "engineHash": "8546a962d3aae3c669a27030f163054ee3942a304dd5d58cacd783ac857a0881",
   "kind": "engine",
   "contract": {
     "embed": {
