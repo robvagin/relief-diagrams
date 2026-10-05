@@ -134,9 +134,11 @@
     G.toWorld = function (sx, sy) { var f = G.fit, v = G.view; return [(sx - f.cx) / (f.s * v.zoom) + v.x, (sy - f.cy) / (f.s * v.zoom) + v.y]; };
     G.scale = function () { return G.fit.s * G.view.zoom; };
     /* вписать мир (bbox) в кадр с полями 6 % */
-    G.fitTo = function (W, H, bbox) {
-      var m = Math.min(W, H) * 0.06, s = Math.min((W - 2 * m) / (bbox[2] - bbox[0]), (H - 2 * m) / (bbox[3] - bbox[1]));
-      G.fit = { s: s, cx: W / 2, cy: H / 2 };
+    /* pad = {top, bottom, left, right} в px сверх полей 6 %: место под шапку и легенду сцены */
+    G.fitTo = function (W, H, bbox, pad) {
+      pad = pad || {}; var m = Math.min(W, H) * 0.06, t = m + (pad.top || 0), b = m + (pad.bottom || 0), l = m + (pad.left || 0), r = m + (pad.right || 0);
+      var s = Math.min((W - l - r) / (bbox[2] - bbox[0]), (H - t - b) / (bbox[3] - bbox[1]));
+      G.fit = { s: s, cx: l + (W - l - r) / 2, cy: t + (H - t - b) / 2 };
       G.home = { zoom: 1, x: (bbox[0] + bbox[2]) / 2, y: (bbox[1] + bbox[3]) / 2 };
       if (!G.viewT && !G._viewed) { G.view = Object.assign({}, G.home); G._viewed = true; }
     };

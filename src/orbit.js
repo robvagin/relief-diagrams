@@ -124,7 +124,8 @@
     var P = ctx.P, W = ctx.W, H = ctx.H, ui = R.ui(W, H), C = R.color;
     if (!G || built !== key(ctx)) rebuild(ctx);
     R.seedFrom(ctx);
-    G.fitTo(W, H, M.bbox);
+    var hu0 = Math.max(ui, 0.9);                                    // шапка сверху и легенда снизу не заходят на организм
+    G.fitTo(W, H, M.bbox, { top: 34 * hu0, bottom: H >= 420 ? 64 * hu0 : 0 });
     G.sync(ctx, { anchorK: 5, drift: +P.drift, springK: +P.springK, repel: +P.repel, period: +P.period, amp: 3 * (+P.float || 0) });
     var T = R.tokens(ctx.theme, P.accent), sc = G.scale(), zk = Math.min(1.6, Math.max(0.6, sc * 1.4));
     var mouse = G.mouse || [W / 2, H / 2], par = +P.parallax || 0;
@@ -145,7 +146,7 @@
       if (nd.lvl === 0) return;                                  // плоские печатаются на полу
       var fill = null, fade = 0.55 * s.fade;                     // притухание цветом к грунту кадра (рельс, pseudo-3d §2)
       if (nd.kind === 'circle') plates.push({ id: nd.id, kind: 'circle', x: s.x, y: s.y, w: 2 * nd.r * sc, z: s.z, idx: s.i, fill: fill, fade: fade, env: s.i === G.focus ? 0 : 1 });
-      else plates.push({ id: nd.id, kind: 'rect', x: s.x, y: s.y, w: nd.w * sc, h: nd.h * sc, r: nd.r * sc, rot: nd.rot, z: s.z, idx: s.i, fill: fill, fade: fade, paper: true, env: s.i === G.focus ? 0 : 1 });
+      else plates.push({ id: nd.id, kind: 'rect', x: s.x, y: s.y, w: Math.max(nd.w * sc, W >= 560 ? 172 * hu0 : 0), h: Math.max(nd.h * sc, W >= 560 ? 100 * hu0 : 0), r: nd.r * sc, rot: nd.rot, z: s.z, idx: s.i, fill: fill, fade: fade, paper: true, env: s.i === G.focus ? 0 : 1 });
     });
 
     // подсказка: маленький бумажный лист z3 над наведённым узлом (README §7.9)
@@ -182,9 +183,10 @@
      плоские non-performing займы, подписи сегментов наружу по лучу, легенда «How to read» */
   function floor(g, F, S, sc, hotSet, focusLoan) {
     var T = F.T, ui = F.ui, P = F.P, C = R.color;
-    R.ink.text(g, F, 'Loan book', F.W * 0.04, F.H * 0.065, { s: 3, w: 500 });
-    R.ink.text(g, F, money(M.nodes[0].value) + ' · ' + M.nodes[0].count + ' loans · as of 2026-09-30', F.W * 0.04, F.H * 0.065 + 18 * ui, { s: 0, mono: true, tone: 'ink3' });
-    R.ink.fictional(g, F);
+    var Fh = Object.assign({}, F, { ui: Math.max(F.ui, 0.9) });   // экранный текст не мельче 10,5 px
+    R.ink.text(g, Fh, 'Loan book', F.W * 0.04, F.H * 0.065, { s: 3, w: 500 });
+    R.ink.text(g, Fh, money(M.nodes[0].value) + ' · ' + M.nodes[0].count + ' loans · as of 2026-09-30', F.W * 0.04, F.H * 0.065 + 18 * Fh.ui, { s: 0, mono: true, tone: 'ink3' });
+    R.ink.fictional(g, Fh);
     M.edges.forEach(function (e) {
       var a = S[e.a], b = S[e.b], dim = Math.max(a.fade, b.fade);
       var ra = radiusOf(a.nd, sc), rb = radiusOf(b.nd, sc);
@@ -208,8 +210,10 @@
       g.beginPath(); g.arc(s.x, s.y, r, 0, Math.PI * 2); g.fill();
     });
     // подписи сегментов наружу по лучу
-    if (P.labels !== 'none' && 11.67 * sc * 0.95 >= 7) {          // мельче 7 px подпись не читается — не печатаем
-      var Fw = Object.assign({}, F, { ui: sc * 0.95 }), wu = Fw.ui, segs = S.filter(function (s) { return s.nd.role === 'segment'; });
+    // подписи узлов не мельче 10,5 px (adaptive-typography: подписи 10–12 px с плюсовым трекингом); растут с зумом.
+    // На кадре уже 560 px им негде встать между семечками — там их несёт подсказка при наведении
+    if (P.labels !== 'none' && F.W >= 560) {
+      var Fw = Object.assign({}, F, { ui: Math.max(sc * 0.95, 0.9) }), wu = Fw.ui, segs = S.filter(function (s) { return s.nd.role === 'segment'; });
       // препятствия: все плашки кругами (семечки — облаком вокруг сегмента), уже поставленные подписи
       var obs = S.filter(function (s) { return s.nd.role !== 'loan'; }).map(function (s) {
         var r = radiusOf(s.nd, sc) * (s.nd.kind === 'circle' ? 1 : 1.25); return { x: s.x - r, y: s.y - r, w: 2 * r, h: 2 * r };
@@ -226,18 +230,19 @@
         var s = segs[k];
         if (!b.ok) {                          // запас: по лучу наружу за облаком семечек, без проверки соседей
           var rr = (s.nd.r + 10 + 5.6 * Math.sqrt(s.nd.count + 1)) * sc, d = s.nd.dir, cx = s.x + Math.cos(d) * rr, cy = s.y + Math.sin(d) * rr;
-          b = { x: Math.cos(d) >= 0 ? cx : cx - b.w, y: cy - 15 * wu };
+          b = { x: Math.cos(d) >= 0 ? cx : cx - b.w, y: cy - 15 * wu, w: b.w, h: b.h };
         }
+        b.x = Math.max(6, Math.min(F.W - b.w - 6, b.x)); b.y = Math.max(6, Math.min(F.H - b.h - 6, b.y));   // ни одна подпись не срезана краем
         R.ink.text(g, Fw, s.nd.label, b.x, b.y + 12 * wu, { s: 0, w: 500, tone: 'ink2', alpha: 1 - 0.7 * s.fade });
         R.ink.text(g, Fw, money(s.nd.value) + ' · ' + pct(s.nd.share), b.x, b.y + 26 * wu, { s: 0, mono: true, tone: 'ink3', alpha: 1 - 0.7 * s.fade });
       });
     }
     // легенда «How to read»
     if (F.H < 420) return;                                          // во фрагменте легенду несёт страница (паспорт)
-    var lx = F.W * 0.04, ly = F.H - F.H * 0.06 - 52 * ui;
-    R.ink.text(g, F, 'How to read', lx, ly, { s: 0, caps: true, tone: 'ink3' });
+    var hu = Fh.ui, lx = F.W * 0.04, ly = F.H - F.H * 0.06 - 52 * hu;
+    R.ink.text(g, Fh, 'How to read', lx, ly, { s: 0, caps: true, tone: 'ink3' });
     ['Area — exposure', 'Distance from the parent — share of it', 'Height — verified · flat — non-performing'].forEach(function (t, k) {
-      R.ink.text(g, F, t, lx, ly + (15 + 14 * k) * ui, { s: 0, tone: 'ink2' });
+      R.ink.text(g, Fh, t, lx, ly + (15 + 14 * k) * hu, { s: 0, tone: 'ink2' });
     });
   }
 
@@ -252,7 +257,7 @@
       return;
     }
     var nd = M.nodes[src.idx], st = S[src.idx], al = 1 - 0.7 * st.fade;
-    ui = sc * 0.95; F = Object.assign({}, F, { ui: ui });            // текст на плашке живёт в мире: зум растит его вместе с листом
+    ui = F.W >= 560 ? Math.max(sc * 0.95, 0.9) : sc * 0.95; F = Object.assign({}, F, { ui: ui });   // не мельче 10,5 px; лист держит экранный минимум под текст            // текст на плашке живёт в мире: зум растит его вместе с листом
     if (nd.role === 'hub') {
       I.text(g, F, 'Loan book', s.x, s.y - 4 * ui, { s: 2, w: 500, align: 'center', alpha: al });
       I.text(g, F, money(nd.value), s.x, s.y + 16 * ui, { s: 1, mono: true, align: 'center', tone: 'ink2', alpha: al });
@@ -275,7 +280,8 @@
       var r = s.nd.r * sc + 4 * ui;
       g.strokeStyle = C.css(T.accent); g.lineWidth = F.lineW * 1.2;
       g.beginPath(); g.arc(s.x, s.y, r, 0, Math.PI * 2); g.stroke();
-      R.ink.text(g, F, 'D-7781 · blocked', s.x + r + 6 * ui, s.y + 4 * ui, { s: 0, mono: true, tone: 'ink' });
+      var Fh = Object.assign({}, F, { ui: Math.max(ui, 0.9) });
+      R.ink.text(g, Fh, 'D-7781 · blocked', s.x + r + 6 * ui, s.y + 4 * Fh.ui, { s: 0, mono: true, tone: 'ink' });
     });
   }
 

@@ -11,10 +11,12 @@
   function place(labels, obstacles, bounds) {
     var taken = (obstacles || []).slice(), out = [];
     labels.forEach(function (L) {
-      var pad = L.pad || 4, cands = [L.angle || 0, (L.angle || 0) + Math.PI / 2, (L.angle || 0) - Math.PI / 2, (L.angle || 0) + Math.PI];
+      // кандидаты: по направлению наружу, затем веером ±30°…±180° от него, на двух радиусах
+      var pad = L.pad || 4, a0 = L.angle || 0, cands = [], radii = [0, L.h || 0];
+      radii.forEach(function (dr) { for (var k = 0; k <= 6; k++) { cands.push([a0 + k * Math.PI / 6, dr]); if (k && k < 6) cands.push([a0 - k * Math.PI / 6, dr]); } });
       var best = null;
       for (var i = 0; i < cands.length && !best; i++) {
-        var a = cands[i], d = (L.r || 0) + pad, cx = L.x + Math.cos(a) * d, cy = L.y + Math.sin(a) * d;
+        var a = cands[i][0], d = (L.r || 0) + pad + cands[i][1], cx = L.x + Math.cos(a) * d, cy = L.y + Math.sin(a) * d;
         var bx = Math.cos(a) >= 0.3 ? cx : Math.cos(a) <= -0.3 ? cx - L.w : cx - L.w / 2;
         var by = Math.sin(a) >= 0.3 ? cy : Math.sin(a) <= -0.3 ? cy - L.h : cy - L.h / 2;
         var box = { x: bx, y: by, w: L.w, h: L.h };

@@ -1507,9 +1507,11 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     G.toWorld = function (sx, sy) { var f = G.fit, v = G.view; return [(sx - f.cx) / (f.s * v.zoom) + v.x, (sy - f.cy) / (f.s * v.zoom) + v.y]; };
     G.scale = function () { return G.fit.s * G.view.zoom; };
     /* вписать мир (bbox) в кадр с полями 6 % */
-    G.fitTo = function (W, H, bbox) {
-      var m = Math.min(W, H) * 0.06, s = Math.min((W - 2 * m) / (bbox[2] - bbox[0]), (H - 2 * m) / (bbox[3] - bbox[1]));
-      G.fit = { s: s, cx: W / 2, cy: H / 2 };
+    /* pad = {top, bottom, left, right} в px сверх полей 6 %: место под шапку и легенду сцены */
+    G.fitTo = function (W, H, bbox, pad) {
+      pad = pad || {}; var m = Math.min(W, H) * 0.06, t = m + (pad.top || 0), b = m + (pad.bottom || 0), l = m + (pad.left || 0), r = m + (pad.right || 0);
+      var s = Math.min((W - l - r) / (bbox[2] - bbox[0]), (H - t - b) / (bbox[3] - bbox[1]));
+      G.fit = { s: s, cx: l + (W - l - r) / 2, cy: t + (H - t - b) / 2 };
       G.home = { zoom: 1, x: (bbox[0] + bbox[2]) / 2, y: (bbox[1] + bbox[3]) / 2 };
       if (!G.viewT && !G._viewed) { G.view = Object.assign({}, G.home); G._viewed = true; }
     };
@@ -2103,10 +2105,12 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
   function place(labels, obstacles, bounds) {
     var taken = (obstacles || []).slice(), out = [];
     labels.forEach(function (L) {
-      var pad = L.pad || 4, cands = [L.angle || 0, (L.angle || 0) + Math.PI / 2, (L.angle || 0) - Math.PI / 2, (L.angle || 0) + Math.PI];
+      // кандидаты: по направлению наружу, затем веером ±30°…±180° от него, на двух радиусах
+      var pad = L.pad || 4, a0 = L.angle || 0, cands = [], radii = [0, L.h || 0];
+      radii.forEach(function (dr) { for (var k = 0; k <= 6; k++) { cands.push([a0 + k * Math.PI / 6, dr]); if (k && k < 6) cands.push([a0 - k * Math.PI / 6, dr]); } });
       var best = null;
       for (var i = 0; i < cands.length && !best; i++) {
-        var a = cands[i], d = (L.r || 0) + pad, cx = L.x + Math.cos(a) * d, cy = L.y + Math.sin(a) * d;
+        var a = cands[i][0], d = (L.r || 0) + pad + cands[i][1], cx = L.x + Math.cos(a) * d, cy = L.y + Math.sin(a) * d;
         var bx = Math.cos(a) >= 0.3 ? cx : Math.cos(a) <= -0.3 ? cx - L.w : cx - L.w / 2;
         var by = Math.sin(a) >= 0.3 ? cy : Math.sin(a) <= -0.3 ? cy - L.h : cy - L.h / 2;
         var box = { x: bx, y: by, w: L.w, h: L.h };
