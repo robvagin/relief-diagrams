@@ -85,24 +85,23 @@
     id: 'gate', title: 'Gate · Mobile',
     blurb: 'Check before action as a Calder mobile: each check hangs on its own arm; a passed check lifts and settles, a blocked one lies flat on the floor.',
     groups: G.rows,
-    init: function (ctx) { O.attach(ctx.canvas, function () { }); },
     draw: function (ctx) {
       var P = ctx.P, data = ctx.data || R.data(), M = G.pick(data, P), tsec = R.motion.time(ctx);
       var tr = G.track(P, M, tsec, ctx.reduced, null);
       var Lo = fit(ctx, layout(ctx, M, tr, tsec), layout(Object.assign({}, ctx, { reduced: true }), M, tr, 0)), ui = Lo.ui;
-      var V = O.frame(ctx, Lo.els.map(function (e, i) {
+      var V = O.frame(ctx, 'gate1/' + M.dec.id + '/' + M.steps.length, Lo.els.map(function (e, i) {
         return { id: e.step.id, x: e.x, y: e.y, r: (e.z.kind === 'circle' ? e.z.w / 2 : Math.max(e.z.w, e.z.h) / 2),
           nb: [Lo.els[i - 1], Lo.els[i + 1]].filter(Boolean).map(function (q) { return q.step.id; }) };
       }));
-      var plates = Lo.els.map(function (e, i) {
-        var o = V.off(e.step.id), lift = V.lift(e.step.id), zp = G.zpx(e.st.lv + lift * 0.9, P, ui);
-        var sp = O.toScreen(e.x + o.x, e.y + o.y, zp);
-        e.sx = sp[0]; e.sy = sp[1];
+      var TN = R.material.tints(R.tokens(ctx.theme, P.accent), +P.temp || 0);
+      var plates = Lo.els.map(function (e) {
+        var lift = V.lift(e.step.id), zp = G.zpx(e.st.lv + (e.st.flat ? 0 : lift * 0.9), P, ui);
+        var sp = V.pos(e.step.id, zp);
+        e.sx = sp[0]; e.sy = sp[1]; e.k = V.k;
         return { id: e.step.id, kind: e.z.kind, x: sp[0], y: sp[1], w: e.z.w * V.k, h: (e.z.h || e.z.w) * V.k, r: e.z.kind === 'rect' ? 3 * ui : null,
-          rot: e.rot, z: zp, env: e.st.env, step: e.step, el: e };
+          rot: e.rot, z: zp, env: e.st.env, step: e.step, el: e, fill: V.fade(e.step.id) > 0.01 ? O.fadeFill({ tn: TN }, V.fade(e.step.id)) : null };
       });
-      O.state.nodes.forEach(function (n, i) { n.sx = Lo.els[i].sx; n.sy = Lo.els[i].sy; });
-      var scr = function (p) { return O.toScreen(p[0], p[1], 0); };
+      var scr = function (p) { return V.pt(p, 0); };
       R.frame(ctx, {
         plates: plates,
         floor: function (g, F) {
@@ -110,7 +109,7 @@
           // нити и коромысла: одна толщина, мягкие кривые, узлы подвеса кольцами (ни одного прямого угла)
           Lo.wires.forEach(function (w) {
             var pts = w.pts.map(scr);
-            if (w.el != null) { var e = Lo.els[w.el]; pts[0] = [e.sx + (pts[0][0] - scr([e.x, e.y])[0]), e.sy - e.half * V.k];
+            if (w.el != null) { var e = Lo.els[w.el]; pts[0] = [e.sx + (pts[0][0] - scr([e.x, e.y])[0]), e.sy - e.half * V.k * Math.cos(e.rot || 0)];
               if (e.st.flat) { var q = pts[pts.length - 1]; pts.splice(1, 0, [(pts[0][0] + q[0]) / 2 + 14 * ui, (pts[0][1] + q[1]) / 2 + 10 * ui]); } }
             if (w.dec != null) { var d = Lo.els[w.dec]; pts[2] = [d.sx, d.sy - d.half * V.k]; }
             O.stem(g, F, pts, { tone: w.tone, alpha: w.a, t: 0.6 });
@@ -133,7 +132,7 @@
           F.plates.forEach(function (s) {
             var e = s.src.el;
             if (e && e.st.st === 'fail') G.blockRing(g, F, s);
-            if (O.state.focus === s.id) { g.save(); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.8); g.setLineDash([3 * ui, 3 * ui]);
+            if (V.focus === s.id) { g.save(); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.8); g.setLineDash([3 * ui, 3 * ui]);
               g.beginPath(); g.arc(s.x, s.y, Math.max(s.w, s.h) / 2 + 9 * ui, 0, Math.PI * 2); g.stroke(); g.restore(); }
           });
         }
