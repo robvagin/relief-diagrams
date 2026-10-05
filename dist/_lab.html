@@ -859,109 +859,136 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
 </script>
 <script>
 /* инлайн: src/light/shade.js · правится ИСТОЧНИК, не этот файл */
-/* light/shade.js · маски затенения по приёмникам (README §7.3, L1, L2).
-   Для каждого приёмника (пол, каждая плашка) считается своё поле затенения от всех, кто выше:
-   Δh постоянна на паре «заслонитель · приёмник», значит сдвиг, σ и плотность тоже; покрытие
-   читается из поля расстояний (light/sdf.js). Объединение заслонителей = максимум, не сумма.
-   Контакт и «юбка» (AO у опоры) — тем же полем расстояний, отдельным слоем.
-   Поле живёт в ½ CSS-разрешения на больших кадрах (размытие прячет), кладётся одним multiply. */
+/* light/shade.js · тени по приёмникам (README §7.3, L1, L2) в бюджете кадра (canvas-frame-budget).
+   Для каждого приёмника (пол, каждая плашка) — своё поле затенения от всех, кто выше: Δh постоянна
+   на паре «заслонитель · приёмник», значит сдвиг, σ и плотность тоже.
+   Покрытие читается из поля расстояний (light/sdf.js: Φ(−sd/σ)) ОДИН раз на спрайт
+   (форма, σ с шагом 0,25 px, плотность с шагом 0,005); плавание двигает спрайт, не пересчитывая его.
+   Спрайт хранится сразу множителем тона тени M = 1 − k·(1 − tint)/(1 − Y); M монотонно убывает по k,
+   поэтому объединение заслонителей «максимум затемнения» = минимум множителей = composite 'darken'
+   (не сумма). Контакт и «юбка» AO — такие же спрайты. Поле кладётся на кадр одним multiply. Пятно лампы и листва — свои кешированные слои multiply (shade.pool, shade.canopy). */
 (function () {
   'use strict';
   var R = window.RELIEF = window.RELIEF || {};
-  var SD = function () { return R.sdf; };
 
-  var scratch = null, sg = null;
-  function scratchFor(w, h) {
-    if (!scratch) { scratch = document.createElement('canvas'); sg = scratch.getContext('2d'); }
-    if (scratch.width < w || scratch.height < h) {
-      scratch.width = Math.max(scratch.width, w, 64); scratch.height = Math.max(scratch.height, h, 64);
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = Math.max(1, w); c.height = Math.max(1, h); return c; }
+  function ensure(c, w, h) { if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); } }
+
+  /* ── спрайты: покрытие из поля расстояний, один раз на ключ ─────────── */
+  var SPR = new Map(), LIMIT = 600;
+  function sprite(c, sig, dens, tint) {
+    var sq = Math.max(0.25, Math.round(sig * 4) / 4), dq = Math.round(dens * 200) / 200;
+    if (dq <= 0) return null;
+    var key = [tint.join(','), c.kind, c.w.toFixed(1), c.h.toFixed(1), (c.r || 0).toFixed(1), sq, dq, c.holes ? JSON.stringify(c.holes) : ''].join('|');
+    var s = SPR.get(key);
+    if (s) { SPR.delete(key); SPR.set(key, s); return s; }      // LRU: свежий в конец
+    var pad = Math.ceil(3.4 * sq) + 2, w = Math.ceil(c.w) + 2 * pad, h = Math.ceil(c.h) + 2 * pad;
+    var cv = canvas(w, h), g = cv.getContext('2d'), im = g.createImageData(w, h), d = im.data;
+    var shape = { kind: c.kind, x: w / 2, y: h / 2, w: c.w, h: c.h, r: c.r, holes: c.holes };
+    var sd = R.sdf.sd, cover = R.sdf.cover;
+    for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) {
+      var v = Math.min(1, dq * cover(sd(shape, i + 0.5, j + 0.5), sq)), p = (j * w + i) * 4;
+      d[p] = Math.round(255 - v * (255 - tint[0])); d[p + 1] = Math.round(255 - v * (255 - tint[1]));
+      d[p + 2] = Math.round(255 - v * (255 - tint[2])); d[p + 3] = 255;
     }
-    return sg;
+    g.putImageData(im, 0, 0);
+    s = { cv: cv, w: w, h: h };
+    SPR.set(key, s);
+    if (SPR.size > LIMIT) SPR.delete(SPR.keys().next().value);
+    return s;
   }
 
-  /* Поле затенения приёмника высоты hr в прямоугольнике (x0,y0,w,h).
-     occs: формы (w, h — размер) с полем z (высота над полом). Возвращает {k: Float32Array, fw, fh, s} или null */
-  function field(L, rect, hr, occs, opts) {
-    var s = opts.scale, x0 = rect[0], y0 = rect[1];
-    var fw = Math.max(1, Math.ceil(rect[2] * s)), fh = Math.max(1, Math.ceil(rect[3] * s));
-    var n = fw * fh, Sd = null, So = null, Cd = null, any = false;
-    var sd = SD().sd, cover = SD().cover, ui = L.ui;
-    for (var ci = 0; ci < occs.length; ci++) {
-      var c = occs[ci], dh = c.z - hr;
+  var dark = canvas(64, 64), dg = dark.getContext('2d');
+  var tmp = canvas(64, 64), tg = tmp.getContext('2d');
+
+  function stamp(sp, c, ox, oy, x0, y0) {
+    dg.save();
+    dg.translate(c.x + ox - x0, c.y + oy - y0);
+    if (c.rot) dg.rotate(c.rot);
+    dg.drawImage(sp.cv, -sp.w / 2, -sp.h / 2);
+    dg.restore();
+  }
+
+  /* Поле на прямоугольник rect = [x, y, w, h] приёмника высоты hr; occs: формы (w, h — размер) с z.
+     Возвращает поле-множитель {cv, x, y, w, h} или null; кладёт его на кадр shade.put (multiply). */
+  function layer(L, rect, hr, occs, tint) {
+    var x0 = Math.floor(rect[0]), y0 = Math.floor(rect[1]), w = Math.ceil(rect[2]), h = Math.ceil(rect[3]);
+    var ys = (0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2]) / 255, inv = 1 / Math.max(0.05, 1 - ys), ui = L.ui;
+    var started = false;
+    for (var i = 0; i < occs.length; i++) {
+      var c = occs[i], dh = c.z - hr;
       if (dh <= 1e-3 || c.noShadow) continue;
-      var o = R.light.offset(L, c.x, c.y, c.z, hr);
-      var sig = R.light.sigma(L, dh), D = R.light.density(L, dh);
-      var cont = dh <= 16 * ui, sc = (0.8 + 0.06 * dh / ui) * ui, oc = [0.25 * o[0], 0.25 * o[1]];
-      // «юбка» AO у опоры: 0,04 при контакте по умолчанию (0,12); ручка Контакт ведёт весь контактный слой
-      var Dc = cont ? L.contact * Math.max(0, 1 - dh / (16 * ui)) : 0, skirt = cont ? 0.04 * Math.min(2, L.contact / 0.12) : 0, ss = 2 * ui;
-      var ex = SD().extent(c);
-      var reach = 3.2 * sig, reachC = 3.2 * Math.max(sc, ss);
-      var bx0 = Math.min(c.x + o[0] - ex[0] - reach, cont ? c.x - ex[0] - reachC : 1e9);
-      var bx1 = Math.max(c.x + o[0] + ex[0] + reach, cont ? c.x + ex[0] + reachC : -1e9);
-      var by0 = Math.min(c.y + o[1] - ex[1] - reach, cont ? c.y - ex[1] - reachC : 1e9);
-      var by1 = Math.max(c.y + o[1] + ex[1] + reach, cont ? c.y + ex[1] + reachC : -1e9);
-      var i0 = Math.max(0, Math.floor((bx0 - x0) * s)), i1 = Math.min(fw - 1, Math.ceil((bx1 - x0) * s));
-      var j0 = Math.max(0, Math.floor((by0 - y0) * s)), j1 = Math.min(fh - 1, Math.ceil((by1 - y0) * s));
-      if (i0 > i1 || j0 > j1) continue;
-      if (!Sd) { Sd = new Float32Array(n); So = new Float32Array(n); Cd = new Float32Array(n); }
-      any = true;
-      var cut = 4.2 * sig, cutC = 4.2 * Math.max(sc, ss);
-      for (var j = j0; j <= j1; j++) {
-        var py = y0 + (j + 0.5) / s, row = j * fw;
-        for (var i = i0; i <= i1; i++) {
-          var px = x0 + (i + 0.5) / s, k = row + i;
-          var d = sd(c, px - o[0], py - o[1]);
-          if (d < cut) {
-            var cv = cover(d, sig), v = D * cv;
-            if (v > Sd[k]) Sd[k] = v;
-            if (cv > So[k]) So[k] = cv;
-          }
-          if (cont) {
-            var d0 = sd(c, px - oc[0], py - oc[1]);
-            if (d0 < cutC) {
-              var vc = Dc * cover(d0, sc) + skirt * cover(sd(c, px, py), ss);
-              if (vc > Cd[k]) Cd[k] = vc;
-            }
-          }
-        }
+      var o = R.light.offset(L, c.x, c.y, c.z, hr), sig = R.light.sigma(L, dh), D = R.light.density(L, dh);
+      var ex = R.sdf.extent(c), reach = 3.4 * sig + 2, cont = dh <= 16 * ui;
+      // отсев: след не задевает приёмник
+      var fx0 = Math.min(c.x + o[0], c.x) - ex[0] - reach, fx1 = Math.max(c.x + o[0], c.x) + ex[0] + reach;
+      var fy0 = Math.min(c.y + o[1], c.y) - ex[1] - reach, fy1 = Math.max(c.y + o[1], c.y) + ex[1] + reach;
+      if (fx1 < x0 || fx0 > x0 + w || fy1 < y0 || fy0 > y0 + h) continue;
+      if (!started) {
+        ensure(dark, w, h);
+        dg.setTransform(1, 0, 0, 1, 0, 0); dg.globalCompositeOperation = 'source-over';
+        dg.fillStyle = 'rgb(255,255,255)'; dg.fillRect(0, 0, w, h);
+        dg.globalCompositeOperation = 'darken';
+        started = true;
+      }
+      var sp = sprite(c, sig, Math.min(1, D * inv), tint);
+      if (sp) stamp(sp, c, o[0], o[1], x0, y0);
+      if (cont) {
+        // контакт: σ = 0,8 + 0,06·h, сдвиг 0,25·o, плотность contact·(1 − h/16); «юбка» AO σ 2 px,
+        // 0,04 при контакте по умолчанию (0,12): ручка Контакт ведёт весь контактный слой
+        var sc = (0.8 + 0.06 * dh / ui) * ui, Dc = L.contact * Math.max(0, 1 - dh / (16 * ui));
+        var sk = 0.04 * Math.min(2, L.contact / 0.12);
+        var spc = sprite(c, sc, Math.min(1, Dc * inv), tint); if (spc) stamp(spc, c, 0.25 * o[0], 0.25 * o[1], x0, y0);
+        var sps = sprite(c, 2 * ui, Math.min(1, sk * inv), tint); if (sps) stamp(sps, c, 0, 0, x0, y0);
       }
     }
-    var lamp = L.mode === 'lamp' && L.lamp.pool > 0, can = L.canopy > 0 && opts.G;
-    if (!any && !lamp && !can) return null;
-    var K = new Float32Array(n), G = opts.G, dirFrac = (1 - L.amb) * Math.sin(L.elev) / L.E0;
-    for (var jj = 0; jj < fh; jj++) {
-      var yy = y0 + (jj + 0.5) / s, rr = jj * fw;
-      for (var ii = 0; ii < fw; ii++) {
-        var kk = rr + ii, keep = 1, so = 0;
-        if (Sd) { keep = (1 - Sd[kk]) * (1 - Cd[kk]); so = So[kk]; }
-        if (lamp) keep *= R.light.lampLit(L, x0 + (ii + 0.5) / s, yy, hr);
-        // листва гасит только прямой свет и только там, где его не забрали плашки (L1)
-        if (can) keep *= 1 - Math.min(0.95, L.canopy * 2.2) * dirFrac * (1 - G.at(x0 + (ii + 0.5) / s, yy)) * (1 - so);
-        K[kk] = 1 - keep;
-      }
-    }
-    return { k: K, fw: fw, fh: fh, s: s };
+    if (!started) return null;
+    // поле уходит в собственный холст: рельс держит его в кеше и кладёт multiply сколько угодно кадров
+    var out = canvas(w, h); out.getContext('2d').drawImage(dark, 0, 0, w, h, 0, 0, w, h);
+    return { cv: out, x: x0, y: y0, w: w, h: h };
   }
-
-  /* Положить поле одним проходом multiply тоном тени: a = k/(1 − Y(tint)) */
-  function apply(g, F, rect, tint) {
+  function put(g, F) {
     if (!F) return;
-    var ys = (0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2]) / 255, inv = 1 / Math.max(0.05, 1 - ys);
-    var sgc = scratchFor(F.fw, F.fh), img = sgc.createImageData(F.fw, F.fh), d = img.data, K = F.k;
-    var r = tint[0], gg = tint[1], b = tint[2];
-    for (var i = 0, p = 0; i < K.length; i++, p += 4) {
-      var a = K[i] * inv; if (a > 1) a = 1;
-      d[p] = r; d[p + 1] = gg; d[p + 2] = b; d[p + 3] = a * 255 + 0.5;
-    }
-    sgc.putImageData(img, 0, 0);
-    g.save();
-    g.globalCompositeOperation = 'multiply';
-    g.imageSmoothingEnabled = true;
-    g.drawImage(scratch, 0, 0, F.fw, F.fh, rect[0], rect[1], F.fw / F.s, F.fh / F.s);
-    g.restore();
+    g.save(); g.globalCompositeOperation = 'multiply';
+    g.drawImage(F.cv, F.x, F.y); g.restore();
   }
 
-  R.shade = { field: field, apply: apply };
+  /* ── пятно лампы: lit = mix(1, E^0.6, pool), E = cos³; кеш на размер и лампу, ¼ разрешения ── */
+  var poolCache = null;
+  function pool(g, L, W, H, tint) {
+    if (L.mode !== 'lamp' || !(L.lamp.pool > 0)) return;
+    var key = [W, H, L.lamp.x, L.lamp.y, L.lamp.h, L.lamp.pool, tint.join(',')].join('|');
+    if (!poolCache || poolCache.key !== key) {
+      var q = 0.25, w = Math.ceil(W * q), h = Math.ceil(H * q), cv = canvas(w, h), cg = cv.getContext('2d'), im = cg.createImageData(w, h);
+      var ys = (0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2]) / 255, inv = 1 / Math.max(0.05, 1 - ys);
+      for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) {
+        var k = Math.min(1, (1 - R.light.lampLit(L, (i + 0.5) / q, (j + 0.5) / q, 0)) * inv), p = (j * w + i) * 4;
+        for (var ch = 0; ch < 3; ch++) im.data[p + ch] = Math.round(255 * (1 - k + k * tint[ch] / 255));
+        im.data[p + 3] = 255;
+      }
+      cg.putImageData(im, 0, 0);
+      poolCache = { key: key, cv: cv };
+    }
+    g.save(); g.globalCompositeOperation = 'multiply'; g.imageSmoothingEnabled = true;
+    g.drawImage(poolCache.cv, 0, 0, W, H); g.restore();
+  }
+
+  /* ── листва: множитель 1 − a·(1 − G) на прямой свет, a = canopy·доля прямого света ── */
+  function canopy(g, L, W, H, G) {
+    if (!G || !(L.canopy > 0)) return;
+    var dirFrac = (1 - L.amb) * Math.sin(L.elev) / L.E0, a = Math.min(0.95, L.canopy * 2.2) * dirFrac;
+    var w = G.cv.width, h = G.cv.height;
+    ensure(tmp, w, h);
+    tg.setTransform(1, 0, 0, 1, 0, 0); tg.globalAlpha = 1; tg.globalCompositeOperation = 'source-over';
+    var base = Math.round(255 * (1 - a));
+    tg.fillStyle = 'rgb(' + base + ',' + base + ',' + base + ')'; tg.fillRect(0, 0, w, h);
+    tg.globalCompositeOperation = 'lighter'; tg.globalAlpha = a; tg.drawImage(G.cv, 0, 0);
+    tg.globalAlpha = 1;
+    g.save(); g.globalCompositeOperation = 'multiply'; g.imageSmoothingEnabled = true;
+    g.drawImage(tmp, 0, 0, w, h, 0, 0, W, H); g.restore();
+  }
+
+  R.shade = { layer: layer, put: put, pool: pool, canopy: canopy, sprite: sprite };
 })();
 </script>
 <script>
@@ -971,7 +998,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
    листья дают резкую кромку, дальние мягкую, а просветы проецируются круглыми «зайчиками»
    с логарифмическим спадом яркости. Ветер тремя полосами (ствол · ветка · лист, иерархия
    пружин из eljojo/komorebi, только прочитано). Маска G ∈ [0,1] умножает ТОЛЬКО прямой свет:
-   её читает light/shade.js, отдельного слоя «поверх» нет (L1). Офскрин ¼ разрешения. */
+   её кладёт light/shade.js множителем 1 − a·(1 − G), a = листва × доля прямого света (L1). Офскрин ¼ разрешения. */
 (function () {
   'use strict';
   var R = window.RELIEF = window.RELIEF || {};
@@ -1000,10 +1027,13 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
   }
 
   /* Маска G для кадра: w = 2π·(t mod P)/P, полосы ветра k=1 (6 px), 3 (2.5 px), 12 (0.8 px) × порыв */
+  var last = null;
   function mask(seed, W, H, ui, tsec, period, still) {
+    var mkey = [R.streamBase, seed, W, H, ui, still ? 0 : tsec, period].join('|');
+    if (last && last.key === mkey) return last;                 // тот же tq — та же маска
     var c = layout(seed, W, H, ui);
     var fw = Math.max(8, Math.ceil(W * Q)), fh = Math.max(8, Math.ceil(H * Q));
-    if (!cv) { cv = document.createElement('canvas'); cg = cv.getContext('2d', { willReadFrequently: true });
+    if (!cv) { cv = document.createElement('canvas'); cg = cv.getContext('2d');
       lay = document.createElement('canvas'); lg = lay.getContext('2d'); }
     if (cv.width !== fw || cv.height !== fh) { cv.width = lay.width = fw; cv.height = lay.height = fh; }
     var w = still ? 0 : TAU * ((tsec % period) / period);
@@ -1047,17 +1077,8 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
       cg.beginPath(); cg.arc((s.x + band(1, 6, c.trunk[0]) * gust) * Q, (s.y + band(1, 3, c.trunk[1]) * gust) * Q, s.rad * Q, 0, TAU); cg.fill();
     }
     cg.filter = 'none'; cg.globalCompositeOperation = 'source-over';
-    var d = cg.getImageData(0, 0, fw, fh).data, A = new Float32Array(fw * fh);
-    for (var p = 0, q = 0; q < A.length; p += 4, q++) A[q] = d[p] / 255;
-    return {
-      fw: fw, fh: fh, A: A,
-      at: function (x, y) {
-        var fx = Math.max(0, Math.min(fw - 1.001, x * Q - 0.5)), fy = Math.max(0, Math.min(fh - 1.001, y * Q - 0.5));
-        var ix = fx | 0, iy = fy | 0, tx = fx - ix, ty = fy - iy, o = iy * fw + ix;
-        var a0 = A[o] + (A[o + 1] - A[o]) * tx, a1 = A[o + fw] + (A[o + fw + 1] - A[o + fw]) * tx;
-        return a0 + (a1 - a0) * ty;
-      }
-    };
+    last = { key: mkey, cv: cv, fw: fw, fh: fh };
+    return last;          // shade.canopy кладёт маску multiply-слоем, без чтения пикселей
   }
 
   R.canopy = { mask: mask, layout: layout };
@@ -1086,8 +1107,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
 
   /* ── неровность: value-noise на сетке ⅙ кадра, ±uneven %, бикубически сглажено апскейлом ── */
   var unevenCache = null;
-  function uneven(g, W, H, seed, pct, T) {
-    if (!(pct > 0)) return;
+  function unevenTiles(W, H, seed, pct, T) {
     var key = [R.streamBase, W, H, seed, pct, T.theme].join('|');
     if (!unevenCache || unevenCache.key !== key) {
       var cols = 8, rows = Math.max(4, Math.round(8 * H / W)), r = R.stream(seed, 'uneven'), vals = [];
@@ -1108,6 +1128,11 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
       };
       unevenCache = { key: key, pos: mk(1), neg: mk(-1) };
     }
+    return unevenCache;
+  }
+  function uneven(g, W, H, seed, pct, T) {
+    if (!(pct > 0)) return;
+    unevenTiles(W, H, seed, pct, T);
     g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
     g.globalCompositeOperation = 'lighter'; g.drawImage(unevenCache.pos, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
     g.globalCompositeOperation = 'multiply'; g.drawImage(unevenCache.neg, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
@@ -1179,7 +1204,42 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     g.restore();
   }
 
-  R.material = { tints: tints, uneven: uneven, grain: grain, rim: rim, loadNoise: loadNoise };
+  /* ── вещество кадра: неровность + зерно статичны, поэтому печатаются один раз в два полноразмерных
+     холста (плюс — 'lighter', минус — 'multiply') и кладутся двумя проходами (бюджет кадра) ── */
+  var matCache = null;
+  function surface(g, W, H, seed, P, T) {
+    var cw = g.canvas.width, ch = g.canvas.height, gr = P.grain == null ? T.grainDefault : +P.grain, un = +P.uneven || 0;
+    if (!(gr > 0) && !(un > 0)) return;
+    var key = [R.streamBase, cw, ch, W, H, seed, gr, un, T.theme, !!noise].join('|');
+    if (!matCache || matCache.key !== key) {
+      var mk = function (fill) { var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+        var x = c.getContext('2d'); x.fillStyle = fill; x.fillRect(0, 0, cw, ch); return c; };
+      var pos = mk('rgb(0,0,0)'), neg = mk('rgb(255,255,255)'), pg = pos.getContext('2d'), ng = neg.getContext('2d');
+      var sx = cw / W, sy = ch / H;
+      [pg, ng].forEach(function (x) { x.setTransform(sx, 0, 0, sy, 0, 0); });
+      // неровность: тот же знак-раздел, что в uneven(), но в кеш
+      if (un > 0) {
+        var ut = unevenTiles(W, H, seed, un, T);
+        pg.imageSmoothingQuality = ng.imageSmoothingQuality = 'high';
+        pg.globalCompositeOperation = 'lighter'; pg.drawImage(ut.pos, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
+        ng.globalCompositeOperation = 'multiply'; ng.drawImage(ut.neg, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
+      }
+      if (gr > 0 && noise) {
+        var tiles = grainTiles(Math.round(gr * 10) / 10, T), r = R.stream(seed, 'grain');
+        var ox = Math.floor(r() * noise.w), oy = Math.floor(r() * noise.h);
+        pg.setTransform(1, 0, 0, 1, -ox, -oy); ng.setTransform(1, 0, 0, 1, -ox, -oy);
+        pg.globalCompositeOperation = 'lighter'; pg.fillStyle = pg.createPattern(tiles.pos, 'repeat'); pg.fillRect(0, 0, cw + ox, ch + oy);
+        ng.globalCompositeOperation = 'multiply'; ng.fillStyle = ng.createPattern(tiles.neg, 'repeat'); ng.fillRect(0, 0, cw + ox, ch + oy);
+      }
+      matCache = { key: key, pos: pos, neg: neg };
+    }
+    g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = 'lighter'; g.drawImage(matCache.pos, 0, 0);
+    g.globalCompositeOperation = 'multiply'; g.drawImage(matCache.neg, 0, 0);
+    g.restore();
+  }
+
+  R.material = { tints: tints, uneven: uneven, grain: grain, rim: rim, loadNoise: loadNoise, surface: surface };
 })();
 </script>
 <script>
@@ -1323,6 +1383,17 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     };
   };
 
+  /* ключ кеша теней: свет, тон, кадр и состояние плашек на tq (округлено до 1/64 px) */
+  function shadeKey(L, tn, W, H, ps) {
+    var q = function (v) { return Math.round(v * 64); };
+    var parts = [W, H, L.mode, q(L.az), q(L.elev), q(L.soft), q(L.dens), q(L.contact), q(L.lamp.x), q(L.lamp.y), q(L.lamp.h), q(L.ui), tn.shadow.join(',')];
+    for (var i = 0; i < ps.length; i++) {
+      var p = ps[i];
+      parts.push(p.kind, q(p.x), q(p.y), q(p.w), q(p.h), q(p.r || 0), q(p.rot || 0), q(p.z), p.noShadow ? 1 : 0, p.holes ? JSON.stringify(p.holes) : '');
+    }
+    return parts.join('|');
+  }
+
   /* uiScale §7.1 и единица раскладки u; толщина линии L7 */
   R.ui = function (W, H) { return Math.max(0.34, Math.min(1.6, Math.min(W / 1440, H / 900))); };
   R.lineW = function (ui) { var dpr = Math.min(2, window.devicePixelRatio || 1); return Math.max(1 / dpr, 1.25 * ui); };
@@ -1353,30 +1424,37 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     var F = { ctx: ctx, g: g, P: P, W: W, H: H, ui: ui, u: Math.min(W, H) / 48, T: T, tn: tn, L: L, tsec: tsec,
       lineW: R.lineW(ui), still: still };
 
-    var plates = (spec.plates || []).map(function (p, i) {
+    function place(p, i, ts) {
       var env = still ? 0 : (p.env == null ? 1 : p.env);
       var sz = p.kind === 'circle' ? p.w : p.h;
-      var m = R.motion.float(ctx.seed, p.id == null ? i : p.id, tsec, P, p.w, sz, p.z || 0, env);
-      var asm = (still || p.assembleIndex == null) ? 1 : R.motion.assemble(tsec, p.assembleIndex, +P.assemble);
+      var m = R.motion.float(ctx.seed, p.id == null ? i : p.id, ts, P, p.w, sz, p.z || 0, env);
+      var asm = (still || p.assembleIndex == null) ? 1 : R.motion.assemble(ts, p.assembleIndex, +P.assemble);
       return {
         id: p.id, kind: p.kind || 'rect', x: p.x + m.dx, y: p.y + m.dy, w: p.w, h: sz,
         r: p.r == null ? (+P.radius || 0) * ui : p.r, rot: (p.rot || 0) + m.rot, holes: p.holes,
         z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fill, noShadow: p.noShadow, ghost: p.ghost, src: p
       };
-    });
+    }
+    var plates = (spec.plates || []).map(function (p, i) { return place(p, i, tsec); });
+    /* бюджет кадра (Б2): поля теней строятся по состоянию на квантованном времени tq = ⌊кадр/4⌋·4,
+       плашки рисуются на точном t; за 4 кадра плавание уходит ≤ 0,09 px. Состояние на tq считается
+       заново, а не берётся из истории: кадр N одинаков при любом пути к нему (детерминизм) */
+    var fq = R.motion.clock.fps || 60, tq = still ? tsec : Math.floor(Math.round(tsec * fq) / 4) * 4 / fq;
+    var shadePl = tq === tsec ? plates : (spec.plates || []).map(function (p, i) { return place(p, i, tq); });
     F.plates = plates;
-    var occ = plates.filter(function (s) { return s.z > 0 && !s.noShadow; });
-    var scale = W * H > 700000 ? 0.5 : 1;
-    var G = (L.canopy > 0) ? R.canopy.mask(ctx.seed, W, H, ui, tsec, Math.max(1, +P.period || 36), still) : null;
+    var G = (L.canopy > 0) ? R.canopy.mask(ctx.seed, W, H, ui, tq, Math.max(1, +P.period || 36), still) : null;
+    var occ = shadePl.filter(function (s) { return s.z > 0 && !s.noShadow; });
     F.G = G;
+    var key = shadeKey(L, tn, W, H, shadePl), cache = R._shade && R._shade.key === key ? R._shade : (R._shade = { key: key, floor: undefined, plates: {} });
+
 
     g.save();
     // 1–2 · пол и печать на полу
     g.fillStyle = C.css(tn.ground); g.fillRect(0, 0, W, H);
     if (spec.floor) spec.floor(g, F);
     // 3–4 · тени и контакт на пол (+ пятно лампы и листва по прямому свету)
-    var floorRect = [0, 0, W, H];
-    R.shade.apply(g, R.shade.field(L, floorRect, 0, occ, { scale: scale, G: G }), floorRect, tn.shadow);
+    if (cache.floor === undefined) cache.floor = R.shade.layer(L, [0, 0, W, H], 0, occ, tn.shadow);
+    R.shade.put(g, cache.floor);
     // 5 · плашки по возрастанию высоты
     sortPlates(plates).forEach(function (s) {
       if (s.ghost) return;                       // пробы: «призрак» отбрасывает тень, но сам не рисуется
@@ -1385,16 +1463,20 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
       g.fillStyle = C.css(s.fill || tn.plate); g.fill('evenodd');
       g.clip('evenodd');
       if (spec.print) spec.print(g, s, F);
-      var above = occ.filter(function (c) { return c.z > s.z + 1e-3; });
-      var ex = R.sdf.extent(s);
-      var rect = [Math.floor(s.x - ex[0] - 2), Math.floor(s.y - ex[1] - 2), Math.ceil(2 * ex[0] + 4), Math.ceil(2 * ex[1] + 4)];
-      R.shade.apply(g, R.shade.field(L, rect, s.z, above, { scale: scale, G: G }), rect, tn.shadow);
+      var si = plates.indexOf(s), sq = shadePl[si] || s;
+      if (!(si in cache.plates)) {
+        var above = occ.filter(function (c) { return c.z > sq.z + 1e-3; }), ex = R.sdf.extent(sq);
+        var rect = [Math.floor(sq.x - ex[0] - 2), Math.floor(sq.y - ex[1] - 2), Math.ceil(2 * ex[0] + 4), Math.ceil(2 * ex[1] + 4)];
+        cache.plates[si] = R.shade.layer(L, rect, sq.z, above, tn.shadow);
+      }
+      R.shade.put(g, cache.plates[si]);
       g.restore();
       if (s.z > 0) R.material.rim(g, s, L, tn, +P.rim, ui);
     });
-    // 6 · неровность и зерно последними (зерно оно же дизер, P-L6)
-    R.material.uneven(g, W, H, ctx.seed, +P.uneven, T);
-    R.material.grain(g, ctx.seed, P.grain == null ? T.grainDefault : +P.grain, T);
+    // 6 · пятно лампы и листва (множители прямого света), затем неровность и зерно (зерно оно же дизер, P-L6)
+    R.shade.pool(g, L, W, H, tn.shadow);
+    R.shade.canopy(g, L, W, H, G);
+    R.material.surface(g, W, H, ctx.seed, P, T);
     g.restore();
     // 7 · слой взаимодействия
     if (spec.above) { g.save(); spec.above(g, F); g.restore(); }

@@ -3,7 +3,7 @@
    листья дают резкую кромку, дальние мягкую, а просветы проецируются круглыми «зайчиками»
    с логарифмическим спадом яркости. Ветер тремя полосами (ствол · ветка · лист, иерархия
    пружин из eljojo/komorebi, только прочитано). Маска G ∈ [0,1] умножает ТОЛЬКО прямой свет:
-   её читает light/shade.js, отдельного слоя «поверх» нет (L1). Офскрин ¼ разрешения. */
+   её кладёт light/shade.js множителем 1 − a·(1 − G), a = листва × доля прямого света (L1). Офскрин ¼ разрешения. */
 (function () {
   'use strict';
   var R = window.RELIEF = window.RELIEF || {};
@@ -32,10 +32,13 @@
   }
 
   /* Маска G для кадра: w = 2π·(t mod P)/P, полосы ветра k=1 (6 px), 3 (2.5 px), 12 (0.8 px) × порыв */
+  var last = null;
   function mask(seed, W, H, ui, tsec, period, still) {
+    var mkey = [R.streamBase, seed, W, H, ui, still ? 0 : tsec, period].join('|');
+    if (last && last.key === mkey) return last;                 // тот же tq — та же маска
     var c = layout(seed, W, H, ui);
     var fw = Math.max(8, Math.ceil(W * Q)), fh = Math.max(8, Math.ceil(H * Q));
-    if (!cv) { cv = document.createElement('canvas'); cg = cv.getContext('2d', { willReadFrequently: true });
+    if (!cv) { cv = document.createElement('canvas'); cg = cv.getContext('2d');
       lay = document.createElement('canvas'); lg = lay.getContext('2d'); }
     if (cv.width !== fw || cv.height !== fh) { cv.width = lay.width = fw; cv.height = lay.height = fh; }
     var w = still ? 0 : TAU * ((tsec % period) / period);
@@ -79,17 +82,8 @@
       cg.beginPath(); cg.arc((s.x + band(1, 6, c.trunk[0]) * gust) * Q, (s.y + band(1, 3, c.trunk[1]) * gust) * Q, s.rad * Q, 0, TAU); cg.fill();
     }
     cg.filter = 'none'; cg.globalCompositeOperation = 'source-over';
-    var d = cg.getImageData(0, 0, fw, fh).data, A = new Float32Array(fw * fh);
-    for (var p = 0, q = 0; q < A.length; p += 4, q++) A[q] = d[p] / 255;
-    return {
-      fw: fw, fh: fh, A: A,
-      at: function (x, y) {
-        var fx = Math.max(0, Math.min(fw - 1.001, x * Q - 0.5)), fy = Math.max(0, Math.min(fh - 1.001, y * Q - 0.5));
-        var ix = fx | 0, iy = fy | 0, tx = fx - ix, ty = fy - iy, o = iy * fw + ix;
-        var a0 = A[o] + (A[o + 1] - A[o]) * tx, a1 = A[o + fw] + (A[o + fw + 1] - A[o + fw]) * tx;
-        return a0 + (a1 - a0) * ty;
-      }
-    };
+    last = { key: mkey, cv: cv, fw: fw, fh: fh };
+    return last;          // shade.canopy кладёт маску multiply-слоем, без чтения пикселей
   }
 
   R.canopy = { mask: mask, layout: layout };

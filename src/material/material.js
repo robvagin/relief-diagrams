@@ -19,8 +19,7 @@
 
   /* ── неровность: value-noise на сетке ⅙ кадра, ±uneven %, бикубически сглажено апскейлом ── */
   var unevenCache = null;
-  function uneven(g, W, H, seed, pct, T) {
-    if (!(pct > 0)) return;
+  function unevenTiles(W, H, seed, pct, T) {
     var key = [R.streamBase, W, H, seed, pct, T.theme].join('|');
     if (!unevenCache || unevenCache.key !== key) {
       var cols = 8, rows = Math.max(4, Math.round(8 * H / W)), r = R.stream(seed, 'uneven'), vals = [];
@@ -41,6 +40,11 @@
       };
       unevenCache = { key: key, pos: mk(1), neg: mk(-1) };
     }
+    return unevenCache;
+  }
+  function uneven(g, W, H, seed, pct, T) {
+    if (!(pct > 0)) return;
+    unevenTiles(W, H, seed, pct, T);
     g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
     g.globalCompositeOperation = 'lighter'; g.drawImage(unevenCache.pos, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
     g.globalCompositeOperation = 'multiply'; g.drawImage(unevenCache.neg, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
@@ -112,5 +116,40 @@
     g.restore();
   }
 
-  R.material = { tints: tints, uneven: uneven, grain: grain, rim: rim, loadNoise: loadNoise };
+  /* ── вещество кадра: неровность + зерно статичны, поэтому печатаются один раз в два полноразмерных
+     холста (плюс — 'lighter', минус — 'multiply') и кладутся двумя проходами (бюджет кадра) ── */
+  var matCache = null;
+  function surface(g, W, H, seed, P, T) {
+    var cw = g.canvas.width, ch = g.canvas.height, gr = P.grain == null ? T.grainDefault : +P.grain, un = +P.uneven || 0;
+    if (!(gr > 0) && !(un > 0)) return;
+    var key = [R.streamBase, cw, ch, W, H, seed, gr, un, T.theme, !!noise].join('|');
+    if (!matCache || matCache.key !== key) {
+      var mk = function (fill) { var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+        var x = c.getContext('2d'); x.fillStyle = fill; x.fillRect(0, 0, cw, ch); return c; };
+      var pos = mk('rgb(0,0,0)'), neg = mk('rgb(255,255,255)'), pg = pos.getContext('2d'), ng = neg.getContext('2d');
+      var sx = cw / W, sy = ch / H;
+      [pg, ng].forEach(function (x) { x.setTransform(sx, 0, 0, sy, 0, 0); });
+      // неровность: тот же знак-раздел, что в uneven(), но в кеш
+      if (un > 0) {
+        var ut = unevenTiles(W, H, seed, un, T);
+        pg.imageSmoothingQuality = ng.imageSmoothingQuality = 'high';
+        pg.globalCompositeOperation = 'lighter'; pg.drawImage(ut.pos, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
+        ng.globalCompositeOperation = 'multiply'; ng.drawImage(ut.neg, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
+      }
+      if (gr > 0 && noise) {
+        var tiles = grainTiles(Math.round(gr * 10) / 10, T), r = R.stream(seed, 'grain');
+        var ox = Math.floor(r() * noise.w), oy = Math.floor(r() * noise.h);
+        pg.setTransform(1, 0, 0, 1, -ox, -oy); ng.setTransform(1, 0, 0, 1, -ox, -oy);
+        pg.globalCompositeOperation = 'lighter'; pg.fillStyle = pg.createPattern(tiles.pos, 'repeat'); pg.fillRect(0, 0, cw + ox, ch + oy);
+        ng.globalCompositeOperation = 'multiply'; ng.fillStyle = ng.createPattern(tiles.neg, 'repeat'); ng.fillRect(0, 0, cw + ox, ch + oy);
+      }
+      matCache = { key: key, pos: pos, neg: neg };
+    }
+    g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = 'lighter'; g.drawImage(matCache.pos, 0, 0);
+    g.globalCompositeOperation = 'multiply'; g.drawImage(matCache.neg, 0, 0);
+    g.restore();
+  }
+
+  R.material = { tints: tints, uneven: uneven, grain: grain, rim: rim, loadNoise: loadNoise, surface: surface };
 })();

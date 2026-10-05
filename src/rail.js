@@ -38,6 +38,17 @@
     };
   };
 
+  /* ключ кеша теней: свет, тон, кадр и состояние плашек на tq (округлено до 1/64 px) */
+  function shadeKey(L, tn, W, H, ps) {
+    var q = function (v) { return Math.round(v * 64); };
+    var parts = [W, H, L.mode, q(L.az), q(L.elev), q(L.soft), q(L.dens), q(L.contact), q(L.lamp.x), q(L.lamp.y), q(L.lamp.h), q(L.ui), tn.shadow.join(',')];
+    for (var i = 0; i < ps.length; i++) {
+      var p = ps[i];
+      parts.push(p.kind, q(p.x), q(p.y), q(p.w), q(p.h), q(p.r || 0), q(p.rot || 0), q(p.z), p.noShadow ? 1 : 0, p.holes ? JSON.stringify(p.holes) : '');
+    }
+    return parts.join('|');
+  }
+
   /* uiScale §7.1 и единица раскладки u; толщина линии L7 */
   R.ui = function (W, H) { return Math.max(0.34, Math.min(1.6, Math.min(W / 1440, H / 900))); };
   R.lineW = function (ui) { var dpr = Math.min(2, window.devicePixelRatio || 1); return Math.max(1 / dpr, 1.25 * ui); };
@@ -68,30 +79,37 @@
     var F = { ctx: ctx, g: g, P: P, W: W, H: H, ui: ui, u: Math.min(W, H) / 48, T: T, tn: tn, L: L, tsec: tsec,
       lineW: R.lineW(ui), still: still };
 
-    var plates = (spec.plates || []).map(function (p, i) {
+    function place(p, i, ts) {
       var env = still ? 0 : (p.env == null ? 1 : p.env);
       var sz = p.kind === 'circle' ? p.w : p.h;
-      var m = R.motion.float(ctx.seed, p.id == null ? i : p.id, tsec, P, p.w, sz, p.z || 0, env);
-      var asm = (still || p.assembleIndex == null) ? 1 : R.motion.assemble(tsec, p.assembleIndex, +P.assemble);
+      var m = R.motion.float(ctx.seed, p.id == null ? i : p.id, ts, P, p.w, sz, p.z || 0, env);
+      var asm = (still || p.assembleIndex == null) ? 1 : R.motion.assemble(ts, p.assembleIndex, +P.assemble);
       return {
         id: p.id, kind: p.kind || 'rect', x: p.x + m.dx, y: p.y + m.dy, w: p.w, h: sz,
         r: p.r == null ? (+P.radius || 0) * ui : p.r, rot: (p.rot || 0) + m.rot, holes: p.holes,
         z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fill, noShadow: p.noShadow, ghost: p.ghost, src: p
       };
-    });
+    }
+    var plates = (spec.plates || []).map(function (p, i) { return place(p, i, tsec); });
+    /* бюджет кадра (Б2): поля теней строятся по состоянию на квантованном времени tq = ⌊кадр/4⌋·4,
+       плашки рисуются на точном t; за 4 кадра плавание уходит ≤ 0,09 px. Состояние на tq считается
+       заново, а не берётся из истории: кадр N одинаков при любом пути к нему (детерминизм) */
+    var fq = R.motion.clock.fps || 60, tq = still ? tsec : Math.floor(Math.round(tsec * fq) / 4) * 4 / fq;
+    var shadePl = tq === tsec ? plates : (spec.plates || []).map(function (p, i) { return place(p, i, tq); });
     F.plates = plates;
-    var occ = plates.filter(function (s) { return s.z > 0 && !s.noShadow; });
-    var scale = W * H > 700000 ? 0.5 : 1;
-    var G = (L.canopy > 0) ? R.canopy.mask(ctx.seed, W, H, ui, tsec, Math.max(1, +P.period || 36), still) : null;
+    var G = (L.canopy > 0) ? R.canopy.mask(ctx.seed, W, H, ui, tq, Math.max(1, +P.period || 36), still) : null;
+    var occ = shadePl.filter(function (s) { return s.z > 0 && !s.noShadow; });
     F.G = G;
+    var key = shadeKey(L, tn, W, H, shadePl), cache = R._shade && R._shade.key === key ? R._shade : (R._shade = { key: key, floor: undefined, plates: {} });
+
 
     g.save();
     // 1–2 · пол и печать на полу
     g.fillStyle = C.css(tn.ground); g.fillRect(0, 0, W, H);
     if (spec.floor) spec.floor(g, F);
     // 3–4 · тени и контакт на пол (+ пятно лампы и листва по прямому свету)
-    var floorRect = [0, 0, W, H];
-    R.shade.apply(g, R.shade.field(L, floorRect, 0, occ, { scale: scale, G: G }), floorRect, tn.shadow);
+    if (cache.floor === undefined) cache.floor = R.shade.layer(L, [0, 0, W, H], 0, occ, tn.shadow);
+    R.shade.put(g, cache.floor);
     // 5 · плашки по возрастанию высоты
     sortPlates(plates).forEach(function (s) {
       if (s.ghost) return;                       // пробы: «призрак» отбрасывает тень, но сам не рисуется
@@ -100,16 +118,20 @@
       g.fillStyle = C.css(s.fill || tn.plate); g.fill('evenodd');
       g.clip('evenodd');
       if (spec.print) spec.print(g, s, F);
-      var above = occ.filter(function (c) { return c.z > s.z + 1e-3; });
-      var ex = R.sdf.extent(s);
-      var rect = [Math.floor(s.x - ex[0] - 2), Math.floor(s.y - ex[1] - 2), Math.ceil(2 * ex[0] + 4), Math.ceil(2 * ex[1] + 4)];
-      R.shade.apply(g, R.shade.field(L, rect, s.z, above, { scale: scale, G: G }), rect, tn.shadow);
+      var si = plates.indexOf(s), sq = shadePl[si] || s;
+      if (!(si in cache.plates)) {
+        var above = occ.filter(function (c) { return c.z > sq.z + 1e-3; }), ex = R.sdf.extent(sq);
+        var rect = [Math.floor(sq.x - ex[0] - 2), Math.floor(sq.y - ex[1] - 2), Math.ceil(2 * ex[0] + 4), Math.ceil(2 * ex[1] + 4)];
+        cache.plates[si] = R.shade.layer(L, rect, sq.z, above, tn.shadow);
+      }
+      R.shade.put(g, cache.plates[si]);
       g.restore();
       if (s.z > 0) R.material.rim(g, s, L, tn, +P.rim, ui);
     });
-    // 6 · неровность и зерно последними (зерно оно же дизер, P-L6)
-    R.material.uneven(g, W, H, ctx.seed, +P.uneven, T);
-    R.material.grain(g, ctx.seed, P.grain == null ? T.grainDefault : +P.grain, T);
+    // 6 · пятно лампы и листва (множители прямого света), затем неровность и зерно (зерно оно же дизер, P-L6)
+    R.shade.pool(g, L, W, H, tn.shadow);
+    R.shade.canopy(g, L, W, H, G);
+    R.material.surface(g, W, H, ctx.seed, P, T);
     g.restore();
     // 7 · слой взаимодействия
     if (spec.above) { g.save(); spec.above(g, F); g.restore(); }

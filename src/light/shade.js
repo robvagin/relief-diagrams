@@ -1,104 +1,131 @@
-/* light/shade.js · маски затенения по приёмникам (README §7.3, L1, L2).
-   Для каждого приёмника (пол, каждая плашка) считается своё поле затенения от всех, кто выше:
-   Δh постоянна на паре «заслонитель · приёмник», значит сдвиг, σ и плотность тоже; покрытие
-   читается из поля расстояний (light/sdf.js). Объединение заслонителей = максимум, не сумма.
-   Контакт и «юбка» (AO у опоры) — тем же полем расстояний, отдельным слоем.
-   Поле живёт в ½ CSS-разрешения на больших кадрах (размытие прячет), кладётся одним multiply. */
+/* light/shade.js · тени по приёмникам (README §7.3, L1, L2) в бюджете кадра (canvas-frame-budget).
+   Для каждого приёмника (пол, каждая плашка) — своё поле затенения от всех, кто выше: Δh постоянна
+   на паре «заслонитель · приёмник», значит сдвиг, σ и плотность тоже.
+   Покрытие читается из поля расстояний (light/sdf.js: Φ(−sd/σ)) ОДИН раз на спрайт
+   (форма, σ с шагом 0,25 px, плотность с шагом 0,005); плавание двигает спрайт, не пересчитывая его.
+   Спрайт хранится сразу множителем тона тени M = 1 − k·(1 − tint)/(1 − Y); M монотонно убывает по k,
+   поэтому объединение заслонителей «максимум затемнения» = минимум множителей = composite 'darken'
+   (не сумма). Контакт и «юбка» AO — такие же спрайты. Поле кладётся на кадр одним multiply. Пятно лампы и листва — свои кешированные слои multiply (shade.pool, shade.canopy). */
 (function () {
   'use strict';
   var R = window.RELIEF = window.RELIEF || {};
-  var SD = function () { return R.sdf; };
 
-  var scratch = null, sg = null;
-  function scratchFor(w, h) {
-    if (!scratch) { scratch = document.createElement('canvas'); sg = scratch.getContext('2d'); }
-    if (scratch.width < w || scratch.height < h) {
-      scratch.width = Math.max(scratch.width, w, 64); scratch.height = Math.max(scratch.height, h, 64);
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = Math.max(1, w); c.height = Math.max(1, h); return c; }
+  function ensure(c, w, h) { if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); } }
+
+  /* ── спрайты: покрытие из поля расстояний, один раз на ключ ─────────── */
+  var SPR = new Map(), LIMIT = 600;
+  function sprite(c, sig, dens, tint) {
+    var sq = Math.max(0.25, Math.round(sig * 4) / 4), dq = Math.round(dens * 200) / 200;
+    if (dq <= 0) return null;
+    var key = [tint.join(','), c.kind, c.w.toFixed(1), c.h.toFixed(1), (c.r || 0).toFixed(1), sq, dq, c.holes ? JSON.stringify(c.holes) : ''].join('|');
+    var s = SPR.get(key);
+    if (s) { SPR.delete(key); SPR.set(key, s); return s; }      // LRU: свежий в конец
+    var pad = Math.ceil(3.4 * sq) + 2, w = Math.ceil(c.w) + 2 * pad, h = Math.ceil(c.h) + 2 * pad;
+    var cv = canvas(w, h), g = cv.getContext('2d'), im = g.createImageData(w, h), d = im.data;
+    var shape = { kind: c.kind, x: w / 2, y: h / 2, w: c.w, h: c.h, r: c.r, holes: c.holes };
+    var sd = R.sdf.sd, cover = R.sdf.cover;
+    for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) {
+      var v = Math.min(1, dq * cover(sd(shape, i + 0.5, j + 0.5), sq)), p = (j * w + i) * 4;
+      d[p] = Math.round(255 - v * (255 - tint[0])); d[p + 1] = Math.round(255 - v * (255 - tint[1]));
+      d[p + 2] = Math.round(255 - v * (255 - tint[2])); d[p + 3] = 255;
     }
-    return sg;
+    g.putImageData(im, 0, 0);
+    s = { cv: cv, w: w, h: h };
+    SPR.set(key, s);
+    if (SPR.size > LIMIT) SPR.delete(SPR.keys().next().value);
+    return s;
   }
 
-  /* Поле затенения приёмника высоты hr в прямоугольнике (x0,y0,w,h).
-     occs: формы (w, h — размер) с полем z (высота над полом). Возвращает {k: Float32Array, fw, fh, s} или null */
-  function field(L, rect, hr, occs, opts) {
-    var s = opts.scale, x0 = rect[0], y0 = rect[1];
-    var fw = Math.max(1, Math.ceil(rect[2] * s)), fh = Math.max(1, Math.ceil(rect[3] * s));
-    var n = fw * fh, Sd = null, So = null, Cd = null, any = false;
-    var sd = SD().sd, cover = SD().cover, ui = L.ui;
-    for (var ci = 0; ci < occs.length; ci++) {
-      var c = occs[ci], dh = c.z - hr;
+  var dark = canvas(64, 64), dg = dark.getContext('2d');
+  var tmp = canvas(64, 64), tg = tmp.getContext('2d');
+
+  function stamp(sp, c, ox, oy, x0, y0) {
+    dg.save();
+    dg.translate(c.x + ox - x0, c.y + oy - y0);
+    if (c.rot) dg.rotate(c.rot);
+    dg.drawImage(sp.cv, -sp.w / 2, -sp.h / 2);
+    dg.restore();
+  }
+
+  /* Поле на прямоугольник rect = [x, y, w, h] приёмника высоты hr; occs: формы (w, h — размер) с z.
+     Возвращает поле-множитель {cv, x, y, w, h} или null; кладёт его на кадр shade.put (multiply). */
+  function layer(L, rect, hr, occs, tint) {
+    var x0 = Math.floor(rect[0]), y0 = Math.floor(rect[1]), w = Math.ceil(rect[2]), h = Math.ceil(rect[3]);
+    var ys = (0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2]) / 255, inv = 1 / Math.max(0.05, 1 - ys), ui = L.ui;
+    var started = false;
+    for (var i = 0; i < occs.length; i++) {
+      var c = occs[i], dh = c.z - hr;
       if (dh <= 1e-3 || c.noShadow) continue;
-      var o = R.light.offset(L, c.x, c.y, c.z, hr);
-      var sig = R.light.sigma(L, dh), D = R.light.density(L, dh);
-      var cont = dh <= 16 * ui, sc = (0.8 + 0.06 * dh / ui) * ui, oc = [0.25 * o[0], 0.25 * o[1]];
-      // «юбка» AO у опоры: 0,04 при контакте по умолчанию (0,12); ручка Контакт ведёт весь контактный слой
-      var Dc = cont ? L.contact * Math.max(0, 1 - dh / (16 * ui)) : 0, skirt = cont ? 0.04 * Math.min(2, L.contact / 0.12) : 0, ss = 2 * ui;
-      var ex = SD().extent(c);
-      var reach = 3.2 * sig, reachC = 3.2 * Math.max(sc, ss);
-      var bx0 = Math.min(c.x + o[0] - ex[0] - reach, cont ? c.x - ex[0] - reachC : 1e9);
-      var bx1 = Math.max(c.x + o[0] + ex[0] + reach, cont ? c.x + ex[0] + reachC : -1e9);
-      var by0 = Math.min(c.y + o[1] - ex[1] - reach, cont ? c.y - ex[1] - reachC : 1e9);
-      var by1 = Math.max(c.y + o[1] + ex[1] + reach, cont ? c.y + ex[1] + reachC : -1e9);
-      var i0 = Math.max(0, Math.floor((bx0 - x0) * s)), i1 = Math.min(fw - 1, Math.ceil((bx1 - x0) * s));
-      var j0 = Math.max(0, Math.floor((by0 - y0) * s)), j1 = Math.min(fh - 1, Math.ceil((by1 - y0) * s));
-      if (i0 > i1 || j0 > j1) continue;
-      if (!Sd) { Sd = new Float32Array(n); So = new Float32Array(n); Cd = new Float32Array(n); }
-      any = true;
-      var cut = 4.2 * sig, cutC = 4.2 * Math.max(sc, ss);
-      for (var j = j0; j <= j1; j++) {
-        var py = y0 + (j + 0.5) / s, row = j * fw;
-        for (var i = i0; i <= i1; i++) {
-          var px = x0 + (i + 0.5) / s, k = row + i;
-          var d = sd(c, px - o[0], py - o[1]);
-          if (d < cut) {
-            var cv = cover(d, sig), v = D * cv;
-            if (v > Sd[k]) Sd[k] = v;
-            if (cv > So[k]) So[k] = cv;
-          }
-          if (cont) {
-            var d0 = sd(c, px - oc[0], py - oc[1]);
-            if (d0 < cutC) {
-              var vc = Dc * cover(d0, sc) + skirt * cover(sd(c, px, py), ss);
-              if (vc > Cd[k]) Cd[k] = vc;
-            }
-          }
-        }
+      var o = R.light.offset(L, c.x, c.y, c.z, hr), sig = R.light.sigma(L, dh), D = R.light.density(L, dh);
+      var ex = R.sdf.extent(c), reach = 3.4 * sig + 2, cont = dh <= 16 * ui;
+      // отсев: след не задевает приёмник
+      var fx0 = Math.min(c.x + o[0], c.x) - ex[0] - reach, fx1 = Math.max(c.x + o[0], c.x) + ex[0] + reach;
+      var fy0 = Math.min(c.y + o[1], c.y) - ex[1] - reach, fy1 = Math.max(c.y + o[1], c.y) + ex[1] + reach;
+      if (fx1 < x0 || fx0 > x0 + w || fy1 < y0 || fy0 > y0 + h) continue;
+      if (!started) {
+        ensure(dark, w, h);
+        dg.setTransform(1, 0, 0, 1, 0, 0); dg.globalCompositeOperation = 'source-over';
+        dg.fillStyle = 'rgb(255,255,255)'; dg.fillRect(0, 0, w, h);
+        dg.globalCompositeOperation = 'darken';
+        started = true;
+      }
+      var sp = sprite(c, sig, Math.min(1, D * inv), tint);
+      if (sp) stamp(sp, c, o[0], o[1], x0, y0);
+      if (cont) {
+        // контакт: σ = 0,8 + 0,06·h, сдвиг 0,25·o, плотность contact·(1 − h/16); «юбка» AO σ 2 px,
+        // 0,04 при контакте по умолчанию (0,12): ручка Контакт ведёт весь контактный слой
+        var sc = (0.8 + 0.06 * dh / ui) * ui, Dc = L.contact * Math.max(0, 1 - dh / (16 * ui));
+        var sk = 0.04 * Math.min(2, L.contact / 0.12);
+        var spc = sprite(c, sc, Math.min(1, Dc * inv), tint); if (spc) stamp(spc, c, 0.25 * o[0], 0.25 * o[1], x0, y0);
+        var sps = sprite(c, 2 * ui, Math.min(1, sk * inv), tint); if (sps) stamp(sps, c, 0, 0, x0, y0);
       }
     }
-    var lamp = L.mode === 'lamp' && L.lamp.pool > 0, can = L.canopy > 0 && opts.G;
-    if (!any && !lamp && !can) return null;
-    var K = new Float32Array(n), G = opts.G, dirFrac = (1 - L.amb) * Math.sin(L.elev) / L.E0;
-    for (var jj = 0; jj < fh; jj++) {
-      var yy = y0 + (jj + 0.5) / s, rr = jj * fw;
-      for (var ii = 0; ii < fw; ii++) {
-        var kk = rr + ii, keep = 1, so = 0;
-        if (Sd) { keep = (1 - Sd[kk]) * (1 - Cd[kk]); so = So[kk]; }
-        if (lamp) keep *= R.light.lampLit(L, x0 + (ii + 0.5) / s, yy, hr);
-        // листва гасит только прямой свет и только там, где его не забрали плашки (L1)
-        if (can) keep *= 1 - Math.min(0.95, L.canopy * 2.2) * dirFrac * (1 - G.at(x0 + (ii + 0.5) / s, yy)) * (1 - so);
-        K[kk] = 1 - keep;
-      }
-    }
-    return { k: K, fw: fw, fh: fh, s: s };
+    if (!started) return null;
+    // поле уходит в собственный холст: рельс держит его в кеше и кладёт multiply сколько угодно кадров
+    var out = canvas(w, h); out.getContext('2d').drawImage(dark, 0, 0, w, h, 0, 0, w, h);
+    return { cv: out, x: x0, y: y0, w: w, h: h };
   }
-
-  /* Положить поле одним проходом multiply тоном тени: a = k/(1 − Y(tint)) */
-  function apply(g, F, rect, tint) {
+  function put(g, F) {
     if (!F) return;
-    var ys = (0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2]) / 255, inv = 1 / Math.max(0.05, 1 - ys);
-    var sgc = scratchFor(F.fw, F.fh), img = sgc.createImageData(F.fw, F.fh), d = img.data, K = F.k;
-    var r = tint[0], gg = tint[1], b = tint[2];
-    for (var i = 0, p = 0; i < K.length; i++, p += 4) {
-      var a = K[i] * inv; if (a > 1) a = 1;
-      d[p] = r; d[p + 1] = gg; d[p + 2] = b; d[p + 3] = a * 255 + 0.5;
-    }
-    sgc.putImageData(img, 0, 0);
-    g.save();
-    g.globalCompositeOperation = 'multiply';
-    g.imageSmoothingEnabled = true;
-    g.drawImage(scratch, 0, 0, F.fw, F.fh, rect[0], rect[1], F.fw / F.s, F.fh / F.s);
-    g.restore();
+    g.save(); g.globalCompositeOperation = 'multiply';
+    g.drawImage(F.cv, F.x, F.y); g.restore();
   }
 
-  R.shade = { field: field, apply: apply };
+  /* ── пятно лампы: lit = mix(1, E^0.6, pool), E = cos³; кеш на размер и лампу, ¼ разрешения ── */
+  var poolCache = null;
+  function pool(g, L, W, H, tint) {
+    if (L.mode !== 'lamp' || !(L.lamp.pool > 0)) return;
+    var key = [W, H, L.lamp.x, L.lamp.y, L.lamp.h, L.lamp.pool, tint.join(',')].join('|');
+    if (!poolCache || poolCache.key !== key) {
+      var q = 0.25, w = Math.ceil(W * q), h = Math.ceil(H * q), cv = canvas(w, h), cg = cv.getContext('2d'), im = cg.createImageData(w, h);
+      var ys = (0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2]) / 255, inv = 1 / Math.max(0.05, 1 - ys);
+      for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) {
+        var k = Math.min(1, (1 - R.light.lampLit(L, (i + 0.5) / q, (j + 0.5) / q, 0)) * inv), p = (j * w + i) * 4;
+        for (var ch = 0; ch < 3; ch++) im.data[p + ch] = Math.round(255 * (1 - k + k * tint[ch] / 255));
+        im.data[p + 3] = 255;
+      }
+      cg.putImageData(im, 0, 0);
+      poolCache = { key: key, cv: cv };
+    }
+    g.save(); g.globalCompositeOperation = 'multiply'; g.imageSmoothingEnabled = true;
+    g.drawImage(poolCache.cv, 0, 0, W, H); g.restore();
+  }
+
+  /* ── листва: множитель 1 − a·(1 − G) на прямой свет, a = canopy·доля прямого света ── */
+  function canopy(g, L, W, H, G) {
+    if (!G || !(L.canopy > 0)) return;
+    var dirFrac = (1 - L.amb) * Math.sin(L.elev) / L.E0, a = Math.min(0.95, L.canopy * 2.2) * dirFrac;
+    var w = G.cv.width, h = G.cv.height;
+    ensure(tmp, w, h);
+    tg.setTransform(1, 0, 0, 1, 0, 0); tg.globalAlpha = 1; tg.globalCompositeOperation = 'source-over';
+    var base = Math.round(255 * (1 - a));
+    tg.fillStyle = 'rgb(' + base + ',' + base + ',' + base + ')'; tg.fillRect(0, 0, w, h);
+    tg.globalCompositeOperation = 'lighter'; tg.globalAlpha = a; tg.drawImage(G.cv, 0, 0);
+    tg.globalAlpha = 1;
+    g.save(); g.globalCompositeOperation = 'multiply'; g.imageSmoothingEnabled = true;
+    g.drawImage(tmp, 0, 0, w, h, 0, 0, W, H); g.restore();
+  }
+
+  R.shade = { layer: layer, put: put, pool: pool, canopy: canopy, sprite: sprite };
 })();

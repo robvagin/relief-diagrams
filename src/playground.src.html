@@ -43,7 +43,8 @@ body{background:var(--pg-bg)}
 @media (max-width:1099px){
   .pg{grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"list list" "frame side"}
   #list{display:flex;gap:6px;align-items:center;overflow-x:auto;overflow-y:hidden;padding:10px 12px;white-space:nowrap}
-  #list .brand{margin:0 8px 0 0}
+  #list .brand{margin:0 8px 0 0;flex:none}
+  #items{display:flex;gap:4px;align-items:center;flex:none}
   #list .grp-h{margin:0 2px 0 10px}
   #list .grp-h .n{display:none}
   #list .it{width:auto;flex:none}
