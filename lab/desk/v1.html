@@ -2360,8 +2360,9 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     },
     // диск-бусина: одно число и подпись
     bead: function (label, value) {
-      return function (g, F, I, w) {
+      return function (g, F, I, w, h, n) {
         var r = w / 2, px = K.fit(g, F, value, r * 1.4, r * 0.5, { mono: true, weight: 500, min: 7 });
+        if (n && n.accDot) K.dot(g, 0, px * 0.34 + 8 * F.ui, Math.max(2.5, 3 * F.ui), I.acc);
         K.text(g, F, value, 0, px * 0.34, { px: px, mono: true, weight: 500, color: I.ink, align: 'center' });
         if (label && K.measure(g, F, label, { size: 1, min: 7 }) < r * 1.6) K.text(g, F, label, 0, -px * 0.6, { size: 1, color: I.ink3, align: 'center', min: 7 });
       };

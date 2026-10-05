@@ -1,9 +1,9 @@
 {
-  "id": "desk-v2",
-  "title": "Desk · plant",
+  "id": "desk-v3",
+  "title": "Desk · octopus",
   "blurb": "RELIEF lab variant: desk, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "2e947980c231468bd5107efd9a12d4e56476fdd934b880432faa9f0bea5bf868",
+  "engineHash": "5a755018fb75a96d4acc4b08a19e3827e1ea9c759648ce8e28b56612cfcbda3f",
   "kind": "engine",
   "contract": {
     "embed": {
