@@ -2635,7 +2635,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     return ORG.fitModel(ORG.relax(M, 0.012 * S), F, null, 1.15);
   }
 
-  var S={G:null,key:'',last:[],textures:new Map(),shadows:null,model:null,modelKey:'',links:[]};
+  var S={G:null,key:'',last:[],textures:new Map(),shadows:null,model:null,modelKey:'',links:[],depths:null,depthSeed:null};
   function world(ctx,t) {
     var P=ctx.P,W=ctx.W,H=ctx.H,ui=R.ui(W,H),key=[W,H,P.spread].join('|');
     if(S.modelKey!==key){S.model=model({W:W,H:H,ui:ui,m:.06*Math.min(W,H)},P);S.modelKey=key;}
@@ -2643,15 +2643,33 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     var yaw=TAU*(+P.orbitAngle||0)/360+(ctx.reduced||!+P.orbit?0:TAU*t/Math.max(24,+P.orbitPeriod||96)),c=Math.cos(yaw),sn=Math.sin(yaw);
     var radius=Math.min(W,H)*.5, depth=+P.depthView||0;
     S.links=M.links;
-    return M.nodes.map(function(n,i){
+    if(S.depthSeed!==ctx.seed){
+      S.depthSeed=ctx.seed;S.depths={hub:0};
+      ['hero','stages','gate','rule','agents','bars','npl','counts'].forEach(function(id,j){
+        var rand=R.stream(ctx.seed,'branch-depth/'+id);
+        S.depths[id]=(j%2?-1:1)*(.40+.42*rand());
+      });
+    }
+    var depthRadius=Math.min(W*.32,H*.42);
+    var nodes=M.nodes.map(function(n,i){
       var p=pose[n.id],dx=p.x-M.cx,dy=p.y-M.cy;
       var group=n.id.indexOf('st')===0?'stages':n.id.indexOf('ag')===0?'agents':n.id;
-      var base=pose[group]||p, dz=(base.y-M.cy)*.48;
+      // Each branch has independent seeded depth; children remain attached to their branch.
+      var dz=(S.depths[group]||0)*depthRadius;
+      if(group!==n.id)dz+=(ORG.hash(ctx.seed+'/'+n.id)()-.5)*depthRadius*.12;
       var x=dx*c+dz*sn,z=-dx*sn+dz*c,scale=1+.045*depth*(z-dz)/radius;
       return Object.assign({},n,{x:M.cx+x,y:p.y+(z-dz)*.20*depth,w:n.w*scale,h:n.h*scale,
         height:(150+32*z/radius)*ui,rot:n.shape==='sheet'?(n.rot0||0)*(+P.tilt)*Math.PI/180:0,
-        fixed:true,depth:z/radius});
+        fixed:true,depth:z/radius,volume:[dx/radius,dy/radius,dz/radius]});
     });
+    // A constant full-orbit fit prevents side-on views from leaving the viewport.
+    var fit=1;
+    M.nodes.forEach(function(n,i){var v=nodes[i].volume,reach=Math.hypot(v[0],v[2])*radius;
+      var extent=(Math.abs(Math.cos(nodes[i].rot))*n.w+Math.abs(Math.sin(nodes[i].rot))*n.h)*.54;
+      if(reach>0)fit=Math.min(fit,(W/2-8*ui-extent)/reach);
+    });
+    nodes.forEach(function(n){n.x=W/2+(n.x-M.cx)*fit;n.y=H*.52+(n.y-M.cy)*fit;});
+    return nodes;
   }
   function pick(x,y) {
     for(var i=S.last.length-1;i>=0;i--){var n=S.last[i],dx=x-n.sx,dy=y-n.sy,c=Math.cos(-n.srot),s=Math.sin(-n.srot);
@@ -2697,7 +2715,11 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     g.save();g.translate(n.x,n.y);g.rotate(n.rot);
     if(n.kind==='circle'){
       g.fillStyle=R.color.css(F.tn.plate);outline(g,n);g.fill();
-      n.print(g,F,K.inks(F),n.w,n.h,n);
+      if(n.id==='hub'){
+        var ink=K.inks(F);
+        K.text(g,F,'Loan book',0,-.05*n.w,{px:.115*n.w,min:1,align:'center',color:ink.ink2});
+        K.text(g,F,'240',0,.23*n.w,{px:.26*n.w,min:1,align:'center',weight:500,color:ink.ink});
+      }else n.print(g,F,K.inks(F),n.w,n.h,n);
     }else g.drawImage(texture(n,F),-n.w/2,-n.h/2,n.w,n.h);
     g.restore();
   }

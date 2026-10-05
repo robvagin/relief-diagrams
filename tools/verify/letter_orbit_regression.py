@@ -19,8 +19,11 @@ with sync_playwright() as p:
  let maxStep=0;for(const count of [360,720]){let prev=sample(0);for(let i=1;i<=count;i++){const next=sample(i*period/count);maxStep=Math.max(maxStep,...next.map((v,j)=>Math.abs(v-prev[j])));prev=next;}}
  const reduced=JSON.stringify(LETTER.world({...c,reduced:true},0))===JSON.stringify(LETTER.world({...c,reduced:true},99));
  const start=LETTER.world(c,0),quarter=LETTER.world(c,period/4);const moved=Math.max(...start.map((n,i)=>Math.hypot(n.x-quarter[i].x,n.y-quarter[i].y)));
- return {closure,velocity,maxStep,reduced,moved,undeformed:start.every(n=>!n.bend&&!n.shear),links:LETTER.state.links.length};}''')
+ const volume=points=>{let best=0;points.forEach(a=>points.forEach(b=>points.forEach(c=>{const d=[b[1]*c[2]-b[2]*c[1],b[2]*c[0]-b[0]*c[2],b[0]*c[1]-b[1]*c[0]];best=Math.max(best,Math.abs(a.reduce((s,x,i)=>s+x*d[i],0)));})));return best;};
+ const coords=start.map(n=>n.volume),solid=volume(coords),flat=volume(coords.map(v=>[v[0],v[1],v[1]*.48]));
+ return {closure,velocity,maxStep,reduced,moved,solid,flat,undeformed:start.every(n=>!n.bend&&!n.shear),links:LETTER.state.links.length};}''')
  assert result['closure']<1e-7 and result['velocity']<.02 and result['maxStep']<15 and result['reduced'],result
+ assert result['solid']>.08 and result['flat']<1e-8,result
  assert result['moved']>100 and result['undeformed'] and result['links']==16,result
  pg.evaluate('Scene.set("orbitAngle",90)');positions=pg.evaluate('ORG.state.last.map(n=>[n.sx,n.sy])');assert all(0<x<1440 and 0<y<900 for x,y in positions)
  print('PASS v1 dimensions, 17 undistorted nodes, 16 links, shared orbit, loop continuity, reduced motion',result)
