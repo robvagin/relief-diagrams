@@ -1,42 +1,36 @@
-/* agents · v2 «Column»: пять агентов z2 колонкой слева, широкие и низкие; справа узел
-   записи займа, в который линии от каждого вида приходят горизонтально — геометрия
-   донора 04-converge как есть: горизонтальный старт и приход, монотонные углы входа,
-   собирающая дуга внутри узла. Под узлом плашка записи z2: пять прочтений одного займа. */
+/* agents · v2 «Flower»: запись займа — сердцевина, пять агентов — лепестки-листы веером вокруг,
+   прямые лучи из сердцевины с засечками (Satellites). Лепестки дышат: раскрываются и
+   закрываются за период, линии от займа на каждом лепестке сходятся в сердцевину. */
 (function () {
   'use strict';
-  var R = window.RELIEF;
+  var R = window.RELIEF, O = R.org, TAU = Math.PI * 2;
+  var ZL = [2, 1, 3, 2, 1];
   AGENTS.make({
-    variant: '02', name: 'Column',
-    layout: function (ctx, U, P) {
-      var m = U.margin * 0.6, W = ctx.W, H = ctx.H;
-      var model = [m, m, W - 2 * m, H - 2 * m];
-      var pad = 14 * U.ui, head = U.fs(1) * 1.6 + U.fs(3) * 1.4 + 18 * U.ui;
-      var top = model[1] + pad + head, colW = model[2] * 0.6, avail = model[3] - head - pad * 2;
-      var gap = (+P.spacing) * U.ui * 0.6, h = (avail - 4 * gap) / 5;
-      var agents = [0, 1, 2, 3, 4].map(function (i) { return [model[0] + pad, top + i * (h + gap), colW, h]; });
-      var stage = [model[0] + pad, top, colW, avail];
-      var hx = model[0] + pad + colW + (model[2] - colW - pad) * 0.42, hy = top + avail * 0.5;
-      var cw = Math.min(model[0] + model[2] - pad - (model[0] + pad + colW + 4 * U.u), 300 * U.ui);
-      var card = [model[0] + model[2] - pad - cw, hy + 34 * U.ui, cw, U.fs(1) * 1.45 * 6 + 24 * U.ui];
-      return { model: model, agents: agents, stage: stage, hub: [hx, hy, 18 * U.ui], axis: 'horizontal', hubLabel: 'none', card: card };
+    name: 'Flower',
+    layout: function (ctx, ui, P, ws, wind, morph) {
+      var W = ctx.W, H = ctx.H, m = Math.min(W, H) * 0.06, cx = W / 2, cy = H / 2 + 18 * ui;
+      var rec = { x: cx, y: cy, r: 52 * ui, z: R.zh(3, P, ui) }, sheets = [], springs = [];
+      if (morph) {
+        rec.x = m + 120 * ui;
+        var w0 = Math.min(W - rec.x - 140 * ui - m, 680 * ui), h0 = Math.min(H - 2 * m - 120 * ui, w0 * 0.66);
+        sheets.push({ id: 'stage', a: 'A1', x: W - m - w0 / 2, y: cy, w: w0, h: h0, z: R.zh(2, P, ui), rot: 0.03 });
+      } else {
+        var D = Math.min(W * 0.33, H * 0.36) + (+P.spacing || 0) * ui * 0.5, w = Math.min(250 * ui, D * 0.95), h = w * 0.72;
+        for (var i = 0; i < 5; i++) {
+          var a = -Math.PI / 2 + i * TAU / 5, ph = O.hash01('petal' + i) * TAU;
+          var bloom = 1 + 0.025 * wind * Math.sin(ws + ph), sway = 0.02 * wind * (0.7 * Math.sin(ws + ph * 1.3) + 0.3 * Math.sin(2 * ws + ph));
+          var aa = a + sway, dd = D * bloom;
+          sheets.push({ id: 'A' + (i + 1), a: 'A' + (i + 1), x: cx + dd * Math.cos(aa) * 1.12, y: cy + dd * Math.sin(aa) * 0.92,
+            w: w, h: h, z: R.zh(ZL[i], P, ui), rot: Math.cos(a) * 5 * Math.PI / 180 + sway * 0.8 });
+        }
+      }
+      sheets.forEach(function (s) { springs.push(['record', s.id, Math.hypot(s.x - rec.x, s.y - rec.y), 5]); });
+      return { sheets: sheets, record: rec, springs: springs };
     },
-    // плашка записи: пять прочтений одного займа, строка на агента
-    extra: function (ctx, U, L, S, plates) {
-      var l = S.byId.get(S.sel); if (!l) return;
-      var c = L.card;
-      plates.push({ id: 'record', kind: 'rect', x: c[0], y: c[1], w: c[2], h: c[3], z: U.z(2), env: 0.6,
-        print: function (g, T, U2, p) {
-          var x = p.cx - p.dx - p.w / 2 + 12 * U2.ui, y = p.cy - p.dy - p.h / 2 + 12 * U2.ui, lh = U2.fs(1) * 1.45;
-          g.textBaseline = 'top'; g.textAlign = 'left';
-          R.font(g, U2, 2, 500); g.fillStyle = R.rgba(T.ink); g.fillText(l.id + ' · one record', x, y);
-          y += U2.fs(2) * 1.4;
-          ctx.data.agents.forEach(function (a) {
-            R.font(g, U2, 1, 500, true); g.fillStyle = R.rgba(T.ink2); g.fillText(a.id, x, y);
-            R.font(g, U2, 1, 400, true); g.fillStyle = R.rgba(T.ink3); g.fillText(AGENTS.tipOf(a.id, l), x + 28 * U2.ui, y);
-            y += lh;
-          });
-        } });
+    floor: function (g, F, ctx, L, S) {
+      if (L.record.sx == null) return;
+      var c = [L.record.sx, L.record.sy];
+      L.sheets.forEach(function (s) { if (s.sx != null) O.ray(g, F, c, [s.sx, s.sy], { ra: L.record.sr, rb: 0, alpha: 0.4, ticks: true }); });
     }
   });
-  R.boot();
 })();

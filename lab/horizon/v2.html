@@ -1243,7 +1243,23 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     g.restore();
   }
 
-  R.material = { tints: tints, uneven: uneven, grain: grain, rim: rim, loadNoise: loadNoise, surface: surface };
+  /* ── бумага: едва заметный провис листа. Середина ниже кромок, поэтому половина со стороны света
+     смотрит от света (чуть темнее), дальняя — к свету (как была). Множитель по профилю sin, ≤ amount ── */
+  function sag(g, s, L, tn, amount) {
+    if (!(amount > 0) || s.kind === 'circle') return;
+    var l = R.light.toLight(L, s.x, s.y, s.z), n = Math.hypot(l[0], l[1]) || 1, ux = l[0] / n, uy = l[1] / n;
+    var ext = Math.abs(ux) * s.w / 2 + Math.abs(uy) * s.h / 2;
+    var gr = g.createLinearGradient(s.x + ux * ext, s.y + uy * ext, s.x - ux * ext, s.y - uy * ext);
+    var C = R.color, sh = tn.shadow, stops = 7;
+    for (var i = 0; i <= stops; i++) {
+      var u = i / stops, k = amount * Math.max(0, Math.sin(Math.PI * u)) * (u < 0.5 ? 1 : 0.25);   // ближняя к свету половина
+      gr.addColorStop(u, 'rgb(' + [0, 1, 2].map(function (c) { return Math.round(255 - k * (255 - sh[c])); }).join(',') + ')');
+    }
+    g.save(); g.globalCompositeOperation = 'multiply'; g.fillStyle = gr;
+    g.fillRect(s.x - s.w, s.y - s.h, s.w * 2, s.h * 2); g.restore();
+  }
+
+  R.material = { sag: sag, tints: tints, uneven: uneven, grain: grain, rim: rim, loadNoise: loadNoise, surface: surface };
 })();
 </script>
 <script>
@@ -1467,6 +1483,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
       g.fillStyle = C.css(s.fill || tn.plate); g.fill('evenodd');
       g.clip('evenodd');
       if (spec.print) spec.print(g, s, F);
+      if (s.src && s.src.paper) R.material.sag(g, s, L, tn, s.src.paper === true ? 0.035 : +s.src.paper);   // бумага провисает
       var si = plates.indexOf(s), sq = shadePl[si] || s;
       if (!(si in cache.plates)) {
         var above = occ.filter(function (c) { return c.z > sq.z + 1e-3; }), ex = R.sdf.extent(sq);
@@ -1568,7 +1585,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
 <script>
 /* инлайн: src/data.js · правится ИСТОЧНИК, не этот файл */
 /* data.js · выдуманный портфель §6.6. Сборка вклеивает data/portfolio.json строкой в RELIEF.dataText
-   (только в те файлы, чей источник просит ); здесь ленивый разбор и короткие выборки. */
+   (только в те цели сборки, где data: True); здесь ленивый разбор и короткие выборки. */
 (function () {
   'use strict';
   var R = window.RELIEF = window.RELIEF || {};
@@ -1833,6 +1850,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
 
   // ── физика ───────────────────────────────────────────────────────────
   function Sim() { this.nodes = []; this.byId = {}; this.links = []; this.lastT = null; this.drag = null; }
+  Sim.prototype.reset = function () { this.nodes = []; this.byId = {}; this.links = []; this.lastT = null; this.drag = null; };
   Sim.prototype.node = function (id, o) {
     var n = this.byId[id];
     if (!n) { n = this.byId[id] = { id: id, x: o.x, y: o.y, vx: 0, vy: 0, ax: o.x, ay: o.y, r: o.r || 0, ka: o.ka || 26, m: o.m || 1, lift: 0, nb: [] }; this.nodes.push(n); }
@@ -2332,7 +2350,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
       if (!S.G) S.G = H.buildGraph(ctx.data);
       S.tree = H.buildTree(S.G, ctx.P.focus, Math.round(+ctx.P.depthH));
       H.layout(S.tree, +ctx.P.link, V.wedge ? V.wedge[0] : undefined, V.wedge ? V.wedge[1] : undefined);
-      S.nav = H.Nav(); S.nav.center = S.tree.root.id; S.sim = new O.Sim(); S.settledAt = -10;
+      S.nav = H.Nav(); S.nav.center = S.tree.root.id; S.sim.reset(); S.settledAt = -10;
     }
 
     function draw(ctx) {

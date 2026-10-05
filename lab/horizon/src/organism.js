@@ -18,6 +18,7 @@
 
   // ── физика ───────────────────────────────────────────────────────────
   function Sim() { this.nodes = []; this.byId = {}; this.links = []; this.lastT = null; this.drag = null; }
+  Sim.prototype.reset = function () { this.nodes = []; this.byId = {}; this.links = []; this.lastT = null; this.drag = null; };
   Sim.prototype.node = function (id, o) {
     var n = this.byId[id];
     if (!n) { n = this.byId[id] = { id: id, x: o.x, y: o.y, vx: 0, vy: 0, ax: o.x, ay: o.y, r: o.r || 0, ka: o.ka || 26, m: o.m || 1, lift: 0, nb: [] }; this.nodes.push(n); }

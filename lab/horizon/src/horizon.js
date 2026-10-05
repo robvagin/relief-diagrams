@@ -70,7 +70,7 @@
       if (!S.G) S.G = H.buildGraph(ctx.data);
       S.tree = H.buildTree(S.G, ctx.P.focus, Math.round(+ctx.P.depthH));
       H.layout(S.tree, +ctx.P.link, V.wedge ? V.wedge[0] : undefined, V.wedge ? V.wedge[1] : undefined);
-      S.nav = H.Nav(); S.nav.center = S.tree.root.id; S.sim = new O.Sim(); S.settledAt = -10;
+      S.nav = H.Nav(); S.nav.center = S.tree.root.id; S.sim.reset(); S.settledAt = -10;
     }
 
     function draw(ctx) {
