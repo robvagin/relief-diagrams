@@ -219,7 +219,11 @@
       const ty = side === 'below' ? nd.y + r + RL.fs(R, 't2') * 1.3 : nd.y - 2;
       const align = side === 'right' ? 'left' : side === 'below' ? 'center' : 'right';
       RL.text(g, R, nd.title, tx, ty, { size: 't2', weight: nd.decision ? 600 : 500, align: align, color: RL.css(T.ink, al) });
-      if (nd.sub) RL.text(g, R, nd.sub, tx, ty + RL.fs(R, 't1') * 1.35, { size: 't1', mono: true, align: align, color: RL.css(nd.state === 'fail' ? T.ink : T.ink3, al), maxW: o.maxW });
+      if (nd.sub) {
+        const so = { size: 't1', mono: true, align: align, color: RL.css(nd.state === 'fail' ? T.ink : T.ink3, al) };
+        const subs = o.colW ? G.wrap(g, R, nd.sub, o.colW, so).slice(0, 3) : [nd.sub];
+        subs.forEach((l, k) => RL.text(g, R, l, tx, ty + RL.fs(R, 't1') * (1.35 + 1.3 * k), so));
+      }
     });
   };
   // протокол решения одной строкой (§7.8)

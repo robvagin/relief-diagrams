@@ -47,7 +47,7 @@ def font_b64(name):
     opts.layout_features = ['kern', 'liga', 'tnum', 'case', 'ss01']
     opts.name_IDs = ['*']
     opts.notdef_outline = True
-    font = TTFont(src)
+    font = TTFont(src, recalcTimestamp=False)
     sub = subset.Subsetter(options=opts)
     sub.populate(unicodes=UNICODES)
     sub.subset(font)
