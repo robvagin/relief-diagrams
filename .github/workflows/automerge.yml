@@ -1,0 +1,38 @@
+name: automerge
+# push в cloud/** вливается в main merge-коммитом, затем публикуется Pages.
+# Токен GITHUB_TOKEN не будит другие workflow push-ем, поэтому pages.yml зовётся явно.
+on:
+  push:
+    branches: ['cloud/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: automerge
+  cancel-in-progress: false
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: merge branch into main
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "$GITHUB_REF_NAME"
+          git merge --no-edit -m "automerge: $GITHUB_REF_NAME" "origin/$GITHUB_REF_NAME"
+          python3 tools/clean_check.py
+          for i in 1 2 3 4; do
+            git push origin HEAD:main && break
+            sleep $((i * 4)); git fetch origin main
+            git merge --no-edit -m "automerge: $GITHUB_REF_NAME (retry)" origin/main
+          done
+      - name: publish pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main

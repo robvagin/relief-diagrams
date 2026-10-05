@@ -12,6 +12,12 @@ python3 -c "import playwright" 2>/dev/null || pip install --user -q playwright 2
 if [ -z "${PLAYWRIGHT_BROWSERS_PATH:-}" ] || ! ls "${PLAYWRIGHT_BROWSERS_PATH}" 2>/dev/null | grep -qi chrom; then
   python3 -m playwright install chromium >/dev/null 2>&1 || echo "Chromium для python-playwright не поставился: проверь доступ к сети"
 fi
+# облако: готовый Chromium в PLAYWRIGHT_BROWSERS_PATH старше свежего pip-пакета; ставим пакет под ревизию браузера
+pwlaunch() { python3 -c "from playwright.sync_api import sync_playwright as s; p=s().start(); p.chromium.launch().close(); p.stop()" >/dev/null 2>&1; }
+if ! pwlaunch && ls "${PLAYWRIGHT_BROWSERS_PATH:-/nonexistent}" 2>/dev/null | grep -q 'chromium-1194'; then
+  pip install -q --break-system-packages "playwright==1.56.0" >/dev/null 2>&1 || pip install --user -q "playwright==1.56.0" >/dev/null 2>&1
+fi
+pwlaunch && echo "chromium: запускается" || echo "chromium: НЕ запускается, браузерные пробы будут skip"
 git config core.hooksPath .githooks 2>/dev/null || true
 python3 tools/clean_check.py >/dev/null && echo "чистота: 0" || { echo "clean_check красный"; ok=0; }
 python3 data/generate.py --check || ok=0
