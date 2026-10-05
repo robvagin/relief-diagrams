@@ -1,6 +1,7 @@
 /* agents · v3 «Graph»: граф книги как в Obsidian. В центре модель, вокруг на мягких дугах пять
    агентов-дисков; каждый займ — узел на пружинах, его тянет к тем агентам, которым он интересен
-   (флаг A1, пакет A2, неполный перенос A3, просрочка A4, шаг взыскания A5). Площадь круга = сумма
+   (флаг A1, пакет A2, неполный перенос A3, просрочка A4, шаг взыскания A5) и собирает плотным ядром
+   вокруг того агента, которому займ нужнее (без лучей-иголок: «ёж» не берём, §2.2 A). Площадь круга = сумма
    займа, дистанция от модели = доля внимания агентов. Тянешь агента — его займы едут следом;
    наведение поднимает узел с соседями, остальное притухает; клик по займу = след, по агенту = фокус. */
 (function () {
@@ -55,7 +56,7 @@
       var ph = O.hash01(l.id) * TAU, drift = 2.2 * ui * wind;
       bx += drift * (0.7 * Math.sin(ws + ph) + 0.3 * Math.sin(2 * ws + ph * 1.4));
       by += drift * (0.7 * Math.cos(ws + ph * 0.8) + 0.3 * Math.sin(3 * ws + ph));
-      var r = Math.max(1.7 * ui, 14 * ui * Math.sqrt(l.exposure / S.maxE));
+      var r = Math.max(1.7 * ui, 18 * ui * Math.sqrt(l.exposure / S.maxE));
       var q = sim.node(l.id, { x: bx, y: by, r: r + 1, ka: 16 }); q.ax = bx; q.ay = by; q.r = r + 1.2 * ui; q.loan = l; q.rad = r;
     }
     rest.forEach(function (l, k) {
@@ -64,12 +65,17 @@
     });
     fam.forEach(function (list, i) {
       var a = agents[i], out = Math.atan2(a.ay - cy, a.ax - cx);
-      list.sort(function (p, q) { return S.w.get(q.id)[i] - S.w.get(p.id)[i] || (p.id < q.id ? -1 : 1); });
-      list.forEach(function (l, k) {   // веер наружу от модели: ±75° вокруг направления агента
-        var rr = a.r + 10 * ui + 7.4 * ui * Math.sqrt(k + 1), th = out + Math.sin(k * GOLD) * 1.3;
+      // плотное ядро вокруг агента: кольцами по площади (филлотаксис), крупные ближе, без иголок
+      list.sort(function (p, q) { return q.exposure - p.exposure || (p.id < q.id ? -1 : 1); });
+      var R0 = a.r + 4 * ui, acc = R0 * R0;
+      list.forEach(function (l, k) {
+        var rad = Math.max(1.7 * ui, 18 * ui * Math.sqrt(l.exposure / S.maxE)), cell = 2 * rad + 2.2 * ui;
+        acc += cell * cell * 0.95 / Math.PI;
+        var rr = Math.sqrt(acc) - rad, th = out + k * GOLD;
         place(l, a.ax + rr * Math.cos(th), a.ay + rr * Math.sin(th), k);
         l._fam = i;
       });
+      a.core = Math.sqrt(acc);
     });
     S.loans.forEach(function (l) {
       var w = S.w.get(l.id), q = sim.byId[l.id];
@@ -121,8 +127,8 @@
         var a = S.agents[i], fam = n.l._fam === i, al = lit ? 0.62 : fam ? 0.26 * (1 - 0.7 * dim) : 0;
         if (hov && hov === a.id && fam) al = 0.6;
         if (al <= 0.004) return;
-        if (fam && !lit) O.ray(g, F, [a.sx, a.sy], [n.x, n.y], { ra: a.sr, rb: n.r, alpha: al, tone: 'ink2' });   // веер семьи: прямые лучи из хаба
-        else O.arc(g, F, [n.x, n.y], [a.sx, a.sy], 0.08, { alpha: al, tone: 'ink' });
+        if (fam && !lit) return;   // семья читается плотным ядром у агента, лучей-иголок нет
+        O.arc(g, F, [n.x, n.y], [a.sx, a.sy], 0.08, { alpha: al, tone: 'ink' });
       });
       if (!n.plate) {
         g.beginPath(); g.arc(n.x, n.y, Math.max(1.2 * F.ui, n.r), 0, TAU);
@@ -133,10 +139,14 @@
     if (sel && +ctx.P.trace && !sel.plate) { g.beginPath(); g.arc(sel.x, sel.y, sel.r + 4 * F.ui, 0, TAU); g.strokeStyle = R.color.css(F.T.accent); g.lineWidth = F.lineW; g.stroke(); }
     // подписи агентов наружу от модели
     S.agents.forEach(function (a) {
-      // подпись со стороны модели, со сдвигом от щупальца: наружу смотрит веер семьи
-      var ag = ctx.data.agents[a.i], base = Math.atan2(a.sy - hp[1], a.sx - hp[0]) + Math.PI, c1 = base + 0.75, c2 = base - 0.75;
-      var ang = a.sy > hp[1] ? (Math.sin(c1) < Math.sin(c2) ? c1 : c2) : (Math.abs(Math.cos(c1)) > Math.abs(Math.cos(c2)) ? c1 : c2), d = a.sr + 12 * F.ui;
-      var x = a.sx + Math.cos(ang) * d, y = a.sy + Math.sin(ang) * d, al = Math.cos(ang) > 0.3 ? 'left' : Math.cos(ang) < -0.3 ? 'right' : 'center';
+      // подпись под ядром семьи (у верхнего — над ним), по центру и строго в кадре:
+      // ядро меряется по фактическим точкам семьи после физики, подпись его не задевает
+      var ag = ctx.data.agents[a.i], ext = a.sr;
+      S.shown.forEach(function (n) { if (n.kind === 'loan' && n.l._fam === a.i) ext = Math.max(ext, Math.hypot(n.x - a.sx, n.y - a.sy) + n.r); });
+      var up = a.sy < hp[1] - 0.5 * Math.abs(a.sx - hp[0]), al = 'center', x = a.sx, y = up ? a.sy - ext - 26 * F.ui : a.sy + ext + 12 * F.ui;
+      g.save(); g.font = '400 ' + (11.67 * F.ui).toFixed(2) + 'px "Geist Mono"'; var tw = g.measureText(ag.job).width; g.restore();
+      var mm = Math.min(F.W, F.H) * 0.04;
+      x = Math.max(mm + tw / 2, Math.min(F.W - mm - tw / 2, x));
       var fade = 1 - 0.5 * dim * (hov === a.id ? 0 : 1);
       R.ink.text(g, F, ag.id + ' · ' + ag.name, x, y, { s: 1, w: 500, align: al, base: 'middle', alpha: fade });
       R.ink.text(g, F, ag.job, x, y + 15 * F.ui, { s: 0, mono: true, tone: 'ink3', align: al, base: 'middle', alpha: fade });
