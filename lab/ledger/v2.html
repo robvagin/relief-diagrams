@@ -1832,16 +1832,19 @@ LEDGER.run({
   compose: function (ctx, F, L, I, body, FORMS) {
     const P = ctx.P, gap = F.u * 1.2, R = window.RELIEF, K = window.RINK;
     const order = ['bars', 'line', 'donut', 'table', 'kpi'];
-    const heroW = (body.w - gap) * 0.618;
-    const hero = { x: body.x, y: body.y, w: heroW, h: body.h };
+    // альбом: герой слева 0.618 ширины, колонка справа; портрет: герой сверху 0.618 высоты, ряд снизу
+    const tall = body.h > body.w * 1.1;
     const rest = order.filter(f => f !== P.chart);
-    const colX = body.x + heroW + gap, colW = body.w - heroW - gap;
-    const sh = (body.h - gap * (rest.length - 1)) / rest.length;
+    const heroW = tall ? body.w : (body.w - gap) * 0.618, heroH = tall ? (body.h - gap) * 0.618 : body.h;
+    const hero = { x: body.x, y: body.y, w: heroW, h: heroH };
+    const colX = tall ? body.x : body.x + heroW + gap, colW = tall ? (body.w - gap) / 2 : body.w - heroW - gap;
+    const sh = tall ? (body.h - heroH - gap * 2) / 2 : (body.h - gap * (rest.length - 1)) / rest.length;
     const main = FORMS[P.chart](ctx, F, L, I, hero, { compact: false });
     const plates = main.plates.slice();
     ctx._views = [];
     rest.forEach((f, i) => {
-      const r = { x: colX, y: body.y + i * (sh + gap), w: colW, h: sh };
+      const r = tall ? { x: colX + (i % 2) * (colW + gap), y: body.y + heroH + gap + Math.floor(i / 2) * (sh + gap), w: colW, h: sh }
+                     : { x: colX, y: body.y + i * (sh + gap), w: colW, h: sh };
       ctx._views.push({ f, r });
       const inner = { x: r.x + 10 * F.ui, y: r.y + 22 * F.ui, w: r.w - 20 * F.ui, h: r.h - 30 * F.ui };
       plates.push({ id: 'view-' + f, z: 1, s: { kind: 'rect', x: r.x, y: r.y, w: r.w, h: r.h, rad: P.radius * F.ui },

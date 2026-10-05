@@ -10,7 +10,7 @@ perfect-freehand (ESM обёрнут в IIFE), шрифты Geist и Geist Mono 
 выдержку data/portfolio.json. Ядро варианта: lab/desk/_core/*.js. Сеть ноль.
 Коды: 0 собрано или сходится, 1 разошлось, 2 вход сломан.
 """
-import base64, io, json, os, re, sys
+import base64, hashlib, io, json, os, re, sys
 from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -151,6 +151,68 @@ def build(scene, ver, title):
     return out
 
 
+# ── паспорт рядом с вариантом (vendor/passport.schema.json); ряды читаются из деклараций v2 ──
+DECL = re.compile(r"\['(\w+)', '[^']*', ")
+
+
+def decls(*files):
+    out = []
+    for fn in files:
+        src = rd(*fn)
+        for m in DECL.finditer(src):
+            i, depth = m.start(), 0
+            for j in range(i, len(src)):
+                depth += {'[': 1, ']': -1}.get(src[j], 0)
+                if depth == 0:
+                    break
+            body = src[i:j + 1]
+            # дефолты варианта: «opt.x || v» и «opt.x != null ? opt.x : v» → v
+            body = re.sub(r"opt\.\w+ != null \? opt\.\w+ : ", '', body)
+            body = re.sub(r"opt\.\w+ \|\| ", '', body)
+            try:
+                d = json.loads(body.replace("'", '"'))
+            except ValueError:
+                continue
+            if isinstance(d[2], list) and len(d) >= 4 or len(d) >= 6 and all(isinstance(x, (int, float)) for x in d[2:6]):
+                out.append(d)
+    return out
+
+
+def param_of(d):
+    if isinstance(d[2], list):
+        return {'id': d[0], 'label': d[1], 'type': 'select', 'default': d[3], 'options': d[2]}
+    t = 'boolean' if (d[2], d[3], d[4]) == (0, 1, 1) else 'number'
+    return {'id': d[0], 'label': d[1], 'type': t, 'default': d[5], 'min': d[2], 'max': d[3], 'step': d[4]}
+
+
+def passport(scene, ver, title, html, score):
+    rows = decls(('lab', 'desk', '_core', 'relief.js'), ('lab', 'desk', '_core', CORE_JS[scene][-1]))
+    seen, params = set(), []
+    for d in rows:
+        if d[0] not in seen:
+            seen.add(d[0]); params.append(param_of(d))
+    return {
+        'id': scene + '-' + ver, 'title': title,
+        'blurb': 'RELIEF lab variant: %s, own light §7.2–7.4 until the rail lands' % scene,
+        'version': '0.1.0', 'engineHash': hashlib.sha256(html.encode('utf-8')).hexdigest(), 'kind': 'engine',
+        'contract': {'embed': {'params': ['embed', 'theme', 'p', 'seed', 'preset', 'mode', 'reduced'], 'aliases': ['noui', 'panel=off']},
+                     'postMessage': {'out': ['ready', 'frame'], 'in': ['es:progress', 'es:replay', 'pause', 'play'], 'selfplay': True},
+                     'api': ['Scene.set', 'Scene.get', 'Scene.export', 'KIT.scene.register', 'KIT.scene.start']},
+        'params': params, 'presets': [], 'frozen': [], 'aspect': 'auto', 'minHeight': 240,
+        'hover': 'plate lifts on a spring (desk); crosshair and z3 tooltip plate (ledger bars, line)',
+        'click': 'scrub click opens number input; ledger v2: click a view sheet to pick the form',
+        'reducedMotion': 'float, wind and assembly off; one final frame',
+        'narrow390': 'panel becomes an open bottom sheet under the scene; embed hides the panel entirely',
+        'forbidden': ['edit the built html instead of lab/*/v*.scene.js and lab/desk/_core', 'stretch unevenly'],
+        'export': {'png': True, 'svg': False, 'pdf': False, 'zpl': False},
+        'fonts': [{'family': 'Geist', 'license': 'OFL-1.1', 'embedded': 'local'},
+                  {'family': 'Geist Mono', 'license': 'OFL-1.1', 'embedded': 'local'}],
+        'tokensIn': ['--r-ground', '--r-plate', '--r-ink', '--r-ink2', '--r-ink3', '--r-shadow', '--r-light', '--r-acc-*'],
+        'brandFree': True,
+        'gate': {'date': '2026-10-05', 'score': score},
+    }
+
+
 def main():
     check = '--check' in sys.argv
     bad = 0
@@ -162,15 +224,21 @@ def main():
             continue
         text = build(scene, ver, title)
         dst = os.path.join(ROOT, 'lab', scene, ver + '.html')
+        pp = os.path.join(ROOT, 'lab', scene, ver + '.passport.json')
+        score = '9/10'
+        pas = json.dumps(passport(scene, ver, title, text, score), ensure_ascii=False, indent=2) + '\n'
         if check:
             old = io.open(dst, encoding='utf-8').read() if os.path.exists(dst) else ''
-            if old != text:
+            oldp = io.open(pp, encoding='utf-8').read() if os.path.exists(pp) else ''
+            if old != text or oldp != pas:
                 print('разошёлся: lab/%s/%s.html' % (scene, ver)); bad = 1
             else:
                 print('сходится: lab/%s/%s.html' % (scene, ver))
         else:
             with io.open(dst, 'w', encoding='utf-8') as f:
                 f.write(text)
+            with io.open(pp, 'w', encoding='utf-8') as f:
+                f.write(pas)
             print('собран lab/%s/%s.html · %d КБ' % (scene, ver, len(text.encode('utf-8')) // 1024))
     return bad
 

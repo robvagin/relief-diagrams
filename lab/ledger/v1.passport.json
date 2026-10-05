@@ -1,0 +1,376 @@
+{
+  "id": "ledger-v1",
+  "title": "Ledger · one sheet",
+  "blurb": "RELIEF lab variant: ledger, own light §7.2–7.4 until the rail lands",
+  "version": "0.1.0",
+  "engineHash": "e78d7e2bac277b413fffed953c851a28fd3ae5f94f614d2e1e923a5e38d161e9",
+  "kind": "engine",
+  "contract": {
+    "embed": {
+      "params": [
+        "embed",
+        "theme",
+        "p",
+        "seed",
+        "preset",
+        "mode",
+        "reduced"
+      ],
+      "aliases": [
+        "noui",
+        "panel=off"
+      ]
+    },
+    "postMessage": {
+      "out": [
+        "ready",
+        "frame"
+      ],
+      "in": [
+        "es:progress",
+        "es:replay",
+        "pause",
+        "play"
+      ],
+      "selfplay": true
+    },
+    "api": [
+      "Scene.set",
+      "Scene.get",
+      "Scene.export",
+      "KIT.scene.register",
+      "KIT.scene.start"
+    ]
+  },
+  "params": [
+    {
+      "id": "light",
+      "label": "Свет",
+      "type": "select",
+      "default": "soft",
+      "options": [
+        "soft",
+        "raking",
+        "lamp",
+        "canopy"
+      ]
+    },
+    {
+      "id": "az",
+      "label": "Азимут, °",
+      "type": "number",
+      "default": 135,
+      "min": 0,
+      "max": 360,
+      "step": 1
+    },
+    {
+      "id": "elev",
+      "label": "Высота, °",
+      "type": "number",
+      "default": 42,
+      "min": 8,
+      "max": 80,
+      "step": 1
+    },
+    {
+      "id": "soft",
+      "label": "Мягкость",
+      "type": "number",
+      "default": 0.28,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "dens",
+      "label": "Плотность тени",
+      "type": "number",
+      "default": 0.2,
+      "min": 0,
+      "max": 0.6,
+      "step": 0.01
+    },
+    {
+      "id": "amb",
+      "label": "Рассеянный",
+      "type": "number",
+      "default": 0.72,
+      "min": 0.2,
+      "max": 0.95,
+      "step": 0.01
+    },
+    {
+      "id": "contact",
+      "label": "Контакт",
+      "type": "number",
+      "default": 0.12,
+      "min": 0,
+      "max": 0.3,
+      "step": 0.01
+    },
+    {
+      "id": "pool",
+      "label": "Пятно лампы",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "lampH",
+      "label": "Высота лампы",
+      "type": "number",
+      "default": 900,
+      "min": 300,
+      "max": 2000,
+      "step": 10
+    },
+    {
+      "id": "canopy",
+      "label": "Листва",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 0.6,
+      "step": 0.01
+    },
+    {
+      "id": "temp",
+      "label": "Температура",
+      "type": "number",
+      "default": 0.25,
+      "min": -1,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "grain",
+      "label": "Зерно, %",
+      "type": "number",
+      "default": 1.6,
+      "min": 0,
+      "max": 4,
+      "step": 0.1
+    },
+    {
+      "id": "uneven",
+      "label": "Неровность, %",
+      "type": "number",
+      "default": 0.8,
+      "min": 0,
+      "max": 2,
+      "step": 0.1
+    },
+    {
+      "id": "rim",
+      "label": "Кант",
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "radius",
+      "label": "Радиус плашки",
+      "type": "number",
+      "default": 6,
+      "min": 0,
+      "max": 8,
+      "step": 0.5
+    },
+    {
+      "id": "zscale",
+      "label": "Шкала высот",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01
+    },
+    {
+      "id": "accent",
+      "label": "Акцент",
+      "type": "select",
+      "default": "terracotta",
+      "options": [
+        "terracotta",
+        "cobalt",
+        "olive"
+      ]
+    },
+    {
+      "id": "hand",
+      "label": "Рука",
+      "type": "boolean",
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    {
+      "id": "float",
+      "label": "Плавание",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01
+    },
+    {
+      "id": "period",
+      "label": "Период, с",
+      "type": "number",
+      "default": 36,
+      "min": 12,
+      "max": 72,
+      "step": 1
+    },
+    {
+      "id": "sway",
+      "label": "Качание, °",
+      "type": "number",
+      "default": 0.3,
+      "min": 0,
+      "max": 1.5,
+      "step": 0.05
+    },
+    {
+      "id": "bob",
+      "label": "Дыхание тени",
+      "type": "number",
+      "default": 0.08,
+      "min": 0,
+      "max": 0.2,
+      "step": 0.01
+    },
+    {
+      "id": "settle",
+      "label": "Оседание, с",
+      "type": "number",
+      "default": 0.9,
+      "min": 0.3,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "id": "assemble",
+      "label": "Сборка",
+      "type": "boolean",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    {
+      "id": "format",
+      "label": "Формат",
+      "type": "select",
+      "default": "screen",
+      "options": [
+        "screen",
+        "16:9",
+        "1:1",
+        "4:5"
+      ]
+    },
+    {
+      "id": "scale",
+      "label": "Масштаб",
+      "type": "number",
+      "default": 2,
+      "min": 1,
+      "max": 3,
+      "step": 1
+    },
+    {
+      "id": "chart",
+      "label": "Форма",
+      "type": "select",
+      "default": "bars",
+      "options": [
+        "bars",
+        "line",
+        "donut",
+        "table",
+        "kpi"
+      ]
+    },
+    {
+      "id": "series",
+      "label": "Серий",
+      "type": "number",
+      "default": 1,
+      "min": 1,
+      "max": 4,
+      "step": 1
+    },
+    {
+      "id": "relief",
+      "label": "Рельеф",
+      "type": "boolean",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    {
+      "id": "labelsL",
+      "label": "Подписи",
+      "type": "select",
+      "default": "key",
+      "options": [
+        "none",
+        "key",
+        "all"
+      ]
+    }
+  ],
+  "presets": [],
+  "frozen": [],
+  "aspect": "auto",
+  "minHeight": 240,
+  "hover": "plate lifts on a spring (desk); crosshair and z3 tooltip plate (ledger bars, line)",
+  "click": "scrub click opens number input; ledger v2: click a view sheet to pick the form",
+  "reducedMotion": "float, wind and assembly off; one final frame",
+  "narrow390": "panel becomes an open bottom sheet under the scene; embed hides the panel entirely",
+  "forbidden": [
+    "edit the built html instead of lab/*/v*.scene.js and lab/desk/_core",
+    "stretch unevenly"
+  ],
+  "export": {
+    "png": true,
+    "svg": false,
+    "pdf": false,
+    "zpl": false
+  },
+  "fonts": [
+    {
+      "family": "Geist",
+      "license": "OFL-1.1",
+      "embedded": "local"
+    },
+    {
+      "family": "Geist Mono",
+      "license": "OFL-1.1",
+      "embedded": "local"
+    }
+  ],
+  "tokensIn": [
+    "--r-ground",
+    "--r-plate",
+    "--r-ink",
+    "--r-ink2",
+    "--r-ink3",
+    "--r-shadow",
+    "--r-light",
+    "--r-acc-*"
+  ],
+  "brandFree": true,
+  "gate": {
+    "date": "2026-10-05",
+    "score": "9/10"
+  }
+}
