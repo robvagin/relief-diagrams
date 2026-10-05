@@ -128,6 +128,8 @@
     if (best.side === 'l') hero.r = Object.assign({}, hero.r, { x: hero.r.x - gap - d, w: hero.r.w + gap + d });
     if (best.side === 'b') hero.r = Object.assign({}, hero.r, { h: hero.r.h + gap + d });
     hero.overOn = best.o.id;
+    // текст соседа не уходит под героя: печать соседа сжимается на накрытую полосу
+    best.o.cut = { side: best.side, d: d + gap };
   }
 
   // уровни: герой z3; 2–4 второстепенных z2 (по весу); остальные z1
@@ -166,8 +168,10 @@
     kpi(g, ctx, F, L, I, r, it) {
       const k = D().kpi, s = D().series, p = pad(F);
       head(g, ctx, F, I, r, 'Exposure', 'as of 30 Sep 2026');
-      const big = Math.min(it.hero ? 11 : 9, 4 + Math.floor(Math.min(r.w / (150 * F.ui), r.h / (60 * F.ui))));
       const num = K.eur(k.exposure);
+      // число вписано в ширину: подпись к числу ≈ 1:5 (донор pitch-composer)
+      const w100 = K.measure(g, F, num, { size: 100 / F.ui, mono: true, weight: 500, min: 1 }) / 100;
+      const big = Math.max(14, Math.min((r.w - 2 * p) * (it.hero ? 0.86 : 0.7) / Math.max(0.01, w100), r.h * 0.3)) / F.ui;
       const by = r.y + r.h * (it.hero ? 0.56 : 0.6);
       const px = K.text(g, F, num, r.x + p, by, { size: big, mono: true, weight: 500, color: I.ink });
       const d = s.exposure[11] / s.exposure[0] - 1;
@@ -201,7 +205,11 @@
         K.text(g, F, c.label, x, cy + rr + 14 * F.ui, { size: 1, color: I.ink2, align: 'center', min: 7 });
         K.text(g, F, K.eur(c.value), x, cy + rr + 28 * F.ui, { size: 1, mono: true, color: I.ink3, align: 'center', min: 7 });
         if (c.label === 'non-performing') { g.fillStyle = I.acc; g.beginPath(); g.arc(x, cy, Math.max(2.5, 4 * F.ui), 0, TAU); g.fill(); }
-        x += rr + (i < kids.length - 1 ? Math.max(14 * F.ui, rmax * Math.sqrt(kids[i + 1].value / vmax) + 16 * F.ui) : 0);
+        if (i < kids.length - 1) {
+          const nr = Math.max(3, rmax * Math.sqrt(kids[i + 1].value / vmax));
+          const lw = (K.measure(g, F, c.label, { size: 1, min: 7 }) + K.measure(g, F, kids[i + 1].label, { size: 1, min: 7 })) / 2 + 8 * F.ui;
+          x += Math.max(rr + nr + 14 * F.ui, lw);
+        }
       });
     },
     gate(g, ctx, F, L, I, r) {
@@ -273,19 +281,25 @@
         }
         g.restore();
         K.text(g, F, a.id, cx, cy + s + 12 * F.ui, { size: 1, mono: true, color: I.ink2, align: 'center', min: 7 });
-        K.text(g, F, a.name, cx, cy + s + 25 * F.ui, { size: 1, color: I.ink3, align: 'center', min: 7 });
+        if (K.measure(g, F, 'Diligence', { size: 1, min: 7 }) < cw - 4) K.text(g, F, a.name, cx, cy + s + 25 * F.ui, { size: 1, color: I.ink3, align: 'center', min: 7 });
       });
     },
     rule(g, ctx, F, L, I, r) {
       const ru = D().rules[0], p = pad(F);
       head(g, ctx, F, I, r, 'Rule', ru.id);
       // перенос строк по ширине
-      const words = ru.text.split(' '), lines = []; let cur = '';
-      K.font(g, F, 3, { weight: 500 });
-      words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width > r.w - 2 * p && cur) { lines.push(cur); cur = w; } else cur = t; });
-      if (cur) lines.push(cur);
-      const lh = 16.8 * 1.2 * F.ui;
-      lines.forEach((l, i) => K.text(g, F, l, r.x + p, r.y + p + 38 * F.ui + i * lh, { size: 3, weight: 500, color: I.ink, min: 8 }));
+      // кегль по месту: самый крупный шаг шкалы, при котором текст влезает в 60 % высоты
+      let lines = [], st = 3;
+      for (let k = 7; k >= 3; k--) {
+        const words = ru.text.split(' '), ls = []; let cur = '';
+        K.font(g, F, k, { weight: 500 });
+        words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width > r.w - 2 * p && cur) { ls.push(cur); cur = w; } else cur = t; });
+        if (cur) ls.push(cur);
+        lines = ls; st = k;
+        if (ls.length * K.TS[k] * 1.2 * F.ui <= (r.h - 2 * p) * 0.6 && ls.every(l => g.measureText(l).width <= r.w - 2 * p)) break;
+      }
+      const lh = K.TS[st] * 1.2 * F.ui;
+      lines.forEach((l, i) => K.text(g, F, l, r.x + p, r.y + p + 30 * F.ui + (i + 0.8) * lh, { size: st, weight: 500, color: I.ink, min: 8 }));
     },
     counts(g, ctx, F, L, I, r) {
       const k = D().kpi, p = pad(F);
@@ -417,14 +431,18 @@
       if (l.tray) pl.print = (gg) => {
         K.text(gg, F, l.title, r.x + F.u, r.y + F.u + 10 * F.ui, { size: 1, caps: true, weight: 500, color: I.ink3, min: 7 });
         // виджеты, печатаемые прямо на лотке (z0 относительно лотка)
-        lay.filter(w => w.onTray === l.id && w.z === 0).forEach(w => {
+        lay.filter(w => 'tray-' + w.onTray === l.id && w.z === 0).forEach(w => {
           const wr = { x: w.r.x + fl.dx, y: w.r.y + fl.dy, w: w.r.w, h: w.r.h };
           K.relief(gg, ctx, F, L, (q, ox, oy) => { q.beginPath(); if (q.roundRect) q.roundRect(wr.x + ox, wr.y + oy, wr.w, wr.h, rad); else q.rect(wr.x + ox, wr.y + oy, wr.w, wr.h); }, P.relief !== 0);
           gg.save(); gg.beginPath(); gg.rect(wr.x, wr.y, wr.w, wr.h); gg.clip();
           PRINT[w.id](gg, ctx, F, L, I, wr, w, tsec); gg.restore();
         });
       };
-      else pl.print = (gg) => PRINT[l.id](gg, ctx, F, L, I, r, l, tsec);
+      else {
+        const c = l.cut, pr = !c ? r : c.side === 'r' ? Object.assign({}, r, { x: r.x + c.d, w: r.w - c.d })
+          : c.side === 'l' ? Object.assign({}, r, { w: r.w - c.d }) : Object.assign({}, r, { y: r.y + c.d, h: r.h - c.d });
+        pl.print = (gg) => PRINT[l.id](gg, ctx, F, L, I, pr, l, tsec);
+      }
       out.push(pl);
     });
     R.render(g, ctx, F, L, out, {

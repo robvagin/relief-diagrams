@@ -487,7 +487,7 @@
         if (p.rot) { g.translate(cc[0], cc[1]); g.rotate(p.rot); g.translate(-cc[0], -cc[1]); }
         shapePath(g, p.s); g.clip();
         g.lineWidth = 0.75;
-        g.strokeStyle = rgba(L.lightTint, (night ? 0.45 : 0.6) * ctx.P.rim);
+        g.strokeStyle = rgba(L.lightTint, (night ? 0.3 : 0.6) * ctx.P.rim);
         shapePath(g, p.s, -0.5 * l[0], -0.5 * l[1]); g.stroke();
         g.strokeStyle = rgba(L.shadowTint, 0.35 * ctx.P.rim);
         shapePath(g, p.s, 0.5 * l[0], 0.5 * l[1]); g.stroke();
