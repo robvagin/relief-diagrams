@@ -38,14 +38,12 @@
     };
   };
 
-  /* ключ кеша теней: свет, тон, кадр и состояние плашек на tq (округлено до 1/64 px) */
-  function shadeKey(L, tn, W, H, ps) {
+  /* ключ кеша теней: свет, тон, кадр, СОСТАВ плашек и tq. Позиции в ключ не входят: поле строится
+     раз на tq по позициям этого кадра (физика графа двигает узлы каждый кадр, иначе пересборка каждый кадр) */
+  function shadeKey(L, tn, W, H, ps, tq) {
     var q = function (v) { return Math.round(v * 64); };
-    var parts = [W, H, L.mode, q(L.az), q(L.elev), q(L.soft), q(L.dens), q(L.contact), q(L.lamp.x), q(L.lamp.y), q(L.lamp.h), q(L.ui), tn.shadow.join(',')];
-    for (var i = 0; i < ps.length; i++) {
-      var p = ps[i];
-      parts.push(p.kind, q(p.x), q(p.y), q(p.w), q(p.h), q(p.r || 0), q(p.rot || 0), q(p.z), p.noShadow ? 1 : 0, p.holes ? JSON.stringify(p.holes) : '');
-    }
+    var parts = [tq, W, H, L.mode, q(L.az), q(L.elev), q(L.soft), q(L.dens), q(L.contact), q(L.lamp.x), q(L.lamp.y), q(L.lamp.h), q(L.ui), tn.shadow.join(','), ps.length];
+    for (var i = 0; i < ps.length; i++) parts.push(ps[i].kind, ps[i].noShadow ? 1 : 0, ps[i].id == null ? i : ps[i].id);
     return parts.join('|');
   }
 
@@ -87,7 +85,7 @@
       return {
         id: p.id, kind: p.kind || 'rect', x: p.x + m.dx, y: p.y + m.dy, w: p.w, h: sz,
         r: p.r == null ? (+P.radius || 0) * ui : p.r, rot: (p.rot || 0) + m.rot, holes: p.holes,
-        z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fill, noShadow: p.noShadow, ghost: p.ghost, src: p
+        z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fade > 0.005 ? C.mix(p.fill || tn.plate, tn.ground, Math.min(1, p.fade)) : p.fill, noShadow: p.noShadow, ghost: p.ghost, src: p
       };
     }
     var plates = (spec.plates || []).map(function (p, i) { return place(p, i, tsec); });
@@ -100,7 +98,7 @@
     var G = (L.canopy > 0) ? R.canopy.mask(ctx.seed, W, H, ui, tq, Math.max(1, +P.period || 36), still) : null;
     var occ = shadePl.filter(function (s) { return s.z > 0 && !s.noShadow; });
     F.G = G;
-    var key = shadeKey(L, tn, W, H, shadePl), cache = R._shade && R._shade.key === key ? R._shade : (R._shade = { key: key, floor: undefined, plates: {} });
+    var key = shadeKey(L, tn, W, H, shadePl, still ? 'still' : tq), cache = R._shade && R._shade.key === key ? R._shade : (R.shade.recycle(), R._shade = { key: key, floor: undefined, plates: {} });
 
 
     g.save();

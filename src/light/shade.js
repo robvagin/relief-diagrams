@@ -14,16 +14,17 @@
   function ensure(c, w, h) { if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); } }
 
   /* ── спрайты: покрытие из поля расстояний, один раз на ключ ─────────── */
-  var SPR = new Map(), LIMIT = 600;
+  var SPR = new Map(), LIMIT = 2400;
   function sprite(c, sig, dens, tint) {
     var sq = Math.max(0.25, Math.round(sig * 4) / 4), dq = Math.round(dens * 200) / 200;
     if (dq <= 0) return null;
-    var key = [tint.join(','), c.kind, c.w.toFixed(1), c.h.toFixed(1), (c.r || 0).toFixed(1), sq, dq, c.holes ? JSON.stringify(c.holes) : ''].join('|');
+    var qs = function (v) { return (Math.round(v * 2) / 2).toFixed(1); };        // размер квантуется 0,5 px: семья мелких дисков делит спрайты
+    var key = [tint.join(','), c.kind, qs(c.w), qs(c.h), qs(c.r || 0), sq, dq, c.holes ? JSON.stringify(c.holes) : ''].join('|');
     var s = SPR.get(key);
     if (s) { SPR.delete(key); SPR.set(key, s); return s; }      // LRU: свежий в конец
-    var pad = Math.ceil(3.4 * sq) + 2, w = Math.ceil(c.w) + 2 * pad, h = Math.ceil(c.h) + 2 * pad;
+    var pad = Math.ceil(3.4 * sq) + 2, w = Math.ceil(+qs(c.w)) + 2 * pad, h = Math.ceil(+qs(c.h)) + 2 * pad;
     var cv = canvas(w, h), g = cv.getContext('2d'), im = g.createImageData(w, h), d = im.data;
-    var shape = { kind: c.kind, x: w / 2, y: h / 2, w: c.w, h: c.h, r: c.r, holes: c.holes };
+    var shape = { kind: c.kind, x: w / 2, y: h / 2, w: +qs(c.w), h: +qs(c.h), r: +qs(c.r || 0), holes: c.holes };
     var sd = R.sdf.sd, cover = R.sdf.cover;
     for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) {
       var v = Math.min(1, dq * cover(sd(shape, i + 0.5, j + 0.5), sq)), p = (j * w + i) * 4;
@@ -83,13 +84,23 @@
     }
     if (!started) return null;
     // поле уходит в собственный холст: рельс держит его в кеше и кладёт multiply сколько угодно кадров
-    var out = canvas(w, h); out.getContext('2d').drawImage(dark, 0, 0, w, h, 0, 0, w, h);
+    var out = pooled(w, h); out.getContext('2d').drawImage(dark, 0, 0, w, h, 0, 0, w, h);
     return { cv: out, x: x0, y: y0, w: w, h: h };
   }
+  /* пул холстов полей: кадр берёт новые, прошлый кадр отдаёт свои (shade.recycle в начале сборки) */
+  var POOL = [], USED = [];
+  function pooled(w, h) {
+    var c = null;
+    for (var i = 0; i < POOL.length; i++) if (POOL[i].width >= w && POOL[i].height >= h) { c = POOL.splice(i, 1)[0]; break; }
+    if (!c) c = canvas(w, h);
+    var x = c.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'copy';
+    USED.push(c); return c;
+  }
+  function recycle() { POOL = POOL.concat(USED); USED = []; if (POOL.length > 600) POOL.length = 600; }
   function put(g, F) {
     if (!F) return;
     g.save(); g.globalCompositeOperation = 'multiply';
-    g.drawImage(F.cv, F.x, F.y); g.restore();
+    g.drawImage(F.cv, 0, 0, F.w, F.h, F.x, F.y, F.w, F.h); g.restore();
   }
 
   /* ── пятно лампы: lit = mix(1, E^0.6, pool), E = cos³; кеш на размер и лампу, ¼ разрешения ── */
@@ -127,5 +138,5 @@
     g.drawImage(tmp, 0, 0, w, h, 0, 0, W, H); g.restore();
   }
 
-  R.shade = { layer: layer, put: put, pool: pool, canopy: canopy, sprite: sprite };
+  R.shade = { layer: layer, put: put, recycle: recycle, pool: pool, canopy: canopy, sprite: sprite };
 })();

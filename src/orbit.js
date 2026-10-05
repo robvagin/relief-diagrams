@@ -143,9 +143,9 @@
     S.forEach(function (s) {
       var nd = s.nd;
       if (nd.lvl === 0) return;                                  // плоские печатаются на полу
-      var fill = s.fade > 0.01 ? C.mix(R.material.tints(T, +P.temp || 0).plate, R.material.tints(T, +P.temp || 0).ground, 0.55 * s.fade) : null;
-      if (nd.kind === 'circle') plates.push({ id: nd.id, kind: 'circle', x: s.x, y: s.y, w: 2 * nd.r * sc, z: s.z, idx: s.i, fill: fill, env: s.i === G.focus ? 0 : 1 });
-      else plates.push({ id: nd.id, kind: 'rect', x: s.x, y: s.y, w: nd.w * sc, h: nd.h * sc, r: nd.r * sc, rot: nd.rot, z: s.z, idx: s.i, fill: fill, paper: true, env: s.i === G.focus ? 0 : 1 });
+      var fill = null, fade = 0.55 * s.fade;                     // притухание цветом к грунту кадра (рельс, pseudo-3d §2)
+      if (nd.kind === 'circle') plates.push({ id: nd.id, kind: 'circle', x: s.x, y: s.y, w: 2 * nd.r * sc, z: s.z, idx: s.i, fill: fill, fade: fade, env: s.i === G.focus ? 0 : 1 });
+      else plates.push({ id: nd.id, kind: 'rect', x: s.x, y: s.y, w: nd.w * sc, h: nd.h * sc, r: nd.r * sc, rot: nd.rot, z: s.z, idx: s.i, fill: fill, fade: fade, paper: true, env: s.i === G.focus ? 0 : 1 });
     });
 
     // подсказка: маленький бумажный лист z3 над наведённым узлом (README §7.9)
