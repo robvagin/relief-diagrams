@@ -38,20 +38,35 @@
       EP.forEach(function (s, i) { s.t0 = acc; acc += s.dur; if (tt >= s.t0) cur = i; });
       if (!play) cur = n - 1;
       var fold = play ? Math.max(0, Math.min(1, (tt - total - 0.6) / 0.9)) : 0; fold = fold * fold * (3 - 2 * fold);
-      var S = Math.min(W, H), m = S * 0.06, top = m + 86 * ui, bot = H - m * 0.6;
+      var S = Math.min(W, H), m = S * 0.06, top = m + 86 * ui, bot = H - m;
       var wind = ctx.reduced ? 0 : O.swing(ctx.seed, 'wind', tsec, P, S * 0.04 * flt, 1), wind2 = ctx.reduced ? 0 : O.swing(ctx.seed, 'wind2', tsec, P, S * 0.02 * flt, 1);
-      var p0 = [W * 0.42, bot], p1 = [W * 0.36 + wind2 * 0.3, top + (bot - top) * 0.62], p2 = [W * 0.68 + wind * 0.6, top + (bot - top) * 0.45], p3 = [W * 0.56 + wind, top + (bot - top) * 0.08];
-      var els = [];
-      EP.forEach(function (s, i) {
-        var f = 0.12 + 0.86 * i / (n - 1), side = i % 2 ? 1 : -1;
-        var since = tt - s.t0, open = play ? (i <= cur ? R.motion.spring(0, 1, since) : 0) * (1 - fold) : 1;
-        var base = bez(p0, p1, p2, p3, f), sway = O.swing(ctx.seed, 'lf' + i, tsec, P, 7 * D2R * flt, ctx.reduced ? 0 : 1);
-        var isCur = play ? i === cur : s.state === P.stateG, gs = isCur ? size : 24;
-        var ang = (side < 0 ? 196 : -16) * D2R + side * 10 * D2R + sway, len = S * 0.12 * (0.4 + 0.6 * open);
-        var c = [base[0] + Math.cos(ang) * len, base[1] + Math.sin(ang) * len - S * 0.02];
-        els.push({ id: 'st' + i, i: i, s: s, x: c[0], y: c[1], base: base, w: Math.max(S * (isCur ? 0.13 : 0.075), gs * 1.75) * Math.max(open, 0.05), gs: gs, cur: isCur, open: open, side: side,
-          since: play ? since : 99, past: play && i < cur });
-      });
+      function geom(still) {
+        var wd = still ? 0 : wind, wd2 = still ? 0 : wind2;
+        var C = [[W * 0.42, bot], [W * 0.36 + wd2 * 0.3, top + (bot - top) * 0.62], [W * 0.68 + wd * 0.6, top + (bot - top) * 0.45], [W * 0.56 + wd, top + (bot - top) * 0.08]];
+        var out = [];
+        EP.forEach(function (s, i) {
+          var f = 0.12 + 0.86 * i / (n - 1), side = i % 2 ? 1 : -1;
+          var since = tt - s.t0, open = still ? 1 : play ? (i <= cur ? R.motion.spring(0, 1, since) : 0) * (1 - fold) : 1;
+          var base = bez(C[0], C[1], C[2], C[3], f), sway = still ? 0 : O.swing(ctx.seed, 'lf' + i, tsec, P, 7 * D2R * flt, ctx.reduced ? 0 : 1);
+          var isCur = play ? i === cur : s.state === P.stateG, gs = isCur ? size : 28;
+          var ang = (side < 0 ? 196 : -16) * D2R + side * 10 * D2R + sway, len = S * 0.14 * (0.4 + 0.6 * open);
+          var c = [base[0] + Math.cos(ang) * len, base[1] + Math.sin(ang) * len - S * 0.02];
+          out.push({ id: 'st' + i, i: i, s: s, x: c[0], y: c[1], base: base, w: Math.max(S * (isCur ? 0.16 : 0.105), gs * 1.75) * Math.max(open, 0.05), gs: gs, cur: isCur, open: open, side: side,
+            since: play ? since : 99, past: play && i < cur });
+        });
+        return { C: C, els: out };
+      }
+      // габарит полностью выросшего растения в покое → масштаб и сдвиг: стебель, корни, станции и подписи в кадре
+      var full = geom(true), x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, lab = 170 * ui;
+      full.els.forEach(function (e) { var r = e.w / 2; x0 = Math.min(x0, e.x - r - (e.side < 0 ? lab : 0)); x1 = Math.max(x1, e.x + r + (e.side > 0 ? lab : 0)); y0 = Math.min(y0, e.y - r); y1 = Math.max(y1, e.y + r); });
+      for (var qq = 0; qq <= 20; qq++) { var sp0 = bez(full.C[0], full.C[1], full.C[2], full.C[3], qq / 20); x0 = Math.min(x0, sp0[0]); x1 = Math.max(x1, sp0[0]); y0 = Math.min(y0, sp0[1]); y1 = Math.max(y1, sp0[1]); }
+      x0 = Math.min(x0, full.C[0][0] - S * 0.11); x1 = Math.max(x1, full.C[0][0] + S * 0.11); y1 = Math.max(y1, full.C[0][1] + S * 0.01);
+      var bw = W - 2 * m, bh = H - top - m * 1.4, kf = Math.min(1.25, bw / (x1 - x0), bh / (y1 - y0)) * 0.95;
+      var ox = m + (bw - (x1 - x0) * kf) / 2 - x0 * kf, oy = top + (bh - (y1 - y0) * kf) / 2 - y0 * kf;
+      var TF = function (p) { return [p[0] * kf + ox, p[1] * kf + oy]; };
+      var live = geom(false), p0 = TF(live.C[0]), p1 = TF(live.C[1]), p2 = TF(live.C[2]), p3 = TF(live.C[3]);
+      var els = live.els.map(function (e) { var c = TF([e.x, e.y]); e.x = c[0]; e.y = c[1]; e.base = TF(e.base); e.w = Math.max(e.w * kf, e.gs * 1.75 * Math.max(e.open, 0.05)); return e; });
+      S = S * kf;
       // верхушка стебля идёт за самой высокой распустившейся станцией (рост = время эпизода)
       var stemEnd = play ? 0.06 : 1;
       if (play) els.forEach(function (e) { stemEnd = Math.max(stemEnd, Math.min(1, (0.12 + 0.86 * e.i / (n - 1)) * Math.min(1, e.open * 1.4) + 0.05 * e.open)); });

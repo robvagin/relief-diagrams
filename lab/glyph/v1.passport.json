@@ -3,7 +3,7 @@
   "title": "Glyph · v1 Mobile",
   "blurb": "Agent state in 16–96 px as a living organism of discs: five states told apart by count, not by motion.",
   "version": "0.3.0",
-  "engineHash": "18b756cacc6c9a8e339579686a272cbc5d5343c1db72f09e93720833d0624e24",
+  "engineHash": "1351070e7d5b682c9ed91fd569ae5dbf1e8457f03d081c841376bc37662c39c6",
   "kind": "engine",
   "contract": {
     "embed": {
