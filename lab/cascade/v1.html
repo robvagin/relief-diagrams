@@ -798,12 +798,13 @@ html.is-embed #side{display:none}
     return [dh * L.cot * L.dx, dh * L.cot * L.dy];
   }
   const sigma = (L, dh) => 0.6 + L.soft * dh;
+  // высота для света: у разнесённого вида (stack) геометрия поднята для чтения, а свет считается
+  // по лестнице высот z0–z3 (L5); у остальных сцен это одна и та же высота
+  const lh = (p) => (p.hl != null ? p.hl : p.h);
   const density = (L, dh) => L.dens * (1 - 0.35 * smoothstep(0, 40, dh / L.S));
-  // цвет маски: multiply тоном shadowTint с альфой a = D/(1 − Y(tint))
-  function shadeColor(L, D) {
-    const a = clamp(D / Math.max(0.05, 1 - L.Yst), 0, 1);
-    return [0, 1, 2].map((i) => 255 * (1 - a * (1 - L.shadowTint[i] / 255)));
-  }
+  // маска: тон shadowTint с альфой a = D/(1 − Y(tint)); на белом darken и multiply дают 1 − a·(1 − tint).
+  // Спрайт хранит форму в чистом тоне, плотность едет альфой: кеш не зависит от плотности
+  const shade = (L, D) => clamp(D / Math.max(0.05, 1 - L.Yst), 0, 1);
   function lightDir(L, x, y) {
     if (!L.lamp) return [L.lx, L.ly];
     const vx = L.Lx - x, vy = L.Ly - y, n = Math.hypot(vx, vy) || 1;
@@ -828,7 +829,7 @@ html.is-embed #side{display:none}
       if (r < 0.5) { pts.forEach((q, i) => { const X = x0 + q[0] * c - q[1] * s, Y = y0 + q[0] * s + q[1] * c; i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); g.closePath(); return; }
       // скруглённый поворот: дуги по углам
       const cr = [[w / 2 - r, -d / 2 + r, -90], [w / 2 - r, d / 2 - r, 0], [-w / 2 + r, d / 2 - r, 90], [-w / 2 + r, -d / 2 + r, 180]];
-      cr.forEach((q) => { const X = x0 + q[0] * c - q[1] * s, Y = y0 + q[0] * s + q[1] * c; const a0 = (q[2] - 90) * D2R + p.rot; g.arc(X, Y, r, a0, a0 + Math.PI / 2); });
+      cr.forEach((q) => { const X = x0 + q[0] * c - q[1] * s, Y = y0 + q[0] * s + q[1] * c; const a0 = q[2] * D2R + p.rot; g.arc(X, Y, r, a0, a0 + Math.PI / 2); });
       g.closePath(); return;
     }
     g.roundRect(p.x + ox - w / 2, p.y + oy - d / 2, w, d, r);
@@ -839,43 +840,46 @@ html.is-embed #side{display:none}
     return e ? [p.x - e, p.y - e, p.x + e, p.y + e] : [p.x - p.w / 2, p.y - p.d / 2, p.x + p.w / 2, p.y + p.d / 2];
   }
 
-  // спрайт размытой формы (кеш по форме и корзине σ 0,25 px, §7.3): плавание двигает спрайт
+  // спрайт размытой формы (кеш по форме, корзине σ 0,25 px и наклону, §7.3): плавание двигает спрайт,
+  // перерисовка только при смене корзины. Наклон камеры аффинный, поэтому спрайт рисуется
+  // в проекции плоскости (y × cos τ) и ставится в проекцию центра заслонителя
   const SPR = new Map();
-  function sprite(p, sg, col) {
-    const sb = Math.round(sg * 4) / 4;
-    const key = (p.kind === 'disc' ? 'd' + p.r.toFixed(1) : 'r' + p.w.toFixed(1) + 'x' + p.d.toFixed(1) + 'r' + (p.rad || 0) + 'o' + (p.rot || 0).toFixed(3)) + '|' + sb + '|' + col.map((v) => v | 0).join(',');
+  function sprite(p, sg, col, cos) {
+    // корзины σ: 0,25 px до 4 px, дальше логарифмически (шаг ≈ 4,4 %): широкая полутень глазом не различима
+    const sb = sg < 4 ? Math.round(sg * 4) / 4 : Math.pow(2, Math.round(Math.log2(sg) * 16) / 16), cb = Math.round(cos * 1000) / 1000;
+    const key = (p.kind === 'disc' ? 'd' + p.r.toFixed(1) : 'r' + p.w.toFixed(1) + 'x' + p.d.toFixed(1) + 'r' + (p.rad || 0).toFixed(1)) + '|' + sb.toFixed(2) + '|' + cb + '|' + col.map((v) => v | 0).join(',');
     let s = SPR.get(key);
     if (s) return s;
-    const b = bbox(p), pad = Math.ceil(3 * sb + 2), w = b[2] - b[0] + 2 * pad, h = b[3] - b[1] + 2 * pad;
-    const c = canvas(w, h), g = c.getContext('2d');
-    g.filter = sb > 0.05 ? 'blur(' + sb + 'px)' : 'none';
+    const q = Object.assign({}, p, { x: 0, y: 0, rot: 0 });
+    const b = bbox(q), pad = Math.ceil(3 * sb + 2);
+    const w = b[2] - b[0] + 2 * pad, h = (b[3] - b[1]) * cb + 2 * pad;
+    // широкое размытие считается в уменьшенном спрайте и растягивается билинейно (бюджет кадра §7.3)
+    const f = clamp(3 / Math.max(sb, 0.01), 0.1, 1);
+    const c = canvas(Math.ceil(w * f), Math.ceil(h * f)), g = c.getContext('2d');
+    g.filter = sb > 0.05 ? 'blur(' + (sb * f).toFixed(2) + 'px)' : 'none';
     g.fillStyle = css(col);
-    trace(g, Object.assign({}, p, { x: p.x - b[0] + pad, y: p.y - b[1] + pad }), 0, 0, 0);
+    g.setTransform(f, 0, 0, cb * f, (pad - b[0]) * f, (pad - b[1] * cb) * f);
+    trace(g, q, 0, 0, 0);
     g.fill();
-    s = { c, ox: b[0] - pad - p.x, oy: b[1] - pad - p.y };
+    s = { c, ox: b[0] - pad, oy: b[1] * cb - pad, w: c.width / f, h: c.height / f };
     if (SPR.size > 600) SPR.clear();
     SPR.set(key, s);
     return s;
   }
 
-  // одна тень формы p в маску m: сдвиг o, размытие σ, цвет маски col
-  function castInto(m, cam, p, o, sg, col, hr) {
-    if (cam.tilt === 0) {
-      const s = sprite(p, sg, col);
-      m.drawImage(s.c, p.x + o[0] + s.ox, p.y + o[1] + s.oy);
-      return;
-    }
-    m.save();
-    m.filter = sg > 0.05 ? 'blur(' + (sg * (0.5 + 0.5 * cam.cos)).toFixed(2) + 'px)' : 'none';
-    onPlane(m, cam, hr);
-    m.fillStyle = css(col);
-    trace(m, p, o[0], o[1], 0);
-    m.fill();
-    m.restore();
+  // одна тень формы p в маску m: сдвиг o (мир), размытие σ, цвет маски col, приёмник на высоте hr
+  function castInto(m, cam, p, o, sg, a, hr, tint) {
+    if (a <= 0.001) return;
+    const s = sprite(p, sg, tint, cam.cos), c = project(cam, p.x + o[0], p.y + o[1], hr);
+    m.globalAlpha = a;
+    m.drawImage(s.c, c[0] + s.ox, c[1] + s.oy, s.w, s.h);
+    m.globalAlpha = 1;
   }
 
-  // тени всех заслонителей над приёмником на высоте hr в маску (объединение = максимум: darken)
-  function shadowMask(L, cam, M, plates, hr, rect, withContact) {
+  // тени всех заслонителей на приёмник в маску (объединение = максимум: darken).
+  // recv = null → пол. У разнесённого вида (stack) пол под каждым слоем свой: тень на пол
+  // считается по высоте лестницы hl и едет вместе со слоем; тень слоя на слой — по честной Δh
+  function shadowMask(L, cam, M, plates, recv, rect) {
     const m = M.g;
     m.setTransform(1, 0, 0, 1, 0, 0);
     m.globalCompositeOperation = 'source-over';
@@ -883,33 +887,30 @@ html.is-embed #side{display:none}
     m.fillStyle = '#fff';
     m.fillRect(0, 0, M.c.width, M.c.height);
     m.setTransform(1, 0, 0, 1, -rect[0], -rect[1]);
-    let any = false;
+    const hr = recv ? recv.h : 0;
+    const geo = (c) => recv ? { dh: c.h - hr, at: hr, base: hr } : { dh: lh(c), at: c.h - lh(c), base: 0 };
     m.globalCompositeOperation = 'darken';
     for (const c of plates) {
-      const dh = c.h - hr;
-      if (dh <= 0.01) continue;
-      const o = offset(L, c.x, c.y, c.h, hr);
-      castInto(m, cam, c, o, sigma(L, dh), shadeColor(L, density(L, dh)), hr);
-      any = true;
+      const q = geo(c);
+      if (q.dh <= 0.01) continue;
+      const o = offset(L, c.x, c.y, q.base + q.dh, q.base);
+      castInto(m, cam, c, o, sigma(L, q.dh), shade(L, density(L, q.dh)), q.at, L.shadowTint);
     }
-    if (withContact) {
-      // контакт у опоры: узкая тень σ = 0,8 + 0,06·h, сдвиг 0,25·o, плотность contact·(1 − h/16)₊;
-      // юбка σ 2 px плотностью 0,04 независимо от света (небо загорожено у опоры)
-      m.globalCompositeOperation = 'multiply';
-      for (const c of plates) {
-        const dh = c.h - hr;
-        if (dh <= 0.01) continue;
-        const near = dh <= 16 * L.S;
-        if (hr > 0 && !near) continue;
-        const k = L.contact * Math.max(0, 1 - dh / (16 * L.S));
-        const o = offset(L, c.x, c.y, c.h, hr);
-        if (k > 0.002) castInto(m, cam, c, [o[0] * 0.25, o[1] * 0.25], 0.8 + 0.06 * dh, shadeColor(L, k), hr);
-        castInto(m, cam, c, [0, 0], 2 * L.S, shadeColor(L, 0.04), hr);
-      }
+    // контакт у опоры: узкая тень σ = 0,8 + 0,06·h, сдвиг 0,25·o, плотность contact·(1 − h/16)₊;
+    // юбка σ 2 px плотностью 0,04 независимо от света (небо загорожено у опоры)
+    m.globalCompositeOperation = 'multiply';
+    for (const c of plates) {
+      const q = geo(c);
+      if (q.dh <= 0.01) continue;
+      if (recv && q.dh > 16 * L.S) continue;
+      const k = L.contact * Math.max(0, 1 - q.dh / (16 * L.S));
+      const o = offset(L, c.x, c.y, q.base + q.dh, q.base);
+      if (k > 0.002) castInto(m, cam, c, [o[0] * 0.25, o[1] * 0.25], 0.8 + 0.06 * q.dh, shade(L, k), q.at, L.shadowTint);
+      castInto(m, cam, c, [0, 0], 2 * L.S, shade(L, 0.04), q.at, L.shadowTint);
     }
     m.globalCompositeOperation = 'source-over';
     m.filter = 'none';
-    return any || withContact;
+    return true;
   }
 
   // ── кадр целиком: painter снизу вверх (§7.3) ──────────────────────────
@@ -927,7 +928,7 @@ html.is-embed #side{display:none}
     if (scene.floor) { g.save(); scene.floor(g, L); g.restore(); }
     // 3–4 · тени на пол и контакт: одна маска, один multiply
     const M = mask(W, H);
-    if (shadowMask(L, cam, M, plates, 0, [0, 0], true)) {
+    if (shadowMask(L, cam, M, plates, null, [0, 0])) {
       g.globalCompositeOperation = 'multiply'; g.drawImage(M.c, 0, 0, W, H); g.globalCompositeOperation = 'source-over';
     }
     // 5 · плашки по возрастанию h
@@ -961,7 +962,7 @@ html.is-embed #side{display:none}
         const MW = rect[2] - rect[0], MH = rect[3] - rect[1];
         if (MW > 0 && MH > 0) {
           const R = recv(MW, MH);
-          shadowMask(L, cam, R, above, p.h, rect, true);
+          shadowMask(L, cam, R, above, p, rect);
           const base = g.getTransform();
           g.save(); onPlane(g, cam, p.h); trace(g, p, 0, 0, 0); g.clip(); g.setTransform(base);
           g.globalCompositeOperation = 'multiply'; g.drawImage(R.c, rect[0], rect[1]); g.restore();
@@ -1124,6 +1125,14 @@ html.is-embed #side{display:none}
     if ('letterSpacing' in g) g.letterSpacing = '0px';
     return w;
   }
+  // строка в заданную ширину: длинное режется многоточием, а не уходит за край кадра
+  function fit(g, s, o, maxW) {
+    if (maxW <= 0) return '';
+    if (measure(g, s, o) <= maxW) return s;
+    let lo = 0, hi = s.length;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (measure(g, s.slice(0, mid) + '…', o) <= maxW) lo = mid; else hi = mid - 1; }
+    return lo > 0 ? s.slice(0, lo).trimEnd() + '…' : '';
+  }
   // рельефная линия: структура вырезана (тёмный штрих ink2 α .45 + светлый со сдвигом −0,75·l)
   function relief(g, L, pathFn) {
     g.save(); g.lineWidth = L.lineW; g.lineCap = 'round'; g.lineJoin = 'round';
@@ -1276,8 +1285,8 @@ html.is-embed #side{display:none}
   window.RL = {
     COMMON, PRESETS, FORMATS, clamp, mix, smoothstep, smootherstep, EASE, D2R, TAU,
     rgb, css, tokens, lightOf, offset, sigma, render, camera, onPlane, project, trace,
-    phases, float, assemble, assembleEnd, settle, tsec, text, measure, relief, printLine, hand, handRing,
-    exportPNG, boot, get fps() { return FPS; }
+    phases, float, assemble, assembleEnd, settle, tsec, text, measure, fit, relief, printLine, hand, handRing,
+    exportPNG, boot, get fps() { return FPS; }, get sprites() { return SPR.size; }
   };
 })();
 </script>
