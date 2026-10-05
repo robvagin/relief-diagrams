@@ -142,6 +142,7 @@
       var pos = new Map(), r = dotR(rc, loans.length, U), lab = U.fs(1) * 1.5;
       var keys = ['monitor', 'restructure', 'settlement', 'legal route', 'collateral sale'];
       var grp = keys.map(function (k) { return loans.filter(function (l) { return l.views.A5.action === k; }); });
+      if (rc[3] < rc[2] * 0.42) return A5wide(loans, rc, U, keys, grp, r, lab);
       var gap = 6 * U.ui, avail = rc[3] - keys.length * (lab + gap);
       var cell = fitCell(grp.map(function (a) { return Math.max(1, a.length); }), rc[2], avail, r);
       var y = rc[1], rows = [];
@@ -160,6 +161,33 @@
       }, caption: 'next recovery step' };
     }
   };
+  // A5 на широкой низкой плашке: группы колонками, ширина колонки по числу займов
+  function A5wide(loans, rc, U, keys, grp, r, lab) {
+    var pos = new Map(), gap = 10 * U.ui, h = rc[3] - lab, cell = 2 * r + 1.6;
+    var minW = keys.map(function (k2, i) { return (k2.length + String(grp[i].length).length + 1) * U.fs(1) * 0.62 + 6 * U.ui; });   // моно: ширина подписи
+    for (var k = 0; k < 30; k++) {
+      var rows = Math.max(1, Math.floor(h / cell)), tot = 0;
+      grp.forEach(function (a, i) { tot += Math.max(minW[i], Math.ceil(a.length / rows) * cell); });
+      if (tot + gap * (keys.length - 1) <= rc[2]) break;
+      cell *= 0.93;
+    }
+    var rowsN = Math.max(1, Math.floor(h / cell)), x = rc[0], cols = [];
+    grp.forEach(function (arr, i) {
+      var nc = Math.max(1, Math.ceil(arr.length / rowsN)), w = Math.max(minW[i], nc * cell);
+      arr.forEach(function (l, j) {
+        pos.set(l.id, [x + Math.floor(j / rowsN) * cell + cell / 2, rc[1] + lab + (j % rowsN) * cell + cell / 2, i === 0 ? 'dot' : i >= 3 ? 'square' : 'ring']);
+      });
+      cols.push([x, keys[i], arr.length]); x += w + gap;
+    });
+    return { pos: pos, r: Math.min(r, cell * 0.4), marks: function (g, T, U2, relief) {
+      R.font(g, U2, 1, 400, true); g.fillStyle = R.rgba(T.ink3); g.textBaseline = 'top';
+      cols.forEach(function (c, i) {
+        if (i) relief(g, [[c[0] - gap / 2, rc[1]], [c[0] - gap / 2, rc[1] + rc[3]]]);
+        g.fillText(c[1] + ' ' + c[2], c[0], rc[1]);
+      });
+      g.textBaseline = 'alphabetic';
+    }, caption: 'next recovery step' };
+  }
   function tipOf(a, l) {
     if (a === 'A1') return 'PD ' + pct(l.pd, 2) + ' · ' + money(l.exposure) + (l.views.A1.flag ? ' · flagged' : '');
     if (a === 'A2') return l.views.A2.inBatch ? 'batch · ' + l.views.A2.result : 'not in batch';
@@ -302,7 +330,7 @@
       R.font(g, U, 1, 400, true); g.fillStyle = R.rgba(T.ink3); g.textAlign = 'right';
       g.fillText('Fictional data', L.model[0] + L.model[2] - m, L.model[1] + L.model[3] - m - U.fs(1));
       g.textAlign = 'left';
-      if (!+ctx.P.trace) return;
+      if (!+ctx.P.trace) { if (V.modelPrint) V.modelPrint(g, T, U, ctx, L, cards, []); return; }
       var pts = cards.filter(function (c) { return c.selLocal; }).map(function (c) { return [c.selLocal[0], c.selLocal[1], c]; });
       g.lineWidth = U.lineW;
       if (pts.length > 1 && !L.noPolyline) {   // ломаная следа: видна в зазорах между агентами
@@ -310,6 +338,7 @@
         g.strokeStyle = R.rgba(T.ink, 0.42); g.setLineDash([2 * U.ui, 3 * U.ui]); g.stroke(); g.setLineDash([]);
       }
       if (L.hub) converge(g, T, U, L, pts);
+      if (V.modelPrint) V.modelPrint(g, T, U, ctx, L, cards, pts);
     }
     function converge(g, T, U, L, pts) {
       var hx = L.hub[0], hy = L.hub[1], rc = L.hub[2] * 0.45, N = pts.length;
@@ -336,7 +365,7 @@
       g.beginPath(); g.arc(x, y, 2.6 * U.ui, 0, TAU); g.fillStyle = R.rgba(T.accent); g.fill();
     }
     function overlay(g, T, U, ctx, L) {
-      if (!L.hub) return;
+      if (!L.hub || L.hubLabel === 'none') return;
       var l = S.byId.get(S.sel); if (!l) return;
       var x = L.hub[0], y = L.hub[1] + L.hub[2] + 8 * U.ui;
       g.textAlign = L.hubLabel === 'left' ? 'right' : 'center'; g.textBaseline = 'top';
