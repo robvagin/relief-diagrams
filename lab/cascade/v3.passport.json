@@ -1,9 +1,9 @@
 {
   "id": "cascade-v3",
-  "title": "Cascade · mobile",
-  "blurb": "RELIEF lab variant. Book hangs from the top, levels hang in tiers: arms balance by weight. Own light §7.2–7.4 until the rail lands.",
-  "version": "0.1.0",
-  "engineHash": "fb6c9328d8797515ff9ccaec18d4ef939509bb2afd4cc748eef81609dabe3ca5",
+  "title": "Cascade · plant",
+  "blurb": "Loan book as a living organism of matte discs and paper sheets: area is exposure, distance is share.",
+  "version": "0.3.0",
+  "engineHash": "d522b09a4714a66d2c5f10980d93cff9ad7e58853fb3977b2db04fb1f090dec4",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -44,38 +44,16 @@
   },
   "params": [
     {
-      "id": "mode",
-      "label": "Кодирование",
-      "type": "select",
-      "options": [
-        "share",
-        "balance"
-      ],
-      "default": "balance",
-      "group": "Сцена"
-    },
-    {
-      "id": "levels",
-      "label": "Уровней",
-      "type": "number",
-      "default": 3,
-      "min": 1,
-      "max": 3,
-      "step": 1,
-      "group": "Сцена"
-    },
-    {
       "id": "light",
       "label": "Свет",
       "type": "select",
+      "default": "soft",
       "options": [
         "soft",
         "raking",
         "lamp",
         "canopy"
-      ],
-      "default": "soft",
-      "group": "Свет"
+      ]
     },
     {
       "id": "az",
@@ -84,8 +62,7 @@
       "default": 135,
       "min": 0,
       "max": 360,
-      "step": 1,
-      "group": "Свет"
+      "step": 1
     },
     {
       "id": "elev",
@@ -94,8 +71,7 @@
       "default": 42,
       "min": 8,
       "max": 80,
-      "step": 1,
-      "group": "Свет"
+      "step": 1
     },
     {
       "id": "soft",
@@ -104,8 +80,7 @@
       "default": 0.28,
       "min": 0,
       "max": 1,
-      "step": 0.01,
-      "group": "Свет"
+      "step": 0.01
     },
     {
       "id": "dens",
@@ -114,8 +89,7 @@
       "default": 0.2,
       "min": 0,
       "max": 0.6,
-      "step": 0.01,
-      "group": "Свет"
+      "step": 0.01
     },
     {
       "id": "amb",
@@ -124,8 +98,7 @@
       "default": 0.72,
       "min": 0.2,
       "max": 0.95,
-      "step": 0.01,
-      "group": "Свет"
+      "step": 0.01
     },
     {
       "id": "contact",
@@ -134,8 +107,7 @@
       "default": 0.12,
       "min": 0,
       "max": 0.3,
-      "step": 0.01,
-      "group": "Свет"
+      "step": 0.01
     },
     {
       "id": "pool",
@@ -144,8 +116,7 @@
       "default": 0,
       "min": 0,
       "max": 1,
-      "step": 0.01,
-      "group": "Свет"
+      "step": 0.01
     },
     {
       "id": "lampH",
@@ -154,8 +125,7 @@
       "default": 900,
       "min": 300,
       "max": 2000,
-      "step": 10,
-      "group": "Свет"
+      "step": 10
     },
     {
       "id": "canopy",
@@ -164,8 +134,7 @@
       "default": 0,
       "min": 0,
       "max": 0.6,
-      "step": 0.01,
-      "group": "Свет"
+      "step": 0.01
     },
     {
       "id": "temp",
@@ -174,8 +143,7 @@
       "default": 0.25,
       "min": -1,
       "max": 1,
-      "step": 0.01,
-      "group": "Свет"
+      "step": 0.01
     },
     {
       "id": "grain",
@@ -184,8 +152,7 @@
       "default": 1.6,
       "min": 0,
       "max": 4,
-      "step": 0.1,
-      "group": "Материал"
+      "step": 0.1
     },
     {
       "id": "uneven",
@@ -194,8 +161,7 @@
       "default": 0.8,
       "min": 0,
       "max": 2,
-      "step": 0.1,
-      "group": "Материал"
+      "step": 0.1
     },
     {
       "id": "rim",
@@ -204,8 +170,7 @@
       "default": 0.5,
       "min": 0,
       "max": 1,
-      "step": 0.01,
-      "group": "Материал"
+      "step": 0.01
     },
     {
       "id": "radius",
@@ -214,8 +179,7 @@
       "default": 6,
       "min": 0,
       "max": 8,
-      "step": 0.5,
-      "group": "Материал"
+      "step": 0.5
     },
     {
       "id": "zscale",
@@ -224,20 +188,18 @@
       "default": 1,
       "min": 0,
       "max": 2,
-      "step": 0.01,
-      "group": "Материал"
+      "step": 0.01
     },
     {
       "id": "accent",
       "label": "Акцент",
       "type": "select",
+      "default": "terracotta",
       "options": [
         "terracotta",
         "cobalt",
         "olive"
-      ],
-      "default": "terracotta",
-      "group": "Материал"
+      ]
     },
     {
       "id": "hand",
@@ -246,8 +208,7 @@
       "default": 0,
       "min": 0,
       "max": 1,
-      "step": 1,
-      "group": "Материал"
+      "step": 1
     },
     {
       "id": "float",
@@ -256,8 +217,7 @@
       "default": 1,
       "min": 0,
       "max": 2,
-      "step": 0.01,
-      "group": "Движение"
+      "step": 0.01
     },
     {
       "id": "period",
@@ -266,8 +226,7 @@
       "default": 36,
       "min": 12,
       "max": 72,
-      "step": 1,
-      "group": "Движение"
+      "step": 1
     },
     {
       "id": "sway",
@@ -276,8 +235,7 @@
       "default": 0.3,
       "min": 0,
       "max": 1.5,
-      "step": 0.05,
-      "group": "Движение"
+      "step": 0.05
     },
     {
       "id": "bob",
@@ -286,8 +244,7 @@
       "default": 0.08,
       "min": 0,
       "max": 0.2,
-      "step": 0.01,
-      "group": "Движение"
+      "step": 0.01
     },
     {
       "id": "settle",
@@ -296,8 +253,7 @@
       "default": 0.9,
       "min": 0.3,
       "max": 2,
-      "step": 0.05,
-      "group": "Движение"
+      "step": 0.05
     },
     {
       "id": "assemble",
@@ -306,72 +262,19 @@
       "default": 1,
       "min": 0,
       "max": 1,
-      "step": 1,
-      "group": "Движение"
-    },
-    {
-      "id": "spread",
-      "label": "Раскрытие, °",
-      "type": "number",
-      "default": 300,
-      "min": 90,
-      "max": 360,
-      "step": 1,
-      "group": "Ритм"
-    },
-    {
-      "id": "ticks",
-      "label": "Засечки",
-      "type": "boolean",
-      "default": 1,
-      "min": 0,
-      "max": 1,
-      "step": 1,
-      "group": "Ритм"
-    },
-    {
-      "id": "phyllo",
-      "label": "Филлотаксис",
-      "type": "boolean",
-      "default": 0,
-      "min": 0,
-      "max": 1,
-      "step": 1,
-      "group": "Ритм"
-    },
-    {
-      "id": "rmax",
-      "label": "Крупнейший, px",
-      "type": "number",
-      "default": 84,
-      "min": 40,
-      "max": 200,
-      "step": 1,
-      "group": "Ритм"
-    },
-    {
-      "id": "metric",
-      "label": "Мера",
-      "type": "select",
-      "options": [
-        "value",
-        "count"
-      ],
-      "default": "value",
-      "group": "Данные"
+      "step": 1
     },
     {
       "id": "format",
       "label": "Формат",
       "type": "select",
+      "default": "screen",
       "options": [
         "screen",
         "16:9",
         "1:1",
         "4:5"
-      ],
-      "default": "screen",
-      "group": "Выгрузка"
+      ]
     },
     {
       "id": "scale",
@@ -380,26 +283,25 @@
       "default": 2,
       "min": 1,
       "max": 3,
-      "step": 1,
-      "group": "Выгрузка"
+      "step": 1
     }
   ],
   "presets": [],
   "frozen": [],
   "aspect": "auto",
   "minHeight": 240,
-  "hover": "nothing",
-  "click": "click on a scrub without drag opens number input; R replay, P pause, E PNG, I theme",
-  "reducedMotion": "float and assembly removed, one final frame",
-  "narrow390": "panel becomes an open bottom sheet, the scene fits its box; no panel in embed",
+  "hover": "node lifts with its neighbours, the rest dims by colour; a small z3 card shows the values",
+  "click": "click = focus on a node, drag = pull a node (neighbours follow on springs), wheel = zoom, drag on the floor = pan, double click = home",
+  "reducedMotion": "sway and assembly removed, one final frame",
+  "narrow390": "panel becomes an open bottom sheet, the organism fits its box; no panel in embed",
   "forbidden": [
     "stretch unevenly",
     "put on a coloured ground",
-    "edit the built v3.html instead of src/"
+    "edit the built file instead of lab/<scene>/src/"
   ],
   "export": {
     "png": true,
-    "svg": false,
+    "svg": true,
     "pdf": false,
     "zpl": false
   },
@@ -407,19 +309,29 @@
     {
       "family": "Geist",
       "license": "OFL-1.1",
-      "embedded": "local"
+      "embedded": "subset"
     },
     {
       "family": "Geist Mono",
       "license": "OFL-1.1",
-      "embedded": "local"
+      "embedded": "subset"
     }
   ],
-  "tokensIn": [],
+  "tokensIn": [
+    "--r-ground",
+    "--r-plate",
+    "--r-ink",
+    "--r-ink2",
+    "--r-ink3",
+    "--r-shadow",
+    "--r-light",
+    "--r-acc-terracotta",
+    "--r-acc-cobalt",
+    "--r-acc-olive"
+  ],
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "10/10",
-    "report": "gate/acceptance.json"
+    "score": "0/10"
   }
 }
