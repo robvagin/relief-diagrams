@@ -213,7 +213,8 @@
     g.fillStyle = rgba([255 - lv * (255 - tint[0]), 255 - lv * (255 - tint[1]), 255 - lv * (255 - tint[2])]);
     shapePath(g, s, pad - b.x, pad - b.y);
     g.fill();
-    e = { c, ox: b.x - pad, oy: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 };
+    // смещение спрайта хранится относительно рамки формы: один спрайт на все плашки того же размера
+    e = { c, pad, w: b.w + pad * 2, h: b.h + pad * 2 };
     SPR.set(key, e);
     return e;
   }
@@ -259,15 +260,15 @@
       const c = hh.c, dh = hh.dh;
       const put = (sg, ox, oy, a) => {
         if (a <= 0.004) return;
-        const sp = sprite(c.s, sg, a, tint);
+        const sp = sprite(c.s, sg, a, tint), cb = shapeBox(c.s), sx = cb.x - sp.pad, sy = cb.y - sp.pad;
         if (c.rot) {
           const cc = shapeCenter(c.s);
           ma.save();
           ma.scale(MS, MS);
           ma.translate(cc[0] + ox - bx, cc[1] + oy - by); ma.rotate(c.rot); ma.translate(-cc[0], -cc[1]);
-          ma.drawImage(sp.c, sp.ox, sp.oy, sp.w, sp.h);
+          ma.drawImage(sp.c, sx, sy, sp.w, sp.h);
           ma.restore();
-        } else ma.drawImage(sp.c, (sp.ox + ox - bx) * MS, (sp.oy + oy - by) * MS, sp.w * MS, sp.h * MS);
+        } else ma.drawImage(sp.c, (sx + ox - bx) * MS, (sy + oy - by) * MS, sp.w * MS, sp.h * MS);
       };
       put(hh.sg, hh.o[0], hh.o[1], densOf(L, dh) * k);
       // контакт §7.3 п.4: узкая тень у опоры и «юбка» независимо от света

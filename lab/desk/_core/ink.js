@@ -73,9 +73,10 @@
       g.strokeStyle = R.rgba(T.ink, ctx.theme === 'night' ? 0.26 : 0.22);
       path(g, 0, 0); g.stroke(); g.restore(); return;
     }
-    g.strokeStyle = R.rgba(T.ink2, ctx.theme === 'night' ? 0.5 : 0.45);
+    // ночью ink2 светлый: вырез даёт приглушённая чернильная линия и слабый тёплый кант
+    g.strokeStyle = R.rgba(T.ink2, ctx.theme === 'night' ? 0.16 : 0.45);
     path(g, 0, 0); g.stroke();
-    g.strokeStyle = R.rgba(L.lightTint, ctx.theme === 'night' ? 0.16 : 0.55);
+    g.strokeStyle = R.rgba(L.lightTint, ctx.theme === 'night' ? 0.08 : 0.55);
     path(g, -0.75 * L.lxy[0], -0.75 * L.lxy[1]); g.stroke();
     g.restore();
   }
