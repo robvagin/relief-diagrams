@@ -49,3 +49,4 @@ Skills applied: autonomous-build-loop, naryad-crafting, panel-canon, motion-kine
 | время (UTC) | пункт | что сделано | чем проверено | хеш |
 |---|---|---|---|---|
 | 2026-10-05T13:58:53Z | orbit | сцена orbit (`src/orbit.js` → `dist/orbit.html`), модуль `src/motion/graph.js`, playground открывается на orbit, калибровка под `?dev=1` | `gate.py dist/orbit.html` → 10/10; headless: наведение, перетаскивание, подсказка, ноль ошибок страницы; кадр глазами без дырок и перпендикуляров | d602a8d |
+| 2026-10-05T14:08:31Z | orbit · бюджет | притухание цветом через рельс (`plate.fade`), кеш теней по составу и tq, пул холстов, спрайты квантуются | rAF-медиана 16,7 мс (было 66), p90 50; `probes.py --negative` зелёный; gate orbit и _lab 10/10; ночь глазами | 6c4343f |
