@@ -3,7 +3,7 @@
   "title": "Stack · graph",
   "blurb": "Model of record as hanging paper sheets and discs lifted by height: data, knowledge, rules, decision.",
   "version": "0.3.0",
-  "engineHash": "f23e9f0b85b9e8e58b650e5151bccfe5af24a541dfe6094a6324e25985053754",
+  "engineHash": "81a4c7a126cdec43afb14f41cbdd85a4b02e8e2542b038a429888ae487d37fcb",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -332,6 +332,7 @@
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "0/10"
+    "score": "10/10",
+    "report": "gate/acceptance.json"
   }
 }

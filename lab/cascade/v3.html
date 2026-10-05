@@ -2692,7 +2692,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
       n.lab = null;
       if (n.depth === 0) return;
       // подпись внутри: большой диск стадии, крупный лист сегмента, диск страны от 12 px
-      n.inside = (!n.sheet && n.depth === 1 && n.r >= 30 * ui) || (n.sheet && n.w > 74 * ui && n.h > 36 * ui) || (!n.sheet && n.depth === 3 && n.r >= 12 * ui);
+      n.inside = (!n.sheet && n.depth === 1 && n.r >= 30 * ui && V !== 'v2') || (n.sheet && n.w > 74 * ui && n.h > 36 * ui) || (!n.sheet && n.depth === 3 && n.r >= 12 * ui);
       if (n.inside) return;
       if (n.depth === 3 && n.r < 6 * ui) return;
       var big = n.depth === 1, sz = big ? 14 : 11.67, wch = (n.label.length + (n.depth < 3 ? 9 : 0)) * sz * 0.58 * ui, hh = (n.depth < 3 ? 2.4 : 1.2) * sz * ui;

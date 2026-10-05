@@ -3,7 +3,7 @@
   "title": "Stack · chandelier",
   "blurb": "Model of record as hanging paper sheets and discs lifted by height: data, knowledge, rules, decision.",
   "version": "0.3.0",
-  "engineHash": "2ecc9ad78776445db7373979503cb7f511530a55168aa75ebe4d6ce0edd82517",
+  "engineHash": "963e1cde2aff30a4cf59e0499132d3678d91df7247d066491f9c951d462e6157",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -332,6 +332,7 @@
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "0/10"
+    "score": "10/10",
+    "report": "gate/acceptance.json"
   }
 }

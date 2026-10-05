@@ -199,7 +199,8 @@
   /* выноски лучами: от самого правого элемента слоя прямой луч к подписи в колонке справа,
      подписи по высоте источников, лучи не пересекаются (сортировка по y источника, донор 01) */
   function callouts(g, F, sc, N, Ly, L, ui) {
-    if (!F.P.callouts) return;
+    // узкий кадр: колонке выносок нет места, основания слоя показывает карточка наведения
+    if (!F.P.callouts || F.W < 700) return;
     var src = CALL.map(function (c) {
       var best = -1, bx = -1e9;
       N.forEach(function (n, i) { if (n.layer === c.layer && sc[i].x + (n.kind === 'disc' ? n.r : n.w / 2) > bx) { bx = sc[i].x + (n.kind === 'disc' ? n.r : n.w / 2) * F.zoom; best = i; } });
