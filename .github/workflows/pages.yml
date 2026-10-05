@@ -1,0 +1,35 @@
+name: pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: clean check (public repo)
+        run: python3 tools/clean_check.py
+      - name: site from dist/
+        run: |
+          mkdir -p _site
+          if [ -d dist ]; then cp -R dist/. _site/; fi
+          if [ ! -f _site/index.html ]; then
+            printf '<!doctype html><meta charset="utf-8"><title>relief</title><p style="font:16px system-ui;margin:48px">The stand is not built yet. See README.</p>' > _site/index.html
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

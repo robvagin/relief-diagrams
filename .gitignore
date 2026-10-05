@@ -1,0 +1,10 @@
+# local only: client brief, references, plain names list
+private/
+# build scratch and tooling
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+_site/
+tools/verify/_out/
+*.tmp

@@ -1,0 +1,96 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Образец модуля арсенала</title>
+<style>
+/* Страничные токены (§6.1 наряда, нейтральный флот). Хексы живут ТОЛЬКО здесь. */
+:root{
+  --paper:#f6f5f2; --panel:#fdfdfc; --ink:#1a1a1a; --muted:#6f6d67;
+  --line:#dcdad4; --accent:#0b0b0c;
+  --sp-2:8px; --sp-3:12px;
+}
+html.is-night{ --paper:#1F1C17; --panel:#26231d; --ink:#F4F0E3; --muted:#A6A19B;
+  --line:rgba(244,240,227,.16); --accent:#C7A985; }
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);
+  font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+#stage{position:absolute;inset:0}
+canvas{display:block;width:100%;height:100%}
+#panel{position:fixed;right:16px;top:16px;max-height:calc(100% - 32px)}
+html.is-embed #panel{display:none}
+</style></head><body>
+<div id="stage"><canvas id="c"></canvas></div>
+<div id="panel" data-panel></div>
+
+<script src="../../kit/kit-panel.js"></script>
+<script src="../../kit/kit-scene.js"></script>
+<script>
+/* Образец модуля арсенала: положительный контроль гейта и читаемый образец контракта.
+   Сцена не знает ни про адрес, ни про панель, ни про кадры — это забота рельса. */
+KIT.scene.register({
+  id: 'sample',
+  title: 'Кольца по сиду',
+  blurb: 'Минимальная сцена контракта: четыре ручки, сид, экспорт.',
+  params: [
+    ['rings',  'Колец',  4, 48, 1,    18],
+    ['spread', 'Разбег', 2, 40, 0.5,   12],
+    ['wobble', 'Дрожь',  0, 3,  0.05, 0.9],
+    ['speed',  'Темп',   0, 4,  0.05,   1],
+    ['dense',  'Плотно', 0, 1,  1,      1],
+    ['look',   'Вид',    ['кольца', 'дуги'], 'tabs'],
+    ['marks',  'Метки',  ['центр', 'края', 'узлы'], 'chips', { default: ['центр'] }],
+    ['grid',   'Сетка',  0, 40, 1, 0, { studio: true }]
+  ],
+  init: function (ctx) {
+    const cs = getComputedStyle(document.documentElement);
+    ctx.pal = {
+      ink: cs.getPropertyValue('--ink').trim(),
+      line: cs.getPropertyValue('--line').trim(),
+      accent: cs.getPropertyValue('--accent').trim()
+    };
+  },
+  draw: function (ctx) {
+    const g = ctx.g, P = ctx.P, W = ctx.W, H = ctx.H, cx = W / 2, cy = H / 2;
+    g.clearRect(0, 0, W, H);
+
+    if (P.grid > 0) {                       // ряд студии: в клиенте его нет вовсе
+      g.strokeStyle = ctx.pal.line; g.lineWidth = 1; g.globalAlpha = 0.5;
+      for (let x = 0; x < W; x += P.grid) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+      g.globalAlpha = 1;
+    }
+
+    const n = Math.round(P.rings);
+    const phase = ctx.t * P.speed * 0.02;
+    const arcs = P.look === 'дуги';
+    for (let i = 0; i < n; i++) {
+      const jitter = (ctx.rand() - 0.5) * P.wobble * 8;
+      const rad = Math.abs(8 + i * P.spread + Math.sin(phase + i * 0.4) * (2 + P.wobble * 3) + jitter);
+      const a0 = arcs ? (ctx.randNoise() * 6.283) : 0;
+      const a1 = arcs ? a0 + 1.2 + ctx.randNoise() * 2.4 : 6.283185307179586;
+      g.beginPath();
+      g.strokeStyle = i % 4 === 0 ? ctx.pal.ink : ctx.pal.line;
+      g.lineWidth = 1;                      // перо не масштабируется: глубина берётся альфой
+      g.globalAlpha = P.dense ? 1 : 0.55;
+      g.arc(cx, cy, rad, a0, a1);
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+
+    const marks = P.marks || [];
+    g.fillStyle = ctx.pal.accent;
+    if (marks.indexOf('центр') !== -1) { g.beginPath(); g.arc(cx, cy, 2.5, 0, 6.283); g.fill(); }
+    if (marks.indexOf('края') !== -1) {
+      [[6, 6], [W - 6, 6], [6, H - 6], [W - 6, H - 6]].forEach(function (pt) {
+        g.beginPath(); g.arc(pt[0], pt[1], 2, 0, 6.283); g.fill();
+      });
+    }
+    if (marks.indexOf('узлы') !== -1) {
+      for (let i = 0; i < n; i += 4) {
+        const rad = Math.abs(8 + i * P.spread);
+        g.beginPath(); g.arc(cx + rad, cy, 1.8, 0, 6.283); g.fill();
+      }
+    }
+  }
+});
+
+KIT.scene.start({ canvas: document.getElementById('c'), panelMount: document.getElementById('panel') });
+</script></body></html>

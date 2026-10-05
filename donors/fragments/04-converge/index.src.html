@@ -1,0 +1,136 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Фрагмент 04 · сходимость</title>
+<style>
+/* Токены страницы. Хексы живут ТОЛЬКО здесь: хост перекрашивает фрагмент,
+   не трогая сцену (закон 3). */
+:root{
+  --paper:#f6f5f2; --panel:#fdfdfc; --ink:#1a1a1a; --muted:#6f6d67;
+  --line:#dcdad4; --accent:#0b0b0c;
+}
+html.is-night{ --paper:#1F1C17; --panel:#26231d; --ink:#F4F0E3; --muted:#A6A19B;
+  --line:rgba(244,240,227,.22); --accent:#C7A985; }
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);
+  font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+#stage{position:absolute;inset:0}
+canvas{display:block;width:100%;height:100%}
+#panel{position:fixed;right:16px;top:16px;max-height:calc(100% - 32px)}
+html.is-embed #panel{display:none}
+</style></head><body>
+<div id="stage"><canvas id="c"></canvas></div>
+<div id="panel" data-panel></div>
+
+<script src="../../kit/kit-panel.js"></script>
+<script src="../../kit/kit-scene.js"></script>
+<script>
+/* Фрагмент 04 · сходимость.
+   Вынуты три правила движка сходимости, без них веер разваливается:
+     1. Не сходиться В ТОЧКУ: линии входят в СОБИРАЮЩУЮ ДУГУ внутри узла,
+        радиус 0.3–0.6 от радиуса узла, по касательной.
+     2. Углы входа назначаются монотонно по порядку источников — тогда линии
+        не пересекаются между собой.
+     3. Плечи асимметричны, а направления старта и прихода ГОРИЗОНТАЛЬНЫ у всех:
+        общий горизонтальный подход читается как параллельные пучки, а не как
+        звёздочка. Формула касательной «по углу» давала переворот знака ровно
+        на средней линии, и половины веера въезжали друг другу в полосу. */
+KIT.scene.register({
+  id: 'converge',
+  title: 'Сходимость',
+  blurb: 'Пучок линий, входящий в собирающую дугу узла: без пересечений и без звёздочки.',
+  params: [
+    ['lines',   'Линий',      2, 64, 1,    22],
+    ['span',    'Разлёт',  0.05, 0.9, 0.005, 0.62],
+    ['hub',     'Узел',    0.02, 0.3, 0.005, 0.085],
+    ['collect', 'Дуга',     0.3, 0.6, 0.01,  0.45],
+    ['shoulder','Плечо',    0.1, 0.9, 0.01,  0.55],
+    ['srcX',    'Старт',   0.04, 0.45, 0.005, 0.12],
+    ['hubX',    'Финиш',   0.3, 0.96, 0.005, 0.78],
+    ['thin',    'Разброс',    0, 1, 0.01,  0.22],
+    ['node',    'Точки',      0, 1, 1,      1],
+    ['pulse',   'Импульс',    0, 1, 0.01,  0.55],
+    ['pulseSpeed','Ход',      0, 3, 0.01,  0.65],
+    ['alpha',   'Плотность', 0.1, 1, 0.01, 0.7],
+    ['accentAt','Акцент',     0, 64, 1,     0]
+  ],
+  presets: [{ schema: 1, id: 'hero', engine: 'converge', seed: 'arsenal',
+              values: { lines: 22, span: 0.62, collect: 0.45, shoulder: 0.55 } }],
+  init: function (ctx) {
+    const cs = getComputedStyle(document.documentElement);
+    ctx.pal = { ink: cs.getPropertyValue('--ink').trim(),
+                line: cs.getPropertyValue('--line').trim(),
+                accent: cs.getPropertyValue('--accent').trim() };
+  },
+  draw: function (ctx) {
+    const g = ctx.g, P = ctx.P, W = ctx.W, H = ctx.H;
+    g.clearRect(0, 0, W, H);
+    const S = Math.min(W, H);
+    const N = Math.max(2, Math.round(P.lines));
+    const hubR = P.hub * S;
+    const hx = W * P.hubX, hy = H / 2;
+    const sx = W * P.srcX;
+    const halfSpan = P.span * H / 2;
+    const rCol = hubR * P.collect;
+    const shoulder = (hx - sx) * P.shoulder;
+
+    for (let i = 0; i < N; i++) {
+      const t = N === 1 ? 0.5 : i / (N - 1);
+      // правило 2: монотонное назначение — порядок входа совпадает с порядком источников
+      const a = Math.PI + Math.PI / 2 - t * Math.PI;
+      // разброс по сиду: источники стоят не по линейке, иначе кадр «слишком ровный»
+      const jit = (ctx.rand() - 0.5) * P.thin * 18;
+      const p0y = hy - halfSpan + t * halfSpan * 2 + jit;
+      const p0x = sx + (ctx.rand() - 0.5) * P.thin * 26;
+      // правило 1: вход в дугу внутри узла, не в точку
+      const p3x = hx + rCol * Math.cos(a), p3y = hy + rCol * Math.sin(a);
+      // правило 3: обе опорные точки лежат на ГОРИЗОНТАЛЯХ своих концов
+      const c1x = p0x + shoulder, c1y = p0y;
+      const c2x = p3x - shoulder, c2y = p3y;
+
+      const isAccent = P.accentAt > 0 && i === Math.min(N - 1, Math.round(P.accentAt) - 1);
+      g.beginPath();
+      g.moveTo(p0x, p0y);
+      g.bezierCurveTo(c1x, c1y, c2x, c2y, p3x, p3y);
+      g.globalAlpha = isAccent ? 1 : P.alpha * (0.55 + 0.45 * (1 - Math.abs(t - 0.5) * 2));
+      g.strokeStyle = isAccent ? ctx.pal.accent : ctx.pal.ink;
+      g.lineWidth = 1;
+      g.stroke();
+
+      if (P.node) {
+        g.beginPath();
+        g.globalAlpha = isAccent ? 1 : P.alpha * 0.8;
+        g.fillStyle = isAccent ? ctx.pal.accent : ctx.pal.ink;
+        g.arc(p0x, p0y, 1.8, 0, Math.PI * 2);
+        g.fill();
+      }
+
+      // импульс: по каждой линии идёт точка со СВОЕЙ задержкой и общим финишем.
+      // Это и есть «сходится в одно»: приходят порознь, заканчивают вместе.
+      if (P.pulse > 0) {
+        const lag = i / N * 0.45;
+        let u = (ctx.t * P.pulseSpeed * 0.004 - lag) % 1;
+        if (u < 0) u += 1;
+        const e = u * u * (3 - 2 * u);                 // мягкий вход, мягкий выход
+        const mt = 1 - e, bx = mt*mt*mt*p0x + 3*mt*mt*e*c1x + 3*mt*e*e*c2x + e*e*e*p3x;
+        const by = mt*mt*mt*p0y + 3*mt*mt*e*c1y + 3*mt*e*e*c2y + e*e*e*p3y;
+        g.beginPath();
+        g.globalAlpha = P.pulse * (1 - Math.abs(e - 0.5) * 0.8);
+        g.fillStyle = ctx.pal.accent;
+        g.arc(bx, by, 2.2, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+
+    // сам узел: окружность собирающей дуги, чтобы правило 1 читалось глазом
+    g.beginPath();
+    g.globalAlpha = 0.5;
+    g.strokeStyle = ctx.pal.line;
+    g.lineWidth = 1;
+    g.arc(hx, hy, hubR, 0, Math.PI * 2);
+    g.stroke();
+    g.globalAlpha = 1;
+  }
+});
+
+KIT.scene.start({ canvas: document.getElementById('c'), panelMount: document.getElementById('panel') });
+</script></body></html>

@@ -1,0 +1,3 @@
+# detector fixtures that look like secrets on purpose (dirty twins of probes); one line each: path<TAB>h16(line)
+skills/release-scrub/scripts/scrub_scan.py	304e9b29aeed1f95
+vendor/gate/gate.py	e02485801aea26ae

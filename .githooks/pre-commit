@@ -1,0 +1,4 @@
+#!/bin/sh
+# public repo hygiene: no client names, no secrets, nothing from private/
+python3 "$(git rev-parse --show-toplevel)/tools/clean_check.py" --staged || {
+  echo "pre-commit: clean_check failed, commit stopped (README L10)"; exit 1; }

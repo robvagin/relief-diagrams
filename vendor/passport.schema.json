@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://heartbeat.local/arsenal/passport.schema.json",
+  "title": "Паспорт модуля арсенала",
+  "description": "Схема паспорта движка, фрагмента, рантайма и инструмента. §6.4 наряда HANDOFF_БАЗА-ПОДАЧИ-БРЕНДИНГА_2026-09-10. PASSPORT.md генерируется из этого json, руками не пишется.",
+  "type": "object",
+  "required": [
+    "id", "title", "version", "engineHash", "kind", "contract", "params",
+    "aspect", "minHeight", "reducedMotion", "narrow390", "export", "fonts",
+    "tokensIn", "brandFree", "gate"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Латиница, дефисы. Совпадает с именем папки модуля."
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "blurb": { "type": "string", "description": "Одна строка: что это и зачем." },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "engineHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 собранного single-file. Считает gate.py, руками не вписывается."
+    },
+    "kind": { "enum": ["engine", "fragment", "runtime", "tool"] },
+    "contract": {
+      "type": "object",
+      "required": ["embed"],
+      "additionalProperties": false,
+      "properties": {
+        "embed": {
+          "type": "object",
+          "required": ["params"],
+          "additionalProperties": false,
+          "properties": {
+            "params": {
+              "type": "array",
+              "items": { "enum": ["embed", "theme", "p", "seed", "preset", "mode", "s", "reduced"] },
+              "description": "Читаемые ключи адреса. Канон §6.2."
+            },
+            "aliases": {
+              "type": "array",
+              "items": { "enum": ["noui", "panel=off"] },
+              "description": "Синонимы embed=1, живут одну волну."
+            }
+          }
+        },
+        "postMessage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "out": { "type": "array", "items": { "enum": ["ready", "frame", "export"] } },
+            "in": { "type": "array", "items": { "enum": ["es:progress", "es:replay", "pause", "play"] } },
+            "selfplay": {
+              "type": "boolean",
+              "description": "true — без сообщения фрагмент играет сам (обязательно для витрины)."
+            }
+          }
+        },
+        "api": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Публичные вызовы рантайма: mount, list, params, recipe, snapshot."
+        }
+      }
+    },
+    "params": {
+      "type": "array",
+      "description": "Объектная форма §6.3. Плоская [key,label,min,max,step,default] разворачивается в неё 1:1.",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "type", "default"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "type": { "enum": ["number", "boolean", "color", "select", "string"] },
+          "default": {},
+          "min": { "type": "number" },
+          "max": { "type": "number" },
+          "step": { "type": "number" },
+          "options": { "type": "array" },
+          "group": { "type": "string" },
+          "unit": { "type": "string" },
+          "format": { "type": "string" },
+          "update": { "enum": ["sync", "reload"] }
+        }
+      }
+    },
+    "presets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["schema", "engine", "seed", "values"],
+        "additionalProperties": false,
+        "properties": {
+          "schema": { "const": 1 },
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "engine": { "type": "string" },
+          "engineHash": { "type": "string" },
+          "seed": { "type": "string" },
+          "values": { "type": "object" }
+        }
+      }
+    },
+    "frozen": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Что заморожено во фрагменте: ручки, снятые из панели и вбитые в пресет."
+    },
+    "aspect": { "type": "string", "pattern": "^\\d+(\\.\\d+)?:\\d+(\\.\\d+)?$|^auto$" },
+    "minHeight": { "type": "integer", "minimum": 0 },
+    "hover": { "type": "string", "description": "Что делает наведение. «ничего» — валидное значение." },
+    "click": { "type": "string" },
+    "reducedMotion": { "type": "string", "description": "Что происходит при prefers-reduced-motion: обычно постер и один кадр." },
+    "narrow390": { "type": "string", "description": "Что происходит на 390 px и в embed 320×240." },
+    "forbidden": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Чего с модулем нельзя: растягивать, класть на цвет, резать поля."
+    },
+    "export": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "png": { "type": "boolean" },
+        "svg": { "type": "boolean" },
+        "pdf": { "type": "boolean" },
+        "zpl": { "type": "boolean" }
+      }
+    },
+    "fonts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["family", "license", "embedded"],
+        "additionalProperties": false,
+        "properties": {
+          "family": { "type": "string" },
+          "license": { "type": "string", "description": "OFL-1.1, коммерческая, системная." },
+          "embedded": { "enum": ["subset", "local", "none"] },
+          "renamed": { "type": "string", "description": "Новое имя при Reserved Font Name." }
+        }
+      }
+    },
+    "tokensIn": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Какие токены модуль читает снаружи. Пустой список значит модуль не окрашивается."
+    },
+    "brandFree": {
+      "const": true,
+      "description": "Закон 3: в коде модуля ноль имён клиентов, хексов, RGB-триплетов, base64 и запечённой геометрии знака."
+    },
+    "gate": {
+      "type": "object",
+      "required": ["date", "score"],
+      "additionalProperties": false,
+      "properties": {
+        "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "score": { "type": "string", "pattern": "^([0-9]|10)/10$" },
+        "report": { "type": "string", "description": "Путь к json прогона гейта." },
+        "code": { "type": "integer", "enum": [0, 1, 2, 3] }
+      }
+    }
+  }
+}

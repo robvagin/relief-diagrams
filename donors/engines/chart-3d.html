@@ -1,0 +1,1282 @@
+<!doctype html>
+<!--
+  Chart 3D — Skeleton. Вариатив по референсам автора (Bloomberg-экструзия, polar-сектора).
+  Брендируемые чарты, которые крутятся в 3D:
+    pie   — экструдированный пай с бортом и разнесением долей (explode)
+    polar — сектора-найтингейл: бледная подложка + насыщенное значение, точечный обод
+    bars  — ступенчатые 3D-блоки со шкалой Y
+    area  — «хребет»: профиль с крышкой и тёмным торцом
+  Painter-грани (дальние первыми), палитра 4 цветов + Shade для боков, жёсткий бордер.
+  Пилюли с коллизиями, клик — тултип-бабл (label, значение/%, note). Шкалы адаптивные.
+  Грамматика конструкторов: стандарт вращения, гизмо, тумблеры, config-merge, PNG, H.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chart 3D</title>
+<style>
+  :root{
+    --paper:#f6f5f2; --ink:#1a1a1a; --muted:#6f6d67; --line:#dcdad4;
+    --accent:#0b0b0c; --panel:#fdfdfc;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);
+    font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
+  canvas{display:block;cursor:grab}
+  canvas:active{cursor:grabbing}
+  #panel{position:fixed;top:16px;left:16px;width:272px;max-height:calc(100vh - 32px);
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    display:flex;flex-direction:column;overflow:hidden;z-index:10}
+  #tabs{display:flex;border-bottom:1px solid var(--line)}
+  #tabs button{flex:1;padding:10px 0;background:none;border:0;font:inherit;color:var(--muted);
+    cursor:pointer;text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+  #tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 -2px var(--ink)}
+  #body{overflow-y:auto;padding:12px 14px 16px}
+  .tab{display:none}.tab.on{display:block}
+  fieldset{border:0;margin:0 0 14px;padding:0}
+  legend{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    margin-bottom:8px;cursor:pointer;user-select:none}
+  legend::before{content:'▾ ';font-size:8px;color:var(--muted)}
+  fieldset.closed>legend::before{content:'▸ '}
+  fieldset.closed>*:not(legend){display:none}
+  .row{display:grid;grid-template-columns:1fr 64px 48px;gap:8px;align-items:center;margin:5px 0}
+  .row label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row input[type=range]{width:100%;accent-color:var(--ink);height:2px}
+  .row input[type=number]{width:100%;font:10px ui-monospace,monospace;color:var(--muted);
+    background:var(--paper);border:1px solid var(--line);border-radius:4px;
+    text-align:right;padding:3px 4px}
+  .row input[type=number]:focus{color:var(--ink);outline:none;border-color:var(--ink)}
+  .row input[type=number]::-webkit-inner-spin-button{display:none}
+  .row.toggle{grid-template-columns:1fr auto}
+  .sw{appearance:none;-webkit-appearance:none;width:30px;height:16px;margin:0;cursor:pointer;
+    border:1px solid var(--line);border-radius:99px;background:var(--paper);position:relative}
+  .sw::before{content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;
+    border-radius:50%;background:var(--muted);transition:left .15s,background .15s}
+  .sw:checked{border-color:var(--ink);background:var(--ink)}
+  .sw:checked::before{left:16px;background:var(--paper)}
+  .seg{display:flex;gap:4px;margin:2px 0 12px;flex-wrap:wrap}
+  .seg button,.btn{padding:7px 10px;font:inherit;font-size:11px;background:none;
+    border:1px solid var(--line);border-radius:6px;cursor:pointer;color:var(--muted)}
+  .seg button[aria-pressed="true"]{border-color:var(--ink);color:var(--ink)}
+  .btn{color:var(--ink);margin:3px 4px 3px 0}
+  .btn:hover{border-color:var(--ink)}
+  .btn.acc{border-color:var(--accent);color:var(--accent)}
+  .note{color:var(--muted);font-size:10px;margin:6px 0}
+  .tin{font:10px ui-monospace,monospace;border:1px solid var(--line);border-radius:4px;
+    background:var(--paper);color:var(--ink);padding:4px 6px;width:100%}
+  .tin:focus{outline:none;border-color:var(--ink)}
+  .crow{display:grid;grid-template-columns:16px 1fr;gap:6px;align-items:center;margin:4px 0}
+  .chip{width:14px;height:14px;border-radius:4px;border:1px solid var(--line)}
+  .arow{display:grid;grid-template-columns:1fr 44px 30px 18px;gap:4px;align-items:center;margin:3px 0}
+  .arow input[type=number]{font:10px ui-monospace,monospace;border:1px solid var(--line);
+    border-radius:4px;background:var(--paper);color:var(--ink);padding:3px 2px;width:100%;text-align:right}
+  .arow input[type=number]::-webkit-inner-spin-button{display:none}
+  .idel{background:none;border:0;color:var(--muted);cursor:pointer;font-size:13px;padding:0}
+  .idel:hover{color:var(--accent)}
+  .nrow{display:grid;grid-template-columns:40px 1fr;gap:6px;align-items:center;margin:4px 0}
+  #hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);color:var(--muted);
+    font-size:10px;letter-spacing:.04em;z-index:5;pointer-events:none}
+  /* транспорт анимации — отдельная панелька снизу */
+  #transport{position:fixed;bottom:34px;left:50%;transform:translateX(-50%);
+    display:flex;gap:6px;align-items:center;z-index:9;
+    background:var(--panel);border:1px solid var(--line);border-radius:99px;
+    padding:6px 10px;box-shadow:0 2px 10px rgba(20,20,25,.06)}
+  #transport button{padding:5px 10px;font:inherit;font-size:11px;background:none;
+    border:1px solid transparent;border-radius:99px;cursor:pointer;color:var(--muted)}
+  #transport button[aria-pressed="true"]{border-color:var(--ink);color:var(--ink)}
+  #transport #tPlay{color:var(--accent);border-color:var(--accent)}
+  #transport input[type=range]{width:70px;accent-color:var(--ink);height:2px}
+  .mpad{position:relative;width:100%;aspect-ratio:1;touch-action:none;cursor:crosshair;margin:2px 0 4px}
+  .mpad canvas{position:absolute;inset:0;width:100%;height:100%;border:1px solid var(--line);border-radius:6px;background:#fff}
+  .mcn{position:absolute;font-size:9px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;pointer-events:none;user-select:none}
+  .mcn.nw{left:7px;top:6px}.mcn.ne{right:7px;top:6px}.mcn.sw{left:7px;bottom:6px}.mcn.se{right:7px;bottom:6px}
+  .mprev{position:relative;height:40px;background:var(--paper);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:6px}
+  .mprev canvas{position:absolute;inset:0;width:100%;height:100%}
+  #transport input#tHold{width:70px;accent-color:var(--ink);height:2px}
+  body.noui #panel,body.noui #hint,body.noui #transport{display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="panel">
+  <div id="tabs">
+    <button data-tab="scene" aria-selected="true">Chart</button>
+    <button data-tab="data">Data</button>
+    <button data-tab="io">Export</button>
+  </div>
+  <div id="body">
+    <div class="tab on" data-tab="scene">
+      <div class="seg" id="modeSeg">
+        <button data-m="pie" aria-pressed="true">Pie</button>
+        <button data-m="polar">Polar</button>
+        <button data-m="bars">Bars</button>
+        <button data-m="area">Area</button>
+      </div>
+      <fieldset id="gMode"><legend id="gModeTitle">Pie</legend></fieldset>
+      <fieldset id="gMotion">
+        <legend>Motion pad</legend>
+        <div class="mpad" id="mpad">
+          <canvas id="mpadc"></canvas>
+          <span class="mcn nw">soft</span><span class="mcn ne">raw</span>
+          <span class="mcn sw">slow</span><span class="mcn se">fast</span>
+        </div>
+        <div id="gMotionSliders"></div>
+        <div style="margin-top:7px"><select class="tin" id="mEase">
+          <option value="balanced">Balanced — center</option>
+          <option value="slow">Slow — soft start/stop</option>
+          <option value="fast">Fast — quick settle</option>
+          <option value="soft">Soft — deep cushion</option>
+          <option value="raw">Raw — linear, mechanical</option>
+          <option value="gentle">Gentle — soft and unhurried</option>
+          <option value="snappy">Snappy — sharp and lively</option>
+        </select></div>
+        <div class="mprev"><canvas id="mprevc"></canvas></div>
+      </fieldset>
+      <fieldset id="gStyle"><legend>Style</legend></fieldset>
+      <fieldset><legend>Brand palette</legend>
+        <div class="crow"><div class="chip" id="ch0"></div><input class="tin pal" data-i="0"></div>
+        <div class="crow"><div class="chip" id="ch1"></div><input class="tin pal" data-i="1"></div>
+        <div class="crow"><div class="chip" id="ch2"></div><input class="tin pal" data-i="2"></div>
+        <div class="crow"><div class="chip" id="ch3"></div><input class="tin pal" data-i="3"></div>
+        <p class="note">Category hex colors — brand.json colors land here at calibration.</p>
+      </fieldset>
+      <fieldset id="gCam" class="closed"><legend>Camera</legend></fieldset>
+    </div>
+    <div class="tab" data-tab="data">
+      <fieldset><legend>Title</legend>
+        <div class="nrow"><label>Title</label><input class="tin" id="nTitle"></div>
+      </fieldset>
+      <fieldset><legend>Items · label / value / cat</legend>
+        <div id="itemsList"></div>
+        <button class="btn" id="addItem">+ Add</button>
+        <p class="note">cat 0–3 — palette color number. Click a slice/bar on the canvas — tooltip; the note is added to the tooltip.</p>
+      </fieldset>
+      <fieldset class="closed"><legend>Category names (legend)</legend>
+        <div id="catsList"></div>
+      </fieldset>
+      <fieldset class="closed"><legend>Area · dense series (mountains)</legend>
+        <textarea class="tin" id="seriesTa" style="height:80px;resize:vertical"
+          placeholder="80, 78.5, 79.1, 77, …"></textarea>
+        <input class="tin" id="xlabelsTa" style="margin-top:4px"
+          placeholder="X labels, comma-separated: 1/1/10, 29/1/10, …">
+        <div style="margin-top:4px">
+          <button class="btn" id="applySeries">Apply</button>
+          <button class="btn acc" id="demoSeries">Demo mountain</button>
+        </div>
+        <p class="note">With a series set, Area builds a detailed mountain from it (items are ignored, no pills, labels along the edge, scale on the front face).</p>
+      </fieldset>
+    </div>
+    <div class="tab" data-tab="io">
+      <fieldset><legend>Config</legend>
+        <button class="btn" id="saveCfg">Save JSON</button>
+        <button class="btn" id="loadCfg">Load JSON</button>
+        <input type="file" id="loadFile" accept=".json" hidden>
+      </fieldset>
+      <fieldset><legend>Image</legend>
+        <button class="btn acc" id="pngBtn">Export PNG</button>
+      </fieldset>
+      <fieldset><legend>UI</legend>
+        <button class="btn" id="hideBtn">Hide UI (H)</button>
+      </fieldset>
+    </div>
+  </div>
+</div>
+<div id="transport">
+  <button id="tPlay" title="Play the reveal">▶ Play</button>
+  <button id="tOnce" aria-pressed="true">Once</button>
+  <button id="tLoop">Loop</button>
+  <input type="range" id="tSpeed" min="0.4" max="2" step="0.05" value="1" title="Speed">
+  <input type="range" id="tHold" min="0.5" max="12" step="0.1" value="2.2" title="Hold — pause before exit (loop)">
+</div>
+<div id="hint">drag — rotate · click an item — tooltip · ▶ — reveal animation · H — hide UI</div>
+
+<script>
+/* ================= @core-begin — чистая математика, без DOM ================= */
+const TAU = Math.PI * 2;
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = v => Math.max(0, Math.min(1, v));
+
+function rotX(p, a){ const c=Math.cos(a), s=Math.sin(a);
+  return { x:p.x, y:p.y*c - p.z*s, z:p.y*s + p.z*c }; }
+function rotY(p, a){ const c=Math.cos(a), s=Math.sin(a);
+  return { x:p.x*c + p.z*s, y:p.y, z:-p.x*s + p.z*c }; }
+function viewTransform(p, cam){ return rotX(rotY(p, cam.yaw), cam.tilt); }
+function project(p, cam){
+  const q = viewTransform(p, cam);
+  const s = cam.fov / (cam.dist + q.z);
+  return { x: q.x * s, y: -q.y * s, z: q.z };
+}
+/* backface culling: грань выпуклого тела с нормалью ОТ камеры невидима.
+   Камера в view-пространстве стоит в (0,0,-dist). */
+function faceVisible(n, centroid, cam){
+  const nv = viewTransform(n, cam), c = viewTransform(centroid, cam);
+  return nv.x * c.x + nv.y * c.y + nv.z * (c.z + cam.dist) < 0;
+}
+
+/* цвет */
+function hexRGB(h){ h = String(h).replace('#',''); if (h.length < 6) h = h.padEnd(6, '0');
+  return [parseInt(h.slice(0,2),16)||0, parseInt(h.slice(2,4),16)||0, parseInt(h.slice(4,6),16)||0]; }
+function rgbHex(r,g,b){ return '#' + [r,g,b].map(v =>
+  Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2,'0')).join(''); }
+function mix(h1, h2, t){ const a = hexRGB(h1), b = hexRGB(h2);
+  return rgbHex(lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)); }
+
+/* изинги анимации */
+/* ===== @motion-core — единый регулятор движения (Motion Pad) ===== */
+let PAD_EASE = null;
+const _mClamp = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const ARCHETYPES = {
+  slow: { speed: 0.55, ease: t => 0.5 * (1 - Math.cos(Math.PI * t)) },
+  fast: { speed: 1.90, ease: t => 1 - Math.pow(1 - t, 3) },
+  soft: { speed: 0.85, ease: t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 },
+  raw:  { speed: 1.30, ease: t => t }
+};
+function motionResolve(x, y){
+  x = _mClamp(x); y = _mClamp(y);
+  const w = { slow:(1-x)*(1-y), fast:x*(1-y), soft:(1-x)*y, raw:x*y }, A = ARCHETYPES;
+  const speed = w.slow*A.slow.speed + w.fast*A.fast.speed + w.soft*A.soft.speed + w.raw*A.raw.speed;
+  const ease = t => { t=_mClamp(t); return w.slow*A.slow.ease(t)+w.fast*A.fast.ease(t)+w.soft*A.soft.ease(t)+w.raw*A.raw.ease(t); };
+  return { speed, ease };
+}
+function speedToX(target, y){
+  const A = ARCHETYPES, left=(1-y)*A.slow.speed+y*A.soft.speed, right=(1-y)*A.fast.speed+y*A.raw.speed;
+  return Math.abs(right-left)<1e-6 ? 0.5 : _mClamp((target-left)/(right-left));
+}
+const easeOutElastic = t => t <= 0 ? 0 : t >= 1 ? 1 :
+  Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * (TAU / 3)) + 1;
+const easeOutCubic = t => 1 - Math.pow(1 - clamp01(t), 3);
+const easeInCubic = t => Math.pow(clamp01(t), 3);
+
+/* фазы анимации появления: наклон+доворот → секции стаггером (elastic) →
+   подписи → затухающее покачивание → hold → (loop) мягкий уход и повтор */
+function animFactors(t, n, mode){
+  const INTRO = 1.1, STEP = Math.min(0.12, 1.8 / Math.max(1, n)), DUR = 0.9;
+  const labelStart = 0.25 + n * STEP + 0.4, labelDur = 0.5;
+  const holdEnd = labelStart + labelDur + (state.anim.hold != null ? state.anim.hold : 2.2), EXIT = 0.85, GAP = 0.35;
+  const cycle = holdEnd + EXIT + GAP;
+  let done = false;
+  if (mode === 'loop') t = ((t % cycle) + cycle) % cycle;
+  else if (t >= holdEnd){ t = holdEnd; done = true; }
+  const intro = clamp01(t / INTRO);
+  const wob = Math.sin(t * 5.2) * Math.exp(-t * 1.15);       // «подрыгалось» и затихло
+  let exitK = 0;
+  if (mode === 'loop' && t > holdEnd) exitK = easeInCubic((t - holdEnd) / EXIT);
+  const keep = 1 - exitK;
+  const sc = [];
+  for (let i = 0; i < n; i++)
+    sc.push((PAD_EASE || easeOutElastic)((t - 0.25 - i * STEP) / DUR) * keep);
+  return {
+    sc,
+    label: clamp01((t - labelStart) / labelDur) * (1 - easeInCubic(exitK * 1.4)),
+    yawOff: (1 - easeOutCubic(intro)) * 1.15 + wob * 0.045 - easeInCubic(exitK) * 0.9,
+    tiltOffDeg: (1 - easeOutCubic(intro)) * 22 + wob * 2.2 + easeInCubic(exitK) * 14,
+    fovK: 0.7 + 0.3 * easeOutElastic(intro) * keep + 0.001,
+    done
+  };
+}
+
+/* красивый шаг шкалы */
+function niceStep(maxV){
+  const raw = maxV / 4, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  for (const m of [1, 2, 5, 10]) if (raw <= m * p) return m * p;
+  return 10 * p;
+}
+
+/* ГЕОМЕТРИИ: возвращают { faces:[{pts,fill,item,n}], anchors:[{item,p,frac?}] }
+   o.sc — массив анимационных масштабов на элемент (0..1, elastic) */
+/* PIE как СВЯЗНОЕ выдавленное тело (coherent extruded solid).
+   Вместо набора независимых граней с view-space порогами — каждый сектор
+   описывается ролями: top / bottom / outerSide / startCap / endCap.
+   Видимость каждой роли — ЧЕСТНЫМ тестом нормали (faceVisible), без порогов
+   и ad-hoc исключений. Отрисовка (drawPie/drawSlice) кладёт роли в
+   детерминированном порядке: боковина → торцы → крышка, обращённая к камере,
+   ПОСЛЕДНЕЙ — она запечатывает швы, и внутренности не «просвечивают». */
+function pieSolid(items, o){
+  const total = items.reduce((s, i) => s + Math.max(0, +i.value || 0), 0) || 1;
+  const slices = [], anchors = [];
+  let a0 = (o.start || 0) - Math.PI / 2;
+  items.forEach((it, idx) => {
+    const k = o.sc ? Math.max(0, o.sc[idx] || 0) : 1;
+    const h = o.extrude * Math.max(0.05, k), R = o.R * k;
+    const frac = Math.max(0, +it.value || 0) / total;
+    if (frac <= 0 || k <= 0.02){ anchors.push(null); a0 += frac * TAU; return; }
+    const a1 = a0 + frac * TAU, mid = (a0 + a1) / 2;
+    const ex = Math.cos(mid) * o.explode * k, ez = Math.sin(mid) * o.explode * k;
+    const col = o.cols[idx];
+    const m = Math.max(4, Math.ceil(frac * 56));          // сегментов дуги
+    const top = [], bot = [], segN = [];
+    for (let s = 0; s <= m; s++){
+      const a = a0 + (a1 - a0) * s / m;
+      top.push({ x: Math.cos(a)*R + ex, y:  h/2, z: Math.sin(a)*R + ez });
+      bot.push({ x: Math.cos(a)*R + ex, y: -h/2, z: Math.sin(a)*R + ez });
+    }
+    for (let s = 0; s < m; s++){                          // нормали сегментов боковины
+      const am = a0 + (a1 - a0) * (s + 0.5) / m;
+      segN.push({ x: Math.cos(am), y: 0, z: Math.sin(am) });
+    }
+    const cT = { x: ex, y: h/2, z: ez }, cB = { x: ex, y: -h/2, z: ez };
+    slices.push({
+      item: idx, m, top, bot, segN, cT, cB,
+      colTop:  col,
+      colSide: mix(col, '#000000', o.shade),
+      colCap:  mix(col, '#000000', o.shade * 0.55),
+      colBot:  mix(col, '#000000', o.shade * 1.15),
+      nTop: { x: 0, y: 1, z: 0 }, nBot: { x: 0, y: -1, z: 0 },
+      capStart: { pts: [cT, top[0], bot[0], cB], n: { x: Math.sin(a0), y: 0, z: -Math.cos(a0) } },
+      capEnd:   { pts: [cT, top[m], bot[m], cB], n: { x: -Math.sin(a1), y: 0, z: Math.cos(a1) } },
+      // ключ сортировки доли: срединный луч (классика для 3D-пая)
+      sp: { x: Math.cos(mid) * R * 0.6 + ex, y: 0, z: Math.sin(mid) * R * 0.6 + ez }
+    });
+    anchors.push({ item: idx, frac,
+      p: { x: Math.cos(mid) * R + ex, y: h/2, z: Math.sin(mid) * R + ez } });
+    a0 = a1;
+  });
+  return { slices, anchors };
+}
+
+function polarGeo(items, o){
+  // равные углы, радиус = значение (найтингейл); бледная подложка до полного R
+  const n = items.length || 1;
+  const maxV = Math.max(...items.map(i => Math.max(0, +i.value || 0)), 1e-9);
+  const faces = [], anchors = [];
+  items.forEach((it, idx) => {
+    const k = o.sc ? Math.max(0, o.sc[idx] || 0) : 1;
+    if (k <= 0.02){ anchors.push(null); return; }
+    const a0 = -Math.PI / 2 + idx / n * TAU, a1 = -Math.PI / 2 + (idx + 1) / n * TAU;
+    const col = o.cols[idx];
+    const r = Math.max(0.02, (+it.value || 0) / maxV) * o.R * k;
+    const m = Math.max(6, Math.ceil(56 / n));
+    const arc = (rr, y) => { const A = [];
+      for (let k = 0; k <= m; k++){
+        const a = a0 + (a1 - a0) * k / m;
+        A.push({ x: Math.cos(a) * rr, y, z: Math.sin(a) * rr });
+      } return A; };
+    if (o.bg > 0.01) // подложка: бледный полный сектор — отдельный нижний слой (bg)
+      faces.push({ pts: [{x:0,y:-0.002,z:0}, ...arc(o.R, -0.002)], fill: mix(col, o.paper, 1 - o.bg * 0.45),
+                   item: idx, thin: true, bg: true });
+    const h = o.extrude;
+    const aT = arc(r, h), aB = arc(r, 0.001);
+    for (let k = 0; k < m; k++){
+      const am = a0 + (a1 - a0) * (k + 0.5) / m;
+      faces.push({ pts: [aT[k], aT[k+1], aB[k+1], aB[k]], fill: mix(col, '#000000', o.shade),
+                   item: idx, n: { x: Math.cos(am), y: 0, z: Math.sin(am) }, seal: true });
+    }
+    faces.push({ pts: [{x:0,y:0.001,z:0}, aT[0], aB[0]], fill: mix(col, '#000000', o.shade * 0.55),
+                 item: idx, n: { x: Math.sin(a0), y: 0, z: -Math.cos(a0) }, seal: true });
+    faces.push({ pts: [{x:0,y:0.001,z:0}, aT[m], aB[m]], fill: mix(col, '#000000', o.shade * 0.55),
+                 item: idx, n: { x: -Math.sin(a1), y: 0, z: Math.cos(a1) }, seal: true });
+    faces.push({ pts: [{x:0,y:h,z:0}, ...aT], fill: col, item: idx, n: { x: 0, y: 1, z: 0 }, seal: true });
+    const mid = (a0 + a1) / 2;
+    const sp = { x: Math.cos(mid) * r * 0.6, y: 0, z: Math.sin(mid) * r * 0.6 };
+    for (let q = faces.length - 1; q >= 0 && faces[q].item === idx; q--)
+      if (!faces[q].bg) faces[q].sp = sp;
+    anchors.push({ item: idx, frac: (+it.value || 0) / maxV,
+      p: { x: Math.cos(mid) * o.R * 1.04, y: 0, z: Math.sin(mid) * o.R * 1.04 } });
+  });
+  return { faces, anchors };
+}
+
+function barsGeo(items, o){
+  const n = items.length || 1;
+  const maxV = Math.max(...items.map(i => Math.max(0, +i.value || 0)), 1e-9);
+  const span = o.span, cell = span / n, bw = cell * (1 - o.gap), dz = Math.min(bw, 0.5) / 2;
+  const faces = [], anchors = [];
+  items.forEach((it, idx) => {
+    const k = o.sc ? Math.max(0, o.sc[idx] || 0) : 1;
+    if (k <= 0.02){ anchors.push(null); return; }
+    const col = o.cols[idx];
+    const h = Math.max(0.01, (+it.value || 0) / maxV) * o.hMax * k;
+    const x0 = -span/2 + cell * idx + (cell - bw) / 2, x1 = x0 + bw;
+    const P = (x, y, z) => ({ x, y, z });
+    faces.push({ pts: [P(x0,h,dz), P(x1,h,dz), P(x1,0,dz), P(x0,0,dz)], fill: col, item: idx,
+                 n: { x: 0, y: 0, z: 1 } });
+    faces.push({ pts: [P(x0,h,-dz), P(x1,h,-dz), P(x1,0,-dz), P(x0,0,-dz)], fill: mix(col,'#000000',o.shade),
+                 item: idx, n: { x: 0, y: 0, z: -1 } });
+    faces.push({ pts: [P(x0,h,dz), P(x1,h,dz), P(x1,h,-dz), P(x0,h,-dz)], fill: mix(col, o.paper, 0.35),
+                 item: idx, n: { x: 0, y: 1, z: 0 } });
+    faces.push({ pts: [P(x0,h,dz), P(x0,h,-dz), P(x0,0,-dz), P(x0,0,dz)], fill: mix(col,'#000000',o.shade*0.7),
+                 item: idx, n: { x: -1, y: 0, z: 0 } });
+    faces.push({ pts: [P(x1,h,dz), P(x1,h,-dz), P(x1,0,-dz), P(x1,0,dz)], fill: mix(col,'#000000',o.shade*0.7),
+                 item: idx, n: { x: 1, y: 0, z: 0 } });
+    anchors.push({ item: idx, p: { x: (x0+x1)/2, y: h, z: dz } });
+  });
+  return { faces, anchors, maxV };
+}
+
+function areaGeo(items, o){
+  // хребет по СЕГМЕНТАМ: каждый сегмент несёт цвет своей категории (палитра работает)
+  const n = items.length;
+  const maxV = Math.max(...items.map(i => Math.max(0, +i.value || 0)), 1e-9);
+  const faces = [], anchors = [];
+  if (n < 2) return { faces, anchors, maxV };
+  const xs = i => -o.span/2 + o.span * i / (n - 1);
+  const ys = i => Math.max(0.01, (+items[i].value || 0) / maxV) * o.hMax *
+    (o.sc ? Math.max(0.02, o.sc[Math.min(i, o.sc.length - 1)] || 0) : 1);
+  const dz = o.depth / 2;
+  for (let i = 0; i < n - 1; i++){
+    const c = o.cols[i];
+    const p00 = { x: xs(i),   y: 0,       z: dz }, p01 = { x: xs(i),   y: ys(i),   z: dz };
+    const p11 = { x: xs(i+1), y: ys(i+1), z: dz }, p10 = { x: xs(i+1), y: 0,       z: dz };
+    const q01 = { ...p01, z: -dz }, q11 = { ...p11, z: -dz };
+    const q00 = { ...p00, z: -dz }, q10 = { ...p10, z: -dz };
+    const dxs = xs(i+1) - xs(i), dys = ys(i+1) - ys(i);
+    faces.push({ pts: [q00, q01, q11, q10], fill: mix(c, '#000000', o.shade), item: i,
+                 n: { x: 0, y: 0, z: -1 } });
+    faces.push({ pts: [p01, p11, q11, q01], fill: mix(c, o.paper, 0.55), item: i,
+                 n: { x: -dys, y: dxs, z: 0 } }); // нормаль склона крышки
+    faces.push({ pts: [p00, p01, p11, p10], fill: c, item: i, n: { x: 0, y: 0, z: 1 } });
+  }
+  // торцы (тёмные, как в референсе)
+  const cap = (i, c, nx) => faces.push({ pts: [
+    { x: xs(i), y: ys(i), z: dz }, { x: xs(i), y: ys(i), z: -dz },
+    { x: xs(i), y: 0, z: -dz }, { x: xs(i), y: 0, z: dz }
+  ], fill: mix(c, '#000000', Math.min(0.9, o.shade * 1.6)), item: i === 0 ? 0 : n - 2,
+     n: { x: nx, y: 0, z: 0 } });
+  cap(0, o.cols[0], -1); cap(n - 1, o.cols[n - 2], 1);
+  items.forEach((it, i) => anchors.push({ item: i, p: { x: xs(i), y: ys(i), z: dz } }));
+  return { faces, anchors, maxV };
+}
+/* ================= @core-end ================= */
+
+const state = {
+  mode: 'pie',
+  pie:   { extrude: 0.22, explode: 0.08, start: 0, sideLines: 1 },
+  polar: { extrude: 0.1, bg: 0.7, rim: 1 },
+  bars:  { gap: 0.35, grid: 1, gridW: 1.3, gridZ: -0.55, gridDens: 4 },
+  area:  { depth: 0.5, grid: 0, gridW: 1.25, gridZ: -0.6, gridDens: 4, frontGrid: 1, colorCat: 0 },
+  style: { border: 1.2, shade: 0.3, values: 1, labels: 1, legend: 1 },
+  cam:   { tilt: 28, yaw: 0.5, spin: 0, fov: 640, dist: 4.2, zoom: 1 },
+  palette: ['#0b0b0c', '#1a1a1a', '#a9b3a1', '#e0a93e'],
+  anim: { playing: 1, mode: 'once', speed: 1, t: 0, hold: 2.2 },
+  motion: { x: 0.5, y: 0.5 },
+  data: {
+    title: "Portfolio — Q2",
+    cats: ['Core', 'Contrast', 'Calm', 'Signal'],
+    items: [
+      { label: 'Software', value: 37, cat: 0, note: 'Revenue core: subscriptions up 12% q/q.' },
+      { label: 'Hardware', value: 22, cat: 1 },
+      { label: 'Services', value: 18, cat: 2, note: 'Services drag margin down — a candidate for rebuild.' },
+      { label: 'Cloud',    value: 14, cat: 3 },
+      { label: 'Other',    value: 9,  cat: 2 }
+    ]
+  },
+  sel: -1
+};
+
+/* ===== канвас ===== */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, clock = 0, lastT = performance.now();
+function resize(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', resize); resize();
+const css = v => getComputedStyle(document.body).getPropertyValue(v).trim();
+const INK = css('--ink'), MUTED = css('--muted'), ACC = css('--accent'), PAPER = css('--paper');
+
+function camNow(){
+  const c = state.cam;
+  // минус: положительный Tilt = взгляд СВЕРХУ (иначе матрица смотрит на дно,
+  // а painter рисует крышку — источник «пробитых» граней)
+  return { yaw: c.yaw, tilt: -c.tilt * Math.PI / 180, dist: c.dist, fov: c.fov * c.zoom };
+}
+const S = p => ({ x: W/2 + 60 + p.x, y: H/2 + p.y, z: p.z });
+const colFor = it => state.palette[Math.max(0, Math.min(3, Math.round(it.cat || 0)))];
+
+/* Двухуровневый painter: сначала сортируются ЭЛЕМЕНТЫ целиком (дальняя доля/бар
+   рисуется первой), затем грани внутри элемента. Иначе крышка дальней доли
+   всплывает между стенками ближней — тот самый «пропуск граней насквозь». */
+function drawFaces(faces, cam){
+  const proj = faces.filter(f => { // backface culling по нормалям
+    const c = f.pts.reduce((m, p) => ({ x: m.x + p.x / f.pts.length,
+      y: m.y + p.y / f.pts.length, z: m.z + p.z / f.pts.length }), { x: 0, y: 0, z: 0 });
+    if (f.side) return viewTransform(c, cam).z <= 0.08;
+    if (f.sideEnd) return faceVisible(f.n, c, cam) || viewTransform(c, cam).z <= 0.12;
+    if (!f.n) return true;
+    return faceVisible(f.n, c, cam);
+  }).map(f => {
+    const spts = f.pts.map(p => S(project(p, cam)));
+    return { ...f, spts, z: spts.reduce((m, p) => m + p.z, 0) / spts.length };
+  });
+  const groups = new Map();
+  proj.forEach(f => {
+    const k = f.item === undefined ? -999 : f.item;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(f);
+  });
+  const glist = [...groups.values()]
+    .map(g => {
+      // ключ: срединный луч (pie/polar, sp) — классика; иначе дальняя точка.
+      // Растущий (sc<1) элемент смещаем «вглубь» — не всплывает над соседями.
+      const zKey = g[0].sp ? viewTransform(g[0].sp, cam).z : Math.max(...g.map(f => f.z));
+      const it = g[0].item;
+      const grow = (ANIM_SC && it >= 0 && ANIM_SC[it] !== undefined)
+        ? (1 - Math.min(1, ANIM_SC[it])) * 0.5 : 0;
+      return { g, z: zKey + grow };
+    })
+    .sort((a, b) => b.z - a.z);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; // без шипов на острых углах
+  for (const G of glist)
+    for (const f of G.g.sort((a, b) => b.z - a.z)){
+      ctx.beginPath();
+      f.spts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+      ctx.closePath();
+      ctx.fillStyle = f.fill; ctx.fill();
+      if (f.seal){ ctx.strokeStyle = f.fill; ctx.lineWidth = 1.2; ctx.globalAlpha = 1; ctx.stroke(); } // запечатать АА-швы цветом блока (острые углы не «ломаются» в фон)
+      if (f.stroke !== false){
+        ctx.strokeStyle = f.strokeFill ? f.fill : INK;
+        ctx.lineWidth = f.thin ? 0.5 : (f.strokeFill ? Math.max(1.3, state.style.border) : state.style.border);
+        ctx.globalAlpha = f.thin ? 0.35 : (f.strokeFill ? 1 : 0.9); ctx.stroke();
+      }
+      ctx.globalAlpha = 1; ctx.lineWidth = 1;
+    }
+  ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
+}
+
+/* ===== PIE: специализированный painter связного тела =====
+   Ни одного view-space порога: видимость каждой грани — честный тест нормали.
+   Боковина рисуется ОДНОЙ заливкой (нет «косички»/швов). Торцы непрозрачны,
+   пока честно смотрят в камеру. Обращённая к камере крышка — последней. */
+function faceCentroid(pts){
+  return pts.reduce((m, p) => ({ x: m.x + p.x / pts.length,
+    y: m.y + p.y / pts.length, z: m.z + p.z / pts.length }), { x: 0, y: 0, z: 0 });
+}
+function drawPie(slices, cam, dividersOn){
+  // доли far→near по срединному лучу; растущая (sc<1) уходит вглубь, не всплывает
+  const order = slices.map(s => {
+    const it = s.item;
+    const grow = (ANIM_SC && it >= 0 && ANIM_SC[it] !== undefined)
+      ? (1 - Math.min(1, ANIM_SC[it])) * 0.5 : 0;
+    return { s, z: viewTransform(s.sp, cam).z + grow };
+  }).sort((a, b) => b.z - a.z);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  for (const o of order) drawSlice(o.s, cam, dividersOn);
+  ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
+}
+function drawSlice(s, cam, dividersOn){
+  const P = p => S(project(p, cam));
+  const border = state.style.border;
+  const fillPath = (pts, fill, strokeStyle, lw, alpha) => {
+    ctx.beginPath();
+    pts.forEach((p, i) => { const q = P(p); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); });
+    ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill();
+    if (strokeStyle){ ctx.strokeStyle = strokeStyle; ctx.lineWidth = lw;
+      ctx.globalAlpha = alpha == null ? 1 : alpha; ctx.stroke(); ctx.globalAlpha = 1; }
+  };
+  const m = s.m;
+  const topVis = faceVisible(s.nTop, faceCentroid([s.cT, ...s.top]), cam);
+  const botVis = faceVisible(s.nBot, faceCentroid([s.cB, ...s.bot]), cam);
+  // боковина: ВИДИМЫЕ сегменты честным тестом нормали (silhouette без порогов)
+  const vis = [];
+  for (let k = 0; k < m; k++){
+    const c = faceCentroid([s.top[k], s.top[k+1], s.bot[k+1], s.bot[k]]);
+    if (faceVisible(s.segN[k], c, cam)) vis.push(k);
+  }
+  // 1) боковина ОДНОЙ заливкой по видимой дуге (без coil/швов)
+  if (vis.length){
+    const vLine = a => { const t = P(s.top[a]), b = P(s.bot[a]); ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
+    const drawStrip = (i0, i1) => {              // i1 — правая кромка (последний сегмент i1-1)
+      const strip = [];
+      for (let a = i0; a <= i1; a++) strip.push(s.top[a]);
+      for (let a = i1; a >= i0; a--) strip.push(s.bot[a]);
+      fillPath(strip, s.colSide, s.colSide, 1, 1);       // заливка + hairline того же цвета (без АА-шва)
+      // СТРУКТУРНЫЕ рёбра — ВСЕГДА: нижний контур боковины + граничные вертикали (важные, совпадают с углами верхней панели)
+      ctx.strokeStyle = INK; ctx.lineWidth = border; ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      for (let a = i0; a <= i1; a++){ const b = P(s.bot[a]); a === i0 ? ctx.moveTo(b.x, b.y) : ctx.lineTo(b.x, b.y); }
+      ctx.stroke();
+      vLine(i0); vLine(i1);
+      ctx.globalAlpha = 1;
+      // ВНУТРЕННИЕ low-poly швы боковины — ТОЛЬКО по тумблеру Side dividers
+      if (dividersOn){
+        ctx.strokeStyle = INK; ctx.lineWidth = Math.max(0.8, border * 0.7); ctx.globalAlpha = 0.85;
+        for (let a = i0 + 1; a < i1; a++) vLine(a);
+        ctx.globalAlpha = 1;
+      }
+    };
+    // видимая дуга выпуклого сектора почти всегда непрерывна; на всякий — по пробегам
+    let runStart = vis[0], prev = vis[0];
+    for (let i = 1; i <= vis.length; i++){
+      if (i === vis.length || vis[i] !== prev + 1){
+        drawStrip(runStart, prev + 1);
+        if (i < vis.length){ runStart = vis[i]; prev = vis[i]; }
+      } else prev = vis[i];
+    }
+  }
+  // 2) радиальные торцы — непрозрачны, пока честно смотрят в камеру
+  if (faceVisible(s.capStart.n, faceCentroid(s.capStart.pts), cam))
+    fillPath(s.capStart.pts, s.colCap, INK, border, 0.9);   // радиальное ребро торца — INK, всегда
+  if (faceVisible(s.capEnd.n, faceCentroid(s.capEnd.pts), cam))
+    fillPath(s.capEnd.pts, s.colCap, INK, border, 0.9);
+  // 3) горизонтальная крышка, обращённая к камере, — ПОСЛЕДНЕЙ (запечатывает всё,
+  //    внутренности сквозь неё не просвечивают); контур INK «сшивает» кромку
+  if (botVis && !topVis)
+    fillPath([s.cB, ...s.bot.slice().reverse()], s.colBot, INK, border, 0.9);
+  if (topVis)
+    fillPath([s.cT, ...s.top], s.colTop, INK, border, 0.9);
+}
+
+/* пилюли с лёгкой релаксацией */
+const pillState = new Map();
+let lastPills = [];
+function drawPills(anchors, cam, fmtVal, itemsArr){
+  if (!state.style.labels || ANIM_LBL < 0.02){ lastPills = []; return; }
+  ctx.font = '11px ui-monospace, monospace';
+  const LA = ANIM_LBL;
+  const pills = [], apts = [];
+  anchors.forEach(a => {
+    if (!a) return;
+    const it = (itemsArr || state.data.items)[a.item];
+    const P = S(project(a.p, cam));
+    apts.push({ x: P.x, y: P.y, r: 6 });
+    let txt = it.label;
+    if (state.style.values) txt += ' · ' + fmtVal(it, a);
+    const w = ctx.measureText(txt).width + 14, h = 19;
+    const key = 'i' + a.item, tx = P.x - w/2, ty = P.y - 30;
+    let st = pillState.get(key);
+    if (!st){ st = { x: tx, y: ty }; pillState.set(key, st); }
+    st.x = lerp(st.x, tx, 0.2); st.y = lerp(st.y, ty, 0.2);
+    pills.push({ i: a.item, txt, w, h, st, x: st.x, y: st.y, ax: P.x, ay: P.y, pr: 1 });
+  });
+  for (let k = 0; k < 4; k++)
+    for (let a = 0; a < pills.length; a++) for (let b = a + 1; b < pills.length; b++){
+      const A = pills[a], B = pills[b];
+      const ox = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x) + 6;
+      const oy = Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y) + 6;
+      if (ox <= 0 || oy <= 0) continue;
+      if (ox < oy){ const d = (A.x < B.x) ? -1 : 1; A.x += d * ox / 2; B.x -= d * ox / 2; }
+      else { const d = (A.y < B.y) ? -1 : 1; A.y += d * oy / 2; B.y -= d * oy / 2; }
+    }
+  for (const p of pills){
+    p.x = Math.max(8, Math.min(W - p.w - 8, p.x));
+    p.y = Math.max(30, Math.min(H - p.h - 8, p.y));
+    p.st.x = p.x; p.st.y = p.y;
+    const cx = p.x + p.w/2, cy = p.y + p.h;
+    if (Math.hypot(cx - p.ax, cy - p.ay) > 12){
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.ax, p.ay);
+      ctx.strokeStyle = INK; ctx.globalAlpha = 0.4 * LA; ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  }
+  for (const p of pills){
+    const sel = p.i === state.sel;
+    ctx.beginPath(); ctx.roundRect(p.x, p.y, p.w, p.h, 10);
+    ctx.fillStyle = PAPER; ctx.globalAlpha = 0.94 * LA; ctx.fill();
+    ctx.globalAlpha = (sel ? 1 : 0.55) * LA; ctx.strokeStyle = sel ? ACC : INK; ctx.stroke();
+    ctx.globalAlpha = (sel ? 1 : 0.85) * LA; ctx.fillStyle = sel ? ACC : INK;
+    ctx.fillText(p.txt, p.x + 7, p.y + 13.5);
+    ctx.globalAlpha = 1;
+  }
+  lastPills = pills;
+}
+
+function drawBubbleAt(P, it, extra){
+  ctx.font = '11px ui-monospace, monospace';
+  const maxW = 210;
+  const lines = [];
+  if (extra) lines.push(extra);
+  const words = String(it.note || '').split(/\s+/).filter(Boolean);
+  let cur = '';
+  for (const w2 of words){
+    const t = cur ? cur + ' ' + w2 : w2;
+    if (ctx.measureText(t).width > maxW && cur){ lines.push(cur); cur = w2; } else cur = t;
+  }
+  if (cur) lines.push(cur);
+  const wPx = Math.min(maxW, Math.max(ctx.measureText(it.label).width,
+    ...(lines.length ? lines.map(l => ctx.measureText(l).width) : [0]), 60)) + 20;
+  const hPx = 24 + lines.length * 15 + 8;
+  let bx = P.x + 22, by = P.y - hPx - 16;
+  bx = Math.max(8, Math.min(W - wPx - 8, bx));
+  by = Math.max(8, Math.min(H - hPx - 8, by));
+  ctx.beginPath(); ctx.moveTo(bx + 10, by + hPx); ctx.lineTo(P.x, P.y);
+  ctx.strokeStyle = ACC; ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.roundRect(bx, by, wPx, hPx, 8);
+  ctx.fillStyle = PAPER; ctx.globalAlpha = 0.97; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = ACC; ctx.stroke();
+  ctx.fillStyle = ACC; ctx.fillText(it.label, bx + 10, by + 16);
+  ctx.fillStyle = INK; ctx.globalAlpha = 0.85;
+  lines.forEach((l, i) => ctx.fillText(l, bx + 10, by + 33 + i * 15));
+  ctx.globalAlpha = 1;
+}
+
+/* ===== кадр ===== */
+let lastAnchors = [], ANIM_LBL = 1, ANIM_SC = null, denseArea = false;
+function frame(now){
+  const dt = Math.min((now - lastT) / 1000, 0.05); lastT = now;
+  clock += dt;
+  state.cam.yaw += state.cam.spin * dt;
+  if (state.anim.playing) state.anim.t += dt * state.anim.speed;
+  ctx.clearRect(0, 0, W, H);
+  const st = state.style;
+  // area: плотная серия (горы) вместо items, если задана
+  let items = state.data.items;
+  denseArea = false;
+  if (state.mode === 'area'){
+    const vals = String(state.data.series || '').split(/[,;\s]+/).map(parseFloat).filter(isFinite);
+    if (vals.length >= 2){
+      denseArea = true;
+      const cc = Math.max(0, Math.min(3, Math.round(state.area.colorCat || 0)));
+      items = vals.map(v => ({ label: '', value: v, cat: cc }));
+    }
+  }
+  // анимация появления
+  PAD_EASE = state.motion ? motionResolve(state.motion.x, state.motion.y).ease : null;
+  const A = animFactors(state.anim.t, items.length, state.anim.mode);
+  if (A.done && state.anim.playing && state.anim.mode === 'once') state.anim.playing = 0;
+  ANIM_LBL = A.label; ANIM_SC = A.sc;
+  const cam0 = camNow();
+  const cam = { ...cam0, yaw: cam0.yaw + A.yawOff,
+    tilt: cam0.tilt - A.tiltOffDeg * Math.PI / 180, fov: cam0.fov * A.fovK };
+
+  const cols = items.map(colFor);
+  const total = items.reduce((s, i) => s + Math.max(0, +i.value || 0), 0) || 1;
+  let geo, fmtVal;
+
+  if (state.mode === 'pie'){
+    geo = pieSolid(items, { R: 1.1, extrude: state.pie.extrude, explode: state.pie.explode,
+      start: state.pie.start * Math.PI / 180, shade: st.shade, cols, sc: A.sc });
+    fmtVal = it => (Math.max(0, +it.value || 0) / total * 100).toFixed(1) + '%';
+  } else if (state.mode === 'polar'){
+    geo = polarGeo(items, { R: 1.2, extrude: state.polar.extrude, bg: state.polar.bg,
+      shade: st.shade, cols, paper: PAPER, sc: A.sc });
+    fmtVal = it => String(it.value);
+    if (state.polar.rim){ // точечный обод (референс)
+      ctx.fillStyle = INK; ctx.globalAlpha = 0.7 * Math.max(0.15, ANIM_LBL);
+      for (let k = 0; k < 72; k++){
+        const a = k / 72 * TAU;
+        const P = S(project({ x: Math.cos(a) * 1.32, y: 0, z: Math.sin(a) * 1.32 }, cam));
+        ctx.beginPath(); ctx.arc(P.x, P.y, 1.1, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  } else if (state.mode === 'bars'){
+    geo = barsGeo(items, { span: 2.6, hMax: 1.5, gap: state.bars.gap, shade: st.shade,
+      cols, paper: PAPER, sc: A.sc });
+    fmtVal = it => String(it.value);
+    if (state.bars.grid) drawValueGrid(cam, geo.maxV, 2.6, 1.5, state.bars);
+  } else {
+    geo = areaGeo(items, { span: 2.8, hMax: 1.4, depth: state.area.depth, shade: st.shade,
+      cols, paper: PAPER, sc: A.sc });
+    fmtVal = it => String(it.value);
+    if (state.area.grid) drawValueGrid(cam, geo.maxV, 2.8, 1.4, state.area);
+  }
+
+  // pie рисуется специализированным painter связного тела; остальные — общим
+  if (state.mode === 'pie'){
+    drawPie(geo.slices, cam, !!state.pie.sideLines);
+  } else {
+    // подложка (polar bg) — всегда ПОД объектами, отдельным проходом
+    const bgFaces = geo.faces.filter(f => f.bg);
+    if (bgFaces.length) drawFaces(bgFaces, cam);
+    drawFaces(geo.faces.filter(f => !f.bg), cam);
+  }
+
+  // area: линии шкалы по ЛИЦЕВОЙ грани (клип по профилю) + подписи X по кромке
+  if (state.mode === 'area'){
+    if (state.area.frontGrid) drawFrontGrid(cam, items, geo.maxV, 2.8, 1.4, state.area.depth / 2, A);
+    drawXLabels(cam, items.length, 2.8, state.area.depth / 2);
+  }
+
+  lastAnchors = denseArea ? [] : geo.anchors; // у плотной горы пилюль нет
+  if (!denseArea) drawPills(geo.anchors, cam, fmtVal, items);
+
+  // тултип выбранного
+  if (!denseArea && state.sel >= 0){
+    const a = geo.anchors.find(x => x && x.item === state.sel);
+    if (a){
+      const it = items[state.sel];
+      const extra = state.mode === 'pie'
+        ? 'value ' + it.value + ' · ' + fmtVal(it, a)
+        : 'value ' + it.value + (a.frac !== undefined ? ' · ' + (a.frac * 100).toFixed(0) + '% max' : '');
+      drawBubbleAt(S(project(a.p, cam)), it, extra);
+    }
+  }
+
+  // легенда категорий
+  if (st.legend){
+    const used = [...new Set(items.map(i => Math.max(0, Math.min(3, Math.round(i.cat || 0)))))];
+    ctx.font = '11px ui-monospace, monospace';
+    let ly = H - 24 - (used.length - 1) * 20;
+    for (const c of used){
+      ctx.fillStyle = state.palette[c];
+      ctx.beginPath(); ctx.roundRect(20, ly - 10, 12, 12, 3); ctx.fill();
+      ctx.strokeStyle = INK; ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.fillStyle = INK; ctx.globalAlpha = 0.8;
+      ctx.fillText(state.data.cats[c] || ('Cat ' + c), 40, ly);
+      ctx.globalAlpha = 1;
+      ly += 20;
+    }
+  }
+
+  if (state.data.title){
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.fillStyle = INK; ctx.globalAlpha = 0.65; ctx.textAlign = 'right';
+    ctx.fillText(String(state.data.title).toUpperCase(), W - 16, 26);
+    ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+  }
+  if (!document.body.classList.contains('noui')) drawGizmo(cam);
+  requestAnimationFrame(frame);
+}
+/* адаптивная шкала значений (bars/area): пунктир на тыльной плоскости,
+   ширина/глубина/плотность настраиваются — чтобы шкала выступала за чарт
+   и была видна с любых ракурсов */
+function drawValueGrid(cam, maxV, span, hMax, g){
+  const step = niceStep(maxV * 4 / Math.max(2, Math.round(g.gridDens)));
+  const half = span / 2 * g.gridW, z = g.gridZ;
+  ctx.font = '9px ui-monospace, monospace';
+  for (let v = 0; v <= maxV * 1.001; v += step){
+    const y = v / maxV * hMax;
+    const A = S(project({ x: -half, y, z }, cam));
+    const B = S(project({ x:  half, y, z }, cam));
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y);
+    ctx.strokeStyle = INK; ctx.globalAlpha = v === 0 ? 0.5 : 0.2;
+    ctx.setLineDash(v === 0 ? [] : [3, 4]); ctx.stroke(); ctx.setLineDash([]);
+    // тики-выступы на концах
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath(); ctx.moveTo(A.x - 4, A.y); ctx.lineTo(A.x, A.y);
+    ctx.moveTo(B.x, B.y); ctx.lineTo(B.x + 4, B.y); ctx.stroke();
+    ctx.globalAlpha = 0.6; ctx.fillStyle = MUTED;
+    ctx.fillText(String(Math.round(v)), A.x - 28, A.y + 3);
+    ctx.globalAlpha = 1;
+  }
+}
+/* линии шкалы по ЛИЦЕВОЙ грани горы — клип по профилю (как в Bloomberg-референсе) */
+function drawFrontGrid(cam, items, maxV, span, hMax, dz, A){
+  const n = items.length; if (n < 2) return;
+  const step = niceStep(maxV * 4 / Math.max(2, Math.round(state.area.gridDens)));
+  const xs = i => -span/2 + span * i / (n - 1);
+  const ysArr = items.map((it, i) => Math.max(0.01, (+it.value || 0) / maxV) * hMax *
+    (A.sc ? Math.max(0.02, A.sc[Math.min(i, A.sc.length - 1)] || 0) : 1));
+  ctx.font = '9px ui-monospace, monospace';
+  for (let v = step; v <= maxV * 1.001; v += step){
+    const y = v / maxV * hMax;
+    let started = false, sx = 0, firstX = null;
+    const flush = (x0, x1) => {
+      if (firstX === null) firstX = x0;
+      const P0 = S(project({ x: x0, y, z: dz + 0.002 }, cam));
+      const P1 = S(project({ x: x1, y, z: dz + 0.002 }, cam));
+      ctx.beginPath(); ctx.moveTo(P0.x, P0.y); ctx.lineTo(P1.x, P1.y);
+      ctx.strokeStyle = INK; ctx.globalAlpha = 0.4; ctx.stroke(); ctx.globalAlpha = 1;
+    };
+    for (let i = 0; i < n - 1; i++){
+      const y0 = ysArr[i], y1 = ysArr[i + 1];
+      const in0 = y0 >= y, in1 = y1 >= y;
+      const x0 = xs(i), x1 = xs(i + 1);
+      if (in0 && in1){ if (!started){ started = true; sx = x0; } }
+      else if (in0 && !in1){
+        const xc = x0 + (x1 - x0) * (y0 - y) / (y0 - y1);
+        if (!started){ started = true; sx = x0; }
+        flush(sx, xc); started = false;
+      } else if (!in0 && in1){
+        started = true; sx = x0 + (x1 - x0) * (y0 - y) / (y0 - y1);
+      }
+    }
+    if (started) flush(sx, xs(n - 1));
+    if (firstX !== null){ // подпись значения у левого выхода линии
+      const P = S(project({ x: firstX - 0.04, y, z: dz }, cam));
+      ctx.textAlign = 'right'; ctx.fillStyle = INK; ctx.globalAlpha = 0.6 * Math.max(0.2, ANIM_LBL);
+      ctx.fillText(String(Math.round(v)), P.x - 3, P.y + 3);
+      ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+    }
+  }
+}
+/* подписи X по нижней кромке (даты, как в референсе) */
+function drawXLabels(cam, n, span, dz){
+  const labs = String(state.data.xlabels || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (labs.length < 2 || n < 2) return;
+  const xs = i => -span/2 + span * i / (n - 1);
+  ctx.font = '9px ui-monospace, monospace';
+  labs.forEach((t, j) => {
+    const idx = Math.round(j * (n - 1) / (labs.length - 1));
+    const P = S(project({ x: xs(idx), y: 0, z: dz }, cam));
+    ctx.strokeStyle = INK; ctx.globalAlpha = 0.5 * Math.max(0.15, ANIM_LBL);
+    ctx.beginPath(); ctx.moveTo(P.x, P.y + 2); ctx.lineTo(P.x, P.y + 7); ctx.stroke();
+    ctx.fillStyle = MUTED; ctx.textAlign = 'center';
+    ctx.fillText(t, P.x, P.y + 18);
+    ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+  });
+}
+/* гизмо (стандарт) */
+const GIZMO_R = 46;
+function gizmoCenter(){ return { x: W - 72, y: H - 72 }; }
+function drawGizmo(cam){
+  const g = gizmoCenter(), r = GIZMO_R;
+  ctx.beginPath(); ctx.arc(g.x, g.y, r, 0, TAU);
+  ctx.fillStyle = PAPER; ctx.globalAlpha = 0.85; ctx.fill();
+  ctx.strokeStyle = INK; ctx.globalAlpha = 0.2; ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.font = '9px ui-monospace, monospace';
+  [{ v:{x:1,y:0,z:0}, t:'X', c:ACC }, { v:{x:0,y:1,z:0}, t:'Y', c:INK },
+   { v:{x:0,y:0,z:1}, t:'Z', c:MUTED }]
+    .map(a => ({ ...a, q: viewTransform(a.v, cam) }))
+    .sort((a, b) => b.q.z - a.q.z)
+    .forEach(a => {
+      const L = r * 0.7, ex = g.x + a.q.x * L, ey = g.y - a.q.y * L;
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x - a.q.x * L, g.y + a.q.y * L);
+      ctx.strokeStyle = a.c; ctx.setLineDash([2,3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalAlpha = a.q.z < 0 ? 0.95 : 0.45;
+      ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(ex, ey); ctx.lineWidth = 1.3; ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(ex, ey, 2.5, 0, TAU); ctx.fillStyle = a.c; ctx.fill();
+      ctx.fillText(a.t, ex + 4, ey - 4);
+      ctx.globalAlpha = 1;
+    });
+}
+requestAnimationFrame(frame);
+
+/* ===== взаимодействие: стандарт вращения + клики ===== */
+let dragging = false, gizmoDrag = false, px = 0, py = 0, moved = 0, dragDir = -1;
+cv.addEventListener('pointerdown', e => {
+  const g = gizmoCenter();
+  gizmoDrag = Math.hypot(e.clientX - g.x, e.clientY - g.y) < GIZMO_R;
+  dragDir = -1;
+  if (!gizmoDrag){ // непрозрачный объект: «хватаешь то, что видишь»
+    const c = S(project({ x: 0, y: 0, z: 0 }, camNow()));
+    if (e.clientY < c.y) dragDir = 1;
+  }
+  dragging = true; px = e.clientX; py = e.clientY; moved = 0;
+});
+addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const dx = e.clientX - px, dy = e.clientY - py; px = e.clientX; py = e.clientY;
+  moved += Math.abs(dx) + Math.abs(dy);
+  const k = gizmoDrag ? 2 : 1;
+  state.cam.yaw += dragDir * dx * 0.005 * k;
+  let t = state.cam.tilt - dy * 0.2 * k;
+  if (t > 180) t -= 360; if (t < -180) t += 360;
+  state.cam.tilt = t;
+  syncPanel();
+});
+addEventListener('pointerup', e => {
+  if (dragging && moved < 5 && !gizmoDrag){
+    let best = -1;
+    for (const p of lastPills){
+      if (e.clientX >= p.x - 3 && e.clientX <= p.x + p.w + 3 &&
+          e.clientY >= p.y - 3 && e.clientY <= p.y + p.h + 3){ best = p.i; break; }
+    }
+    if (best === -1){
+      const cam = camNow(); let bd = 34;
+      lastAnchors.forEach(a => {
+        if (!a) return;
+        const P = S(project(a.p, cam));
+        const d = Math.hypot(P.x - e.clientX, P.y - e.clientY);
+        if (d < bd){ bd = d; best = a.item; }
+      });
+    }
+    state.sel = best === state.sel ? -1 : best;
+    buildItems();
+  }
+  dragging = false; gizmoDrag = false;
+});
+
+/* ===== панель ===== */
+const $ = s => document.querySelector(s);
+const getPath = k => k.split('.').reduce((o, p) => o[p], state);
+const setPath = (k, v) => { const ps = k.split('.'), last = ps.pop();
+  ps.reduce((o, p) => o[p], state)[last] = v; };
+
+const sliderDefs = {
+  pie: [
+    ['pie.extrude', 'Extrude', 0.04, 0.6, 0.01],
+    ['pie.explode', 'Explode', 0, 0.35, 0.01],
+    ['pie.start',   'Start°', -180, 180, 5],
+    ['pie.sideLines', 'Side dividers', 0, 1, 1]
+  ],
+  polar: [
+    ['polar.extrude', 'Extrude', 0.02, 0.4, 0.01],
+    ['polar.bg',      'BG sectors', 0, 1, 0.05],
+    ['polar.rim',     'Dotted rim', 0, 1, 1]
+  ],
+  bars: [
+    ['bars.gap',      'Gap',  0.1, 0.7, 0.05],
+    ['bars.gridW',    'Grid width', 1, 2, 0.05],
+    ['bars.gridZ',    'Grid depth', -1.4, 0, 0.05],
+    ['bars.gridDens', 'Grid steps', 2, 8, 1],
+    ['bars.grid',     'Scale grid', 0, 1, 1]
+  ],
+  area: [
+    ['area.depth',    'Depth', 0.1, 1.2, 0.05],
+    ['area.colorCat', 'Color cat', 0, 3, 1],
+    ['area.gridW',    'Grid width', 1, 2, 0.05],
+    ['area.gridZ',    'Grid depth', -1.4, 0, 0.05],
+    ['area.gridDens', 'Grid steps', 2, 8, 1],
+    ['area.grid',     'Scale grid', 0, 1, 1],
+    ['area.frontGrid','Face grid', 0, 1, 1]
+  ],
+  gStyle: [
+    ['style.border', 'Border', 0.5, 3, 0.1],
+    ['style.shade',  'Shade → black', 0, 1, 0.05],
+    ['style.values', 'Values', 0, 1, 1],
+    ['style.labels', 'Labels', 0, 1, 1],
+    ['style.legend', 'Legend', 0, 1, 1]
+  ],
+  gCam: [
+    ['cam.tilt', 'Tilt', -180, 180, 1],
+    ['cam.spin', 'Spin', -0.5, 0.5, 0.01],
+    ['cam.zoom', 'Zoom', 0.5, 2, 0.05],
+    ['cam.dist', 'Distance', 2.5, 8, 0.1]
+  ]
+};
+function buildSliders(elId, defs){
+  const el = typeof elId === 'string' ? $('#' + elId) : elId;
+  [...el.querySelectorAll('.row')].forEach(r => r.remove());
+  for (const [key, name, min, max, step] of defs){
+    const row = document.createElement('div'); row.className = 'row';
+    if (min === 0 && max === 1 && step === 1){
+      row.classList.add('toggle');
+      row.innerHTML = `<label>${name}</label><input type="checkbox" class="sw">`;
+      const cb = row.querySelector('input');
+      cb.checked = !!getPath(key); cb.dataset.key = key;
+      cb.addEventListener('change', () => setPath(key, cb.checked ? 1 : 0));
+      el.appendChild(row); continue;
+    }
+    row.innerHTML = `<label>${name}</label><input type="range" min="${min}" max="${max}" step="${step}"><input type="number" class="val" min="${min}" max="${max}" step="${step}">`;
+    const inp = row.querySelector('input[type=range]'), val = row.querySelector('input[type=number]');
+    const fmt = x => +(+x).toFixed(step < 1 ? 2 : 0);
+    inp.value = getPath(key); val.value = fmt(getPath(key)); inp.dataset.key = key;
+    inp.addEventListener('input', () => { setPath(key, +inp.value); val.value = fmt(inp.value); });
+    val.addEventListener('change', () => { const x = parseFloat(val.value);
+      if (isFinite(x)){ setPath(key, x); inp.value = x; } });
+    el.appendChild(row);
+  }
+}
+function buildModePanel(){
+  $('#gModeTitle').textContent = { pie:'Pie', polar:'Polar', bars:'Bars', area:'Area' }[state.mode];
+  buildSliders('gMode', sliderDefs[state.mode]);
+}
+function syncPanel(){
+  document.querySelectorAll('#panel input[type=range]').forEach(inp => {
+    const key = inp.dataset.key; if (!key) return;
+    const x = getPath(key), step = +inp.step;
+    inp.value = x; inp.nextElementSibling.value = +(+x).toFixed(step < 1 ? 2 : 0);
+  });
+  document.querySelectorAll('#panel input.sw').forEach(cb => {
+    if (cb.dataset.key) cb.checked = !!getPath(cb.dataset.key);
+  });
+}
+buildModePanel();
+buildSliders('gStyle', sliderDefs.gStyle);
+buildSliders('gCam', sliderDefs.gCam);
+sliderDefs.gMotion = [['anim.speed', 'Speed', 0.4, 2, 0.01]];
+buildSliders('gMotionSliders', sliderDefs.gMotion);
+(function initMotionPad(){
+  const CS = getComputedStyle(document.body);
+  const cINK=CS.getPropertyValue('--ink').trim(),cMUT=CS.getPropertyValue('--muted').trim(),cACC=CS.getPropertyValue('--accent').trim(),cLINE=CS.getPropertyValue('--line').trim();
+  const padEl=$('#mpad'),padC=$('#mpadc'),prevC=$('#mprevc'),easeSel=$('#mEase');
+  const pc=padC.getContext('2d'),rc=prevC.getContext('2d');
+  const PRESETS_XY={balanced:[.5,.5],slow:[.12,.12],fast:[.88,.12],soft:[.12,.88],raw:[.88,.88],gentle:[.3,.7],snappy:[.72,.28]};
+  const cl=v=>v<0?0:v>1?1:v;
+  function nearest(){let b='balanced',bd=1e9;for(const k in PRESETS_XY){const dx=PRESETS_XY[k][0]-state.motion.x,dy=PRESETS_XY[k][1]-state.motion.y,d=dx*dx+dy*dy;if(d<bd){bd=d;b=k;}}return b;}
+  function fit(cv){const dpr=Math.min(devicePixelRatio||1,2),r=cv.getBoundingClientRect();cv.width=Math.max(1,r.width*dpr);cv.height=Math.max(1,r.height*dpr);cv.getContext('2d').setTransform(dpr,0,0,dpr,0,0);return{w:r.width,h:r.height};}
+  let PD=fit(padC),RD=fit(prevC),phase=0,lastM=performance.now();
+  addEventListener('resize',()=>{PD=fit(padC);RD=fit(prevC);});
+  setTimeout(()=>{PD=fit(padC);RD=fit(prevC);},90);
+  const cur=()=>motionResolve(state.motion.x,state.motion.y);
+  function drawPad(){const{w,h}=PD,c=cur();pc.clearRect(0,0,w,h);pc.strokeStyle=cLINE;pc.lineWidth=1;
+    for(let i=1;i<4;i++){const g=i/4;pc.globalAlpha=.6;pc.beginPath();pc.moveTo(g*w,0);pc.lineTo(g*w,h);pc.stroke();pc.beginPath();pc.moveTo(0,g*h);pc.lineTo(w,g*h);pc.stroke();}
+    pc.globalAlpha=1;const p0=13;
+    pc.strokeStyle=cACC;pc.globalAlpha=.28;pc.lineWidth=2;pc.beginPath();
+    for(let i=0;i<=60;i++){const t=i/60,xx=p0+t*(w-2*p0),yy=(h-p0)-c.ease(t)*(h-2*p0);i?pc.lineTo(xx,yy):pc.moveTo(xx,yy);}pc.stroke();
+    pc.globalAlpha=.1;pc.setLineDash([3,4]);pc.beginPath();pc.moveTo(p0,h-p0);pc.lineTo(w-p0,p0);pc.stroke();pc.setLineDash([]);pc.globalAlpha=1;
+    const px=state.motion.x*w,py=(1-state.motion.y)*h;
+    pc.strokeStyle=cINK;pc.globalAlpha=.22;pc.beginPath();pc.moveTo(px,0);pc.lineTo(px,h);pc.moveTo(0,py);pc.lineTo(w,py);pc.stroke();pc.globalAlpha=1;
+    pc.fillStyle=cINK;pc.beginPath();pc.arc(px,py,6,0,Math.PI*2);pc.fill();pc.fillStyle='#fff';pc.beginPath();pc.arc(px,py,2.2,0,Math.PI*2);pc.fill();}
+  function drawPrev(dt){const{w,h}=RD,c=cur();rc.clearRect(0,0,w,h);const y0=h/2,x0=13,x1=w-13;
+    rc.strokeStyle=cLINE;rc.lineWidth=1;rc.beginPath();rc.moveTo(x0,y0);rc.lineTo(x1,y0);rc.stroke();
+    phase+=dt*state.anim.speed*0.6;if(phase>1.35)phase-=1.35;const p=cl(phase);
+    rc.fillStyle=cMUT;rc.globalAlpha=.45;rc.beginPath();rc.arc(x0+p*(x1-x0),y0+8,3,0,Math.PI*2);rc.fill();rc.globalAlpha=1;
+    rc.fillStyle=cINK;rc.beginPath();rc.arc(x0+c.ease(p)*(x1-x0),y0-8,4.6,0,Math.PI*2);rc.fill();}
+  function commit(){ state.anim.speed=+cur().speed.toFixed(2); syncPanel();
+    const ts=document.getElementById('tSpeed'); if(ts) ts.value=state.anim.speed.toFixed(2);
+    easeSel.value=nearest(); drawPad(); }
+  function fromEvt(e){const r=padEl.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width,y:1-(e.clientY-r.top)/r.height};}
+  let drag=false;
+  padEl.addEventListener('pointerdown',e=>{drag=true;padEl.setPointerCapture(e.pointerId);const p=fromEvt(e);state.motion.x=cl(p.x);state.motion.y=cl(p.y);commit();});
+  padEl.addEventListener('pointermove',e=>{if(drag){const p=fromEvt(e);state.motion.x=cl(p.x);state.motion.y=cl(p.y);commit();}});
+  padEl.addEventListener('pointerup',()=>drag=false);padEl.addEventListener('pointercancel',()=>drag=false);
+  const spInp=$('#gMotionSliders input[type=range]');
+  if(spInp) spInp.addEventListener('input',()=>{ state.motion.x=speedToX(+spInp.value,state.motion.y); easeSel.value=nearest(); drawPad(); });
+  easeSel.addEventListener('change',()=>{const q=PRESETS_XY[easeSel.value]||[.5,.5];state.motion.x=q[0];state.motion.y=q[1];commit();});
+  (function ml(now){const dt=Math.min((now-lastM)/1000,.05);lastM=now;drawPad();drawPrev(dt);requestAnimationFrame(ml);})(performance.now());
+  commit();
+})();
+
+
+$('#modeSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.mode = b.dataset.m; state.sel = -1; pillState.clear();
+  document.querySelectorAll('#modeSeg button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  buildModePanel();
+});
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === b.dataset.tab));
+});
+document.querySelectorAll('#panel legend').forEach(lg =>
+  lg.addEventListener('click', () => lg.parentElement.classList.toggle('closed')));
+
+/* палитра */
+function syncPalette(){
+  document.querySelectorAll('.pal').forEach(inp => {
+    const i = +inp.dataset.i;
+    inp.value = state.palette[i];
+    $('#ch' + i).style.background = state.palette[i];
+  });
+}
+document.querySelectorAll('.pal').forEach(inp => {
+  inp.addEventListener('change', () => {
+    const i = +inp.dataset.i, v = inp.value.trim();
+    if (/^#?[0-9a-fA-F]{6}$/.test(v)){ state.palette[i] = v.startsWith('#') ? v : '#' + v; syncPalette(); }
+  });
+});
+syncPalette();
+
+/* данные */
+function buildItems(){
+  const box = $('#itemsList'); box.innerHTML = '';
+  state.data.items.forEach((it, i) => {
+    const row = document.createElement('div'); row.className = 'arow';
+    const lab = document.createElement('input'); lab.className = 'tin'; lab.value = it.label;
+    if (i === state.sel) lab.style.borderColor = 'var(--accent)';
+    lab.addEventListener('input', () => it.label = lab.value);
+    const val = document.createElement('input');
+    val.type = 'number'; val.step = 0.1; val.value = it.value;
+    val.addEventListener('change', () => { const v = parseFloat(val.value);
+      if (isFinite(v)) it.value = v; });
+    const cat = document.createElement('input');
+    cat.type = 'number'; cat.min = 0; cat.max = 3; cat.step = 1; cat.value = it.cat || 0;
+    cat.addEventListener('change', () => { const v = parseInt(cat.value);
+      if (isFinite(v)) it.cat = Math.max(0, Math.min(3, v)); });
+    const del = document.createElement('button'); del.className = 'idel'; del.textContent = '×';
+    del.addEventListener('click', () => { state.data.items.splice(i, 1);
+      pillState.clear(); state.sel = -1; buildItems(); });
+    row.append(lab, val, cat, del);
+    box.appendChild(row);
+    const note = document.createElement('input');
+    note.className = 'tin'; note.placeholder = 'Note for the tooltip';
+    note.style.margin = '0 0 6px'; note.value = it.note || '';
+    note.addEventListener('input', () => it.note = note.value);
+    box.appendChild(note);
+  });
+}
+$('#addItem').addEventListener('click', () => {
+  state.data.items.push({ label: 'Item ' + (state.data.items.length + 1), value: 10, cat: 0 });
+  buildItems();
+});
+buildItems();
+function buildCats(){
+  const box = $('#catsList'); box.innerHTML = '';
+  state.data.cats.forEach((c, i) => {
+    const row = document.createElement('div'); row.className = 'crow';
+    const chip = document.createElement('div'); chip.className = 'chip';
+    chip.style.background = state.palette[i];
+    const inp = document.createElement('input'); inp.className = 'tin'; inp.value = c;
+    inp.addEventListener('input', () => state.data.cats[i] = inp.value);
+    row.append(chip, inp); box.appendChild(row);
+  });
+}
+buildCats();
+
+/* транспорт анимации */
+$('#tPlay').addEventListener('click', () => { state.anim.t = 0; state.anim.playing = 1; });
+$('#tOnce').addEventListener('click', () => { state.anim.mode = 'once';
+  $('#tOnce').setAttribute('aria-pressed', true); $('#tLoop').setAttribute('aria-pressed', false); });
+$('#tLoop').addEventListener('click', () => { state.anim.mode = 'loop'; state.anim.playing = 1;
+  $('#tLoop').setAttribute('aria-pressed', true); $('#tOnce').setAttribute('aria-pressed', false); });
+$('#tSpeed').addEventListener('input', e => { state.anim.speed = +e.target.value; if (state.motion) state.motion.x = speedToX(state.anim.speed, state.motion.y); });
+$('#tHold').addEventListener('input', e => state.anim.hold = +e.target.value);
+
+/* плотная серия area */
+$('#seriesTa').value = state.data.series || '';
+$('#xlabelsTa').value = state.data.xlabels || '';
+$('#applySeries').addEventListener('click', () => {
+  state.data.series = $('#seriesTa').value;
+  state.data.xlabels = $('#xlabelsTa').value;
+  state.anim.t = 0; state.anim.playing = 1;
+});
+$('#demoSeries').addEventListener('click', () => {
+  let v = 80; const out = [];
+  for (let i = 0; i < 90; i++){
+    v += (Math.random() - 0.53) * 1.8;
+    if (Math.random() < 0.055) v -= 3 + Math.random() * 5; // ступени-обрывы как в референсе
+    v = Math.max(30, Math.min(85, v));
+    out.push(+v.toFixed(1));
+  }
+  state.data.series = out.join(',');
+  state.data.xlabels = '1/1/10, 29/1/10, 25/2/10, 23/3/10, 19/4/10, 19/5/10';
+  $('#seriesTa').value = state.data.series;
+  $('#xlabelsTa').value = state.data.xlabels;
+  state.mode = 'area';
+  document.querySelectorAll('#modeSeg button').forEach(x =>
+    x.setAttribute('aria-pressed', x.dataset.m === 'area'));
+  buildModePanel();
+  state.anim.t = 0; state.anim.playing = 1;
+});
+
+/* имена / конфиг / png / ui */
+$('#nTitle').value = state.data.title;
+$('#nTitle').addEventListener('input', e => state.data.title = e.target.value);
+$('#saveCfg').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = 'chart3d.json';
+  a.href = URL.createObjectURL(new Blob(
+    [JSON.stringify({ version: 2, mode: state.mode, pie: state.pie, polar: state.polar,
+      bars: state.bars, area: state.area, style: state.style, cam: state.cam,
+      anim: { mode: state.anim.mode, speed: state.anim.speed },
+      palette: state.palette, data: state.data }, null, 1)], { type: 'application/json' }));
+  a.click();
+});
+$('#loadCfg').addEventListener('click', () => $('#loadFile').click());
+$('#loadFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => {
+    const cfg = JSON.parse(t);
+    if (cfg.mode) state.mode = cfg.mode;
+    for (const k of ['pie','polar','bars','area','style','cam','anim'])
+      if (cfg[k]) state[k] = { ...state[k], ...cfg[k] }; // merge, не замена
+    state.anim.t = 0; state.anim.playing = 1;
+    $('#seriesTa').value = state.data && cfg.data ? (cfg.data.series || '') : $('#seriesTa').value;
+    $('#xlabelsTa').value = state.data && cfg.data ? (cfg.data.xlabels || '') : $('#xlabelsTa').value;
+    if (cfg.palette) state.palette = cfg.palette;
+    if (cfg.data) state.data = cfg.data;
+    state.sel = -1; pillState.clear();
+    $('#nTitle').value = state.data.title || '';
+    document.querySelectorAll('#modeSeg button').forEach(x =>
+      x.setAttribute('aria-pressed', x.dataset.m === state.mode));
+    buildModePanel(); buildItems(); buildCats(); syncPalette(); syncPanel();
+  });
+});
+$('#pngBtn').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = 'chart3d.png'; a.href = cv.toDataURL('image/png'); a.click();
+});
+function toggleUI(){ document.body.classList.toggle('noui'); }
+$('#hideBtn').addEventListener('click', toggleUI);
+addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'h' && !['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) toggleUI();
+});
+</script>
+
+<!-- @scene-invert: flips ONLY the #cv scene (panel/nav untouched). Button or 'I'. -->
+<style>#cv.__scninv{filter:invert(1) hue-rotate(180deg)}
+#__invBtn{position:fixed;right:16px;bottom:16px;z-index:20;width:34px;height:34px;border-radius:99px;
+  border:1px solid var(--line,#dcdad4);background:var(--panel,#fdfdfc);color:var(--ink,#1a1a1a);
+  font:14px/1 ui-monospace,monospace;cursor:pointer;box-shadow:0 2px 10px rgba(20,20,25,.06)}
+#__invBtn[aria-pressed="true"]{background:var(--ink,#1a1a1a);color:var(--panel,#fdfdfc)}
+body.noui #__invBtn{display:none}</style>
+<button id="__invBtn" aria-pressed="false" title="Invert scene (I)">◑</button>
+<script>(function(){var c=document.getElementById('cv'),b=document.getElementById('__invBtn');
+if(!c||!b)return;function t(){var on=c.classList.toggle('__scninv');b.setAttribute('aria-pressed',on);}
+b.addEventListener('click',t);
+addEventListener('keydown',function(e){var g=e.target&&e.target.tagName;
+ if(g==='INPUT'||g==='TEXTAREA'||g==='SELECT')return;
+ if(e.key&&e.key.toLowerCase()==='i')t();});})();</script>
+
+</body>
+</html>

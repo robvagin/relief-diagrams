@@ -1,0 +1,2 @@
+Blue noise textures by Christoph Peters (momentsingraphics.de/BlueNoise.html), via github.com/Calinou/free-blue-noise-textures (64_64/LDR_LLL1_0.png, 128_128/LDR_LLL1_0.png).
+Licensed under CC0 1.0 Universal.

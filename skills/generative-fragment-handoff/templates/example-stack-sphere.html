@@ -1,0 +1,2043 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<!-- client Ellipse Sphere · single-file · собрано 2026-08-10 11:56 · kit-panel.js вклеен verbatim из data-games/src -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>client · Ellipse Sphere</title>
+<style>
+  :root{
+    --ink:#403D38; --bg:#EBE8DF; --panel:#F2EFE6; --card:#FBF8EF;
+    --night:#1F1C17; --on-dark:#F4F0E3; --brand:#A5876B; --brand-deep:#7B5B3D;
+    --brand-soft:#C7A985; --glow:#E8DDC8; --sky:#5075A4; --taupe:#A6A19B;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  html.es-night,html.es-night body{background:var(--night);}
+  #cv{position:fixed;inset:0;display:block;width:100%;height:100%;user-select:none;touch-action:none;}
+
+  .es-kicker{position:fixed;top:18px;left:22px;font-size:11px;font-weight:600;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--ink);opacity:.60;pointer-events:none;user-select:none;z-index:5;
+    transition:color .25s ease;}
+  .es-kicker b{color:var(--brand-deep);font-weight:700;}
+  html.es-night .es-kicker{color:var(--on-dark);opacity:.62;}
+  html.es-night .es-kicker b{color:var(--brand-soft);}
+
+  .es-hints{position:fixed;bottom:16px;left:22px;font-size:11px;letter-spacing:.02em;color:var(--ink);
+    opacity:.48;pointer-events:none;user-select:none;z-index:5;font-variant-numeric:tabular-nums;
+    transition:color .25s ease;}
+  html.es-night .es-hints{color:var(--on-dark);opacity:.5;}
+  .es-hints kbd{font:inherit;border:1px solid currentColor;border-radius:3px;padding:0 4px;opacity:.85;margin:0 2px;}
+
+  #panelWrap{position:fixed;top:16px;right:16px;bottom:16px;z-index:10;display:flex;flex-direction:column;
+    width:246px;}
+  #panelWrap.is-hidden{display:none;}
+  .es-panel-head{flex:0 0 auto;background:var(--panel);border:1px solid #d7d2c4;border-bottom:0;
+    border-radius:6px 6px 0 0;padding:9px 12px;font-size:10px;font-weight:700;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--ink);cursor:pointer;user-select:none;
+    display:flex;align-items:center;justify-content:space-between;}
+  .es-panel-head span.dim{opacity:.5;font-weight:500;letter-spacing:.04em;}
+  #panelMount{flex:1 1 auto;min-height:0;}
+  #panelMount .dg-panel{width:100%;min-width:0;max-width:none;border-top-left-radius:0;border-top-right-radius:0;}
+
+  .es-fab{position:fixed;top:16px;right:16px;z-index:11;display:none;align-items:center;justify-content:center;
+    width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid #d7d2c4;color:var(--ink);
+    font-size:15px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08);}
+  .es-fab.is-visible{display:flex;}
+  @media (hover:hover) and (pointer:fine){ .es-fab:hover{background:var(--card);} }
+  .es-fab:active{transform:scale(0.97);}
+  .es-fab:focus-visible{outline:2px solid var(--brand-deep);outline-offset:2px;}
+
+  /* инлайн-правка текста пилюли: тот же жест, что правка числа в панели — клик, Enter коммит, Esc отмена */
+  #labelEdit{position:fixed;z-index:20;display:none;height:24px;padding:0 8px;border-radius:12px;
+    border:1px solid var(--brand-deep);background:var(--card);color:var(--ink);
+    font:600 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    letter-spacing:.05em;text-align:center;outline:none;min-width:80px;}
+  html.es-night #labelEdit{background:#2A2621;color:var(--on-dark);border-color:var(--brand-soft);}
+
+  /* полка картинок: по слоту на слой, снизу под сценой */
+  #tray{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);z-index:9;
+    display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:min(62vw,720px);}
+  #tray.is-off{display:none;}
+  .es-slot{position:relative;width:40px;height:40px;border-radius:9px;flex:0 0 auto;
+    background:var(--card);border:1px solid #d7d2c4;cursor:pointer;padding:0;
+    background-size:cover;background-position:center;
+    font:600 10px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);display:flex;align-items:flex-end;justify-content:center;
+    transition:border-color .18s ease, transform .18s ease;}
+  .es-slot span{display:block;width:100%;padding:2px 0 3px;border-radius:0 0 8px 8px;
+    background:rgba(251,248,239,.82);letter-spacing:.04em;}
+  .es-slot.has-img span{background:rgba(31,28,23,.55);color:#F4F0E3;}
+  @media (hover:hover) and (pointer:fine){ .es-slot:hover{border-color:var(--brand-deep);transform:translateY(-2px);} }
+  .es-slot:active{transform:scale(0.97);}
+  .es-slot:focus-visible{outline:2px solid var(--brand-deep);outline-offset:2px;}
+  .es-slot.is-over{border-color:var(--brand-deep);border-style:dashed;}
+  html.es-night .es-slot{background:#2A2621;border-color:#4a443c;color:var(--on-dark);}
+  html.es-night .es-slot span{background:rgba(31,28,23,.80);color:var(--on-dark);}
+
+  html.es-embed #tray,
+  html.es-embed .es-kicker,
+  html.es-embed .es-hints,
+  html.es-embed #panelWrap,
+  html.es-embed .es-fab{display:none !important;}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="es-kicker"><b>ELLIPSE SPHERE</b>&nbsp;· client prototype</div>
+<div class="es-hints" id="hints">тяни по полю&nbsp;— угол&nbsp;· <kbd>Shift</kbd>+тяни&nbsp;— разворот&nbsp;· 2×&nbsp;— вид домой&nbsp;&nbsp;·&nbsp;&nbsp;<kbd>P</kbd>панель&nbsp;· <kbd>R</kbd>пересборка&nbsp;· <kbd>Space</kbd>пауза&nbsp;· <kbd>I</kbd>тема&nbsp;· <kbd>S</kbd>снимок</div>
+<button id="panelFab" class="es-fab" title="Показать панель (P)">&#9881;</button>
+<div id="panelWrap">
+  <div class="es-panel-head" id="panelHead">Ellipse Sphere <span class="dim">controls</span></div>
+  <div id="panelMount"></div>
+</div>
+<input id="labelEdit" type="text" autocomplete="off" spellcheck="false">
+<div id="tray" role="group" aria-label="Картинки слоёв"></div>
+<input id="fileIn" type="file" accept="image/*" hidden>
+
+<script>
+// =====================================================================
+// kit-panel.js — verbatim из data-games/src, канон panel-canon.
+// Не переписывать руками: файл вклеивается сборщиком build.py.
+// =====================================================================
+// kit-panel.js — генератор контрол-панели линии DATA GAMES.
+// Zero-dependency vanilla ES2020: без импортов, без DOM-фреймворков, без внешних таблиц.
+// Канон: panel-canon (scrub-field, §1-9), CONTRACT.md §3 (декларации) и §6 (панель).
+// Определяет ровно одну глобаль: window.DG.panel = { build, setValue, getValues, css }.
+// Всё завёрнуто в IIFE, чтобы внутренние хелперы не текли в window.
+
+(function () {
+  'use strict';
+
+  // ===================================================================
+  // §1. Состояние единственного активного инстанса панели
+  // ===================================================================
+  // API документа не принимает mount в setValue/getValues — значит панель
+  // одна на страницу одновременно. Пересборка (повторный build) полностью
+  // сбрасывает состояние ниже.
+
+  let _onChange = function () {};
+  let _values = Object.create(null);   // path -> текущее значение (плоское состояние)
+  let _params = Object.create(null);   // path -> {kind, min,max,step | options | el,...}
+
+  // ===================================================================
+  // §2. Числовые утилиты
+  // ===================================================================
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  // нормализация лейбла: декларации сцен пишут &nbsp; как текст (правило
+  // no-orphan — «не разрывать короткие служебные слова»), но textContent
+  // сущности не парсит и печатает их буквально. Меняем на РЕАЛЬНЫЙ символ
+  // U+00A0 (неразрывный пробел), а не на обычный пробел — иначе no-orphan
+  // ломается: обычный пробел даёт браузеру право перенести строку тут же.
+  // innerHTML сознательно не используем (XSS, нарушение канона).
+  function normalizeLabel(label) {
+    return String(label).replace(/&nbsp;/g, ' ');
+  }
+
+  // формат по step, канон: step<1 ? toFixed(2) : toFixed(0)
+  function fmt(v, step) {
+    v = +v;
+    if (!isFinite(v)) v = 0;
+    return step < 1 ? v.toFixed(2) : v.toFixed(0);
+  }
+
+  // extendParamRange — дословно канон (Закон №3): ввод за диапазон НЕ клампится,
+  // а расширяет границы параметра, чтобы значение реально доехало до onChange.
+  function extendParamRange(p, v) {
+    if (!p || isNaN(v)) return;
+    if (v > p.max) p.max = v;
+    if (v < p.min) p.min = v;
+  }
+
+  // ===================================================================
+  // §3. Классификация rowDecl (три формы, четыре вида ряда)
+  // ===================================================================
+  //   число:    ['path','Label', min, max, step]                 (5 эл.)
+  //   тумблер:  ['path','Label', 0, 1, 1]                         (5 эл., min===0&&max===1&&step===1)
+  //   enum:     ['path','Label', ['soft','hard','wire']]          (3 эл., 3-й — массив)
+  //   действие: ['@id','Label', 'action']                         (3 эл., 3-й === 'action')
+
+  function classifyRow(decl) {
+    if (!Array.isArray(decl) || decl.length < 3) {
+      throw new Error('DG.panel: неверная rowDecl ' + JSON.stringify(decl));
+    }
+    if (decl.length === 5) {
+      const min = decl[2], max = decl[3], step = decl[4];
+      if (min === 0 && max === 1 && step === 1) return 'toggle';
+      return 'number';
+    }
+    if (decl.length === 3) {
+      if (Array.isArray(decl[2])) return 'enum';
+      if (decl[2] === 'action') return 'action';
+    }
+    throw new Error('DG.panel: нераспознанная форма rowDecl ' + JSON.stringify(decl));
+  }
+
+  // ===================================================================
+  // §4. build — сборка панели из деклараций
+  // ===================================================================
+
+  function build(cfg) {
+    cfg = cfg || {};
+    const mount = cfg.mount;
+    if (!mount) throw new Error('DG.panel.build: mount обязателен');
+    const groups = cfg.groups || [];
+    const values = cfg.values || {};
+
+    _onChange = typeof cfg.onChange === 'function' ? cfg.onChange : function () {};
+    _values = Object.create(null);
+    _params = Object.create(null);
+
+    mount.innerHTML = '';
+    mount.classList.add('dg-panel');
+
+    for (let i = 0; i < groups.length; i++) {
+      mount.appendChild(buildGroup(groups[i], values));
+    }
+  }
+
+  function buildGroup(g, values) {
+    const fieldset = document.createElement('fieldset');
+    fieldset.className = 'dg-group';
+    if (g.open === false) fieldset.classList.add('is-closed');
+
+    const legend = document.createElement('legend');
+    legend.className = 'dg-legend dg-ctrl';
+    legend.tabIndex = 0;
+    legend.setAttribute('role', 'button');
+    legend.setAttribute('aria-expanded', g.open === false ? 'false' : 'true');
+
+    const caret = document.createElement('span');
+    caret.className = 'dg-legend-caret';
+    caret.textContent = g.open === false ? '▸' : '▾'; // ▸ / ▾
+    const text = document.createElement('span');
+    text.className = 'dg-legend-text';
+    text.textContent = g.name || '';
+    legend.appendChild(caret);
+    legend.appendChild(text);
+
+    const body = document.createElement('div');
+    body.className = 'dg-group-body';
+
+    const rows = g.rows || [];
+    for (let i = 0; i < rows.length; i++) {
+      body.appendChild(buildRow(rows[i], values));
+    }
+
+    function toggleGroup() {
+      const closed = fieldset.classList.toggle('is-closed');
+      caret.textContent = closed ? '▸' : '▾';
+      legend.setAttribute('aria-expanded', closed ? 'false' : 'true');
+    }
+    legend.addEventListener('click', toggleGroup);
+    legend.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(); }
+    });
+
+    fieldset.appendChild(legend);
+    fieldset.appendChild(body);
+    return fieldset;
+  }
+
+  function buildRow(decl, values) {
+    const kind = classifyRow(decl);
+    if (kind === 'action') return buildActionRow(decl);
+
+    const path = decl[0];
+    const label = decl[1];
+
+    const row = document.createElement('div');
+    row.className = 'dg-row';
+    row.dataset.path = path;
+    row.dataset.kind = kind;
+
+    const lab = document.createElement('label');
+    lab.className = 'dg-row-label';
+    lab.textContent = normalizeLabel(label);
+    row.appendChild(lab);
+
+    let ctrl;
+    if (kind === 'number') ctrl = buildScrub(path, decl[2], decl[3], decl[4], values);
+    else if (kind === 'toggle') ctrl = buildToggle(path, values);
+    else {
+      const opts = decl[2];
+      const wide = Array.isArray(opts) && opts.length > 4;
+      if (wide) row.classList.add('dg-row-wide');
+      ctrl = buildEnum(path, opts, values, wide);
+    }
+
+    row.appendChild(ctrl);
+    return row;
+  }
+
+  // ---------------------------------------------------------------
+  // число — скраб-поле (Закон №1/№2): один виджет, число живёт в треке
+  // ---------------------------------------------------------------
+
+  function buildScrub(path, min, max, step, values) {
+    const p = { kind: 'number', min: min, max: max, step: step };
+
+    let v = values[path];
+    v = (v === undefined || isNaN(v)) ? clamp(0, min, max) : +v;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'dg-scrub dg-ctrl';
+    wrap.tabIndex = 0;
+    wrap.dataset.path = path;
+
+    const fill = document.createElement('div');
+    fill.className = 'dg-scrub-fill';
+
+    const val = document.createElement('span');
+    val.className = 'dg-scrub-val';
+
+    const edit = document.createElement('input');
+    edit.className = 'dg-scrub-edit';
+    edit.type = 'text';
+    edit.inputMode = 'decimal';
+    edit.autocomplete = 'off';
+    edit.spellcheck = false;
+
+    wrap.appendChild(fill);
+    wrap.appendChild(val);
+    wrap.appendChild(edit);
+
+    p.el = wrap; p.fillEl = fill; p.valEl = val; p.editEl = edit;
+    _params[path] = p;
+    _values[path] = v;
+    renderScrub(path);
+
+    // ---- drag = скраб (клампится к диапазону; Shift = ×0.1 точность) ----
+    const RANGE_PX = 150; // px горизонтального свайпа на весь диапазон min..max
+    let dragged = false, startX = 0, startV = 0;
+
+    function onMove(e) {
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 3) dragged = true;
+      const st = _params[path];
+      const range = (st.max - st.min) || 1;
+      const sens = e.shiftKey ? 0.1 : 1;
+      const nv = clamp(startV + (dx / RANGE_PX) * range * sens, st.min, st.max);
+      commitValue(path, nv, true);
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      if (!dragged) enterEdit(path); // клик без драга = правка числом на месте
+    }
+    wrap.addEventListener('pointerdown', function (e) {
+      if (wrap.classList.contains('is-editing')) return;
+      if (e.button !== undefined && e.button !== 0) return;
+      dragged = false;
+      startX = e.clientX;
+      startV = _values[path];
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      e.preventDefault();
+    });
+
+    // ---- стрелки ±step на фокусе, Shift ×10; Enter — тоже правка на месте ----
+    wrap.addEventListener('keydown', function (e) {
+      if (wrap.classList.contains('is-editing')) return;
+      const st = _params[path];
+      let d = 0;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') d = st.step;
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') d = -st.step;
+      else if (e.key === 'Enter') { e.preventDefault(); enterEdit(path); return; }
+      else return;
+      if (e.shiftKey) d *= 10;
+      e.preventDefault();
+      const nv = clamp(_values[path] + d, st.min, st.max);
+      commitValue(path, nv, true);
+    });
+
+    // ---- правка числом: Enter/blur коммит (extendParamRange), Esc отмена ----
+    edit.addEventListener('keydown', function (e) {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); commitEdit(path); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(path); }
+    });
+    edit.addEventListener('blur', function () { commitEdit(path); });
+
+    return wrap;
+  }
+
+  function enterEdit(path) {
+    const p = _params[path];
+    if (!p || p.kind !== 'number') return;
+    p.el.classList.add('is-editing');
+    p.editEl.value = fmt(_values[path], p.step);
+    p.editEl.focus();
+    p.editEl.select();
+  }
+
+  function commitEdit(path) {
+    const p = _params[path];
+    if (!p || !p.el.classList.contains('is-editing')) return;
+    p.el.classList.remove('is-editing');
+    const raw = String(p.editEl.value).trim().replace(',', '.');
+    const v = parseFloat(raw);
+    if (raw === '' || isNaN(v)) { renderScrub(path); return; } // мусор — без изменений
+    extendParamRange(p, v); // ввод за диапазон НЕ клампится — расширяем границы
+    commitValue(path, v, true);
+  }
+
+  function cancelEdit(path) {
+    const p = _params[path];
+    if (!p) return;
+    p.el.classList.remove('is-editing');
+    renderScrub(path); // возврат к значению до правки
+  }
+
+  function renderScrub(path) {
+    const p = _params[path];
+    if (!p) return;
+    const v = _values[path];
+    const range = (p.max - p.min) || 1;
+    const frac = clamp((v - p.min) / range, 0, 1);
+    p.fillEl.style.setProperty('--fill', String(frac));
+    p.valEl.textContent = fmt(v, p.step);
+  }
+
+  // ---------------------------------------------------------------
+  // тумблер (0,1,1)
+  // ---------------------------------------------------------------
+
+  function buildToggle(path, values) {
+    const p = { kind: 'toggle' };
+    let v = values[path];
+    v = (v === undefined) ? 0 : (v ? 1 : 0);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'dg-toggle dg-ctrl';
+    wrap.tabIndex = 0;
+    wrap.dataset.path = path;
+    wrap.setAttribute('role', 'switch');
+
+    const thumb = document.createElement('span');
+    thumb.className = 'dg-toggle-thumb';
+    wrap.appendChild(thumb);
+
+    p.el = wrap;
+    _params[path] = p;
+    _values[path] = v;
+    renderToggle(path);
+
+    function flip() { commitValue(path, _values[path] ? 0 : 1, true); }
+    wrap.addEventListener('click', flip);
+    wrap.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
+    });
+
+    return wrap;
+  }
+
+  function renderToggle(path) {
+    const p = _params[path];
+    if (!p) return;
+    const on = !!_values[path];
+    p.el.classList.toggle('is-on', on);
+    p.el.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+
+  // ---------------------------------------------------------------
+  // enum — сегмент-контрол (донор Unicorn Studio, .seg)
+  // ---------------------------------------------------------------
+
+  function buildEnum(path, options, values, wide) {
+    const p = { kind: 'enum', options: options.slice() };
+    let v = values[path];
+    if (v === undefined || options.indexOf(v) === -1) v = options[0];
+
+    const wrap = document.createElement('div');
+    wrap.className = wide ? 'dg-seg dg-seg-grid' : 'dg-seg';
+    wrap.dataset.path = path;
+
+    const optEls = options.map(function (opt) {
+      const b = document.createElement('div');
+      b.className = 'dg-seg-opt dg-ctrl';
+      b.tabIndex = 0;
+      b.textContent = opt;
+      b.dataset.value = opt;
+      b.addEventListener('click', function () { commitValue(path, opt, true); });
+      b.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); commitValue(path, opt, true); }
+      });
+      wrap.appendChild(b);
+      return b;
+    });
+
+    p.el = wrap; p.optEls = optEls;
+    _params[path] = p;
+    _values[path] = v;
+    renderEnum(path);
+    return wrap;
+  }
+
+  function renderEnum(path) {
+    const p = _params[path];
+    if (!p) return;
+    const v = _values[path];
+    for (let i = 0; i < p.optEls.length; i++) {
+      p.optEls[i].classList.toggle('is-active', p.optEls[i].dataset.value === String(v));
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // действие — полноширинный ряд-кнопка
+  // ---------------------------------------------------------------
+
+  function buildActionRow(decl) {
+    const path = decl[0];
+    const label = decl[1];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dg-action dg-ctrl';
+    btn.textContent = normalizeLabel(label);
+    btn.dataset.path = path;
+    btn.dataset.kind = 'action';
+    btn.addEventListener('click', function () { _onChange(path, true); });
+    return btn;
+  }
+
+  // ===================================================================
+  // §5. Единая точка изменения значения — обновляет UI и (опционально) зовёт onChange
+  // ===================================================================
+
+  function commitValue(path, v, fireChange) {
+    _values[path] = v;
+    const p = _params[path];
+    if (p) {
+      if (p.kind === 'number') renderScrub(path);
+      else if (p.kind === 'toggle') renderToggle(path);
+      else if (p.kind === 'enum') renderEnum(path);
+    }
+    if (fireChange) _onChange(path, v);
+  }
+
+  // ===================================================================
+  // §6. Публичное API: setValue / getValues
+  // ===================================================================
+
+  // программно (например после хоткея) — обновляет UI БЕЗ onChange
+  function setValue(path, value) {
+    const p = _params[path];
+    if (!p) { _values[path] = value; return; } // путь вне текущей панели — просто запомнить
+    if (p.kind === 'number') {
+      const v = +value;
+      extendParamRange(p, v); // тот же закон №3 — программный сдвиг тоже не клампится
+      commitValue(path, v, false);
+    } else if (p.kind === 'toggle') {
+      commitValue(path, value ? 1 : 0, false);
+    } else if (p.kind === 'enum') {
+      if (p.options.indexOf(value) === -1) return;
+      commitValue(path, value, false);
+    }
+  }
+
+  function getValues() {
+    const out = {};
+    for (const k in _values) if (Object.prototype.hasOwnProperty.call(_values, k)) out[k] = _values[k];
+    return out;
+  }
+
+  // ===================================================================
+  // §7. CSS — токены + грамматика ряда + матрица состояний
+  // ===================================================================
+  // Хардкод-хекс живёт ТОЛЬКО внутри .dg-panel{...} (блок определения токенов).
+  // Везде дальше — только var(...). Ширина/цвет/шрифт контролов — токены;
+  // геометрия конкретных виджетов (высота скраба/тумблера/сегмента), которую
+  // канон токеном не называет, оставлена литеральной (см. отчёт).
+
+  const css = ''
+    + '.dg-panel{'
+    + '--fz-s:9px;--fz-m:10px;--fz-l:11px;'
+    + '--sp-1:4px;--sp-2:8px;--sp-3:12px;'
+    + '--ease-out:cubic-bezier(.23,1,.32,1);--dur-press:140ms;--dur-pop:180ms;'
+    + '--dg-bg:#eae7e0;'
+    + '--dg-surface:#f4f2ee;'
+    + '--dg-surface-hover:#ece8e0;'
+    + '--dg-track:#e1ddd0;'
+    + '--dg-fill:#cdc4ac;'
+    + '--dg-ink:#1b1a17;'
+    + '--dg-muted:#8d897c;'
+    + '--dg-border:#d7d2c4;'
+    + '--dg-focus:#3568d4;'
+    + '--dg-accent-live:#b4531f;'
+    + '--dg-accent-warn:#b3261e;'
+    + '--dg-radius-panel:6px;'
+    + '--dg-radius-ctrl:4px;'
+    + 'box-sizing:border-box;'
+    + 'width:232px;min-width:232px;max-width:232px;'
+    + 'max-height:100%;overflow-y:auto;overflow-x:hidden;'
+    + 'background:var(--dg-bg);'
+    + 'border:1px solid var(--dg-border);'
+    + 'border-radius:var(--dg-radius-panel);'
+    + 'padding:var(--sp-2);'
+    + 'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;'
+    + 'font-size:var(--fz-m);line-height:1.4;'
+    + 'color:var(--dg-ink);'
+    + 'font-variant-numeric:tabular-nums;'
+    + 'user-select:none;'
+    + 'filter:none;' // панель НЕ инвертируется вместе со сценой — фильтров нет
+    + '}'
+    + '.dg-panel *{box-sizing:border-box;}'
+    + '.dg-panel :focus{outline:none;}'
+
+    // ---- группа: fieldset+legend, ритм 12 между группами ----
+    + '.dg-group{border:0;margin:0 0 var(--sp-3) 0;padding:0;min-width:0;}'
+    + '.dg-group:last-child{margin-bottom:0;}'
+    + '.dg-legend{display:flex;align-items:center;gap:var(--sp-1);padding:var(--sp-1) var(--sp-1);'
+    + 'font-size:var(--fz-s);letter-spacing:.06em;text-transform:uppercase;color:var(--dg-muted);'
+    + 'cursor:pointer;border-radius:var(--dg-radius-ctrl);'
+    + 'transition:background-color var(--dur-press) var(--ease-out);}'
+    + '.dg-legend-caret{display:inline-block;width:1em;text-align:center;color:var(--dg-muted);}'
+    + '.dg-legend-text{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+    + '.dg-group-body{display:flex;flex-direction:column;gap:var(--sp-2);padding:var(--sp-1) var(--sp-1) 0;}'
+    + '.dg-group.is-closed .dg-group-body{display:none;}'
+
+    // ---- ряд: label слева, контрол справа. Ритм 4 внутри ряда ----
+    + '.dg-row{display:flex;align-items:center;gap:var(--sp-1);min-width:0;}'
+    + '.dg-row-label{flex:0 0 44%;max-width:44%;overflow:hidden;text-overflow:ellipsis;'
+    + 'white-space:nowrap;font-size:var(--fz-m);color:var(--dg-muted);}'
+    // ---- enum "широкий" ряд (>4 опций): лейбл на своей строке сверху,
+    // сегменты сеткой ниже, во всю ширину панели ----
+    + '.dg-row.dg-row-wide{flex-direction:column;align-items:stretch;gap:var(--sp-1);}'
+    + '.dg-row.dg-row-wide .dg-row-label{flex:0 0 auto;max-width:none;width:100%;}'
+
+    // ---- общий контрол: матрица состояний (default/hover/focus-visible/active/disabled) ----
+    + '.dg-ctrl{position:relative;background:var(--dg-surface);border:1px solid transparent;'
+    + 'border-radius:var(--dg-radius-ctrl);color:var(--dg-ink);'
+    + 'transition:background-color var(--dur-press) var(--ease-out),transform var(--dur-press) var(--ease-out);}'
+    + '@media (hover:hover) and (pointer:fine){.dg-ctrl:hover{background:var(--dg-surface-hover);}}'
+    + '.dg-ctrl:focus-visible{outline:2px solid var(--dg-focus);outline-offset:-2px;}'
+    + '.dg-ctrl:active{transform:scale(.97);}'
+    + '.dg-ctrl.is-disabled,.dg-ctrl:disabled{opacity:.42;pointer-events:none;}'
+
+    // ---- скраб-поле: число живёт в треке, заливка = (v-min)/(max-min) ----
+    + '.dg-scrub{flex:1 1 auto;min-width:96px;height:22px;display:flex;align-items:center;'
+    + 'justify-content:flex-end;padding:0 var(--sp-1);overflow:hidden;cursor:ew-resize;touch-action:none;}'
+    + '.dg-scrub-fill{position:absolute;left:0;top:0;bottom:0;width:calc(var(--fill,0) * 100%);'
+    + 'background:var(--dg-fill);pointer-events:none;}'
+    + '.dg-scrub-val{position:relative;z-index:1;font-variant-numeric:tabular-nums;'
+    + 'font-size:var(--fz-m);pointer-events:none;}'
+    + '.dg-scrub-edit{display:none;position:absolute;inset:0;width:100%;height:100%;border:0;'
+    + 'background:transparent;text-align:right;padding:0 var(--sp-1);font:inherit;'
+    + 'font-variant-numeric:tabular-nums;color:var(--dg-ink);z-index:2;}'
+    + '.dg-scrub.is-editing .dg-scrub-val{visibility:hidden;}'
+    + '.dg-scrub.is-editing .dg-scrub-edit{display:block;}'
+    + '.dg-scrub-edit::-webkit-inner-spin-button,.dg-scrub-edit::-webkit-outer-spin-button{'
+    + '-webkit-appearance:none;margin:0;}'
+    + '.dg-scrub-edit{-moz-appearance:textfield;appearance:textfield;}'
+
+    // ---- тумблер ----
+    + '.dg-toggle{flex:0 0 auto;margin-left:auto;width:34px;height:18px;border-radius:999px;'
+    + 'background:var(--dg-track);cursor:pointer;}'
+    + '.dg-toggle-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;'
+    + 'background:var(--dg-bg);'
+    + 'transition:transform var(--dur-press) var(--ease-out),background-color var(--dur-press) var(--ease-out);}'
+    + '.dg-toggle.is-on{background:var(--dg-accent-live);}'
+    + '.dg-toggle.is-on .dg-toggle-thumb{transform:translateX(16px);}'
+
+    // ---- enum: сегмент-контрол ----
+    + '.dg-seg{flex:1 1 auto;min-width:0;display:flex;height:24px;border-radius:var(--dg-radius-ctrl);'
+    + 'background:var(--dg-track);overflow:hidden;}'
+    + '.dg-seg-opt{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;'
+    + 'font-size:var(--fz-s);color:var(--dg-muted);cursor:pointer;border-radius:0;'
+    + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+    + '.dg-seg-opt.is-active{background:var(--dg-ink);color:var(--dg-bg);}'
+    + '.dg-seg.dg-seg-grid{display:grid;grid-template-columns:repeat(3,1fr);height:auto;'
+    + 'background:transparent;gap:var(--sp-1);overflow:visible;}'
+    + '.dg-seg.dg-seg-grid .dg-seg-opt{height:24px;background:var(--dg-track);'
+    + 'border-radius:var(--dg-radius-ctrl);}'
+    + '.dg-seg.dg-seg-grid .dg-seg-opt.is-active{background:var(--dg-ink);color:var(--dg-bg);}'
+
+    // ---- действие: полноширинный ряд-кнопка ----
+    + '.dg-action{display:block;width:100%;text-align:left;padding:var(--sp-1) var(--sp-2);'
+    + 'font:inherit;font-size:var(--fz-m);cursor:pointer;border-color:var(--dg-border);}';
+
+  // ===================================================================
+  // §8. Экспорт — ровно одна глобаль
+  // ===================================================================
+
+  window.DG = window.DG || {};
+  DG.panel = { build: build, setValue: setValue, getValues: getValues, css: css };
+
+})();
+
+// =====================================================================
+// ELLIPSE SPHERE — app
+// =====================================================================
+(function () {
+  'use strict';
+
+  // kit-panel несёт свой CSS — вклеиваем один раз
+  var panelStyleEl = document.createElement('style');
+  panelStyleEl.textContent = DG.panel.css;
+  document.head.appendChild(panelStyleEl);
+
+  // ---- живость (обязательное, канон canvas-loop-liveness) ----
+  window.__ES_FRAMES = 0;
+  window.__ES_READY = false;
+
+  // =====================================================================
+  // Палитра — токены client дословно, ничего не выдумываем
+  // =====================================================================
+  var PAL = {
+    ink: '#403D38', bg: '#EBE8DF', panel: '#F2EFE6', card: '#FBF8EF',
+    night: '#1F1C17', onDark: '#F4F0E3', brand: '#A5876B', brandDeep: '#7B5B3D',
+    brandSoft: '#C7A985', glow: '#E8DDC8', sky: '#5075A4', taupe: '#A6A19B'
+  };
+
+  function hexToRgb(hex) {
+    var h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    var n = parseInt(h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(function (v) {
+      return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+    }).join('');
+  }
+  function mixHex(a, b, t) {
+    var A = hexToRgb(a), B = hexToRgb(b);
+    return rgbToHex(A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t);
+  }
+  function rgba(hex, a) {
+    var c = hexToRgb(hex);
+    return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+  }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function easeOut(p) { var q = 1 - p; return 1 - q * q * q; }          // мягкий ease-out, без bounce
+  var TAU = Math.PI * 2, D2R = Math.PI / 180;
+
+  function theme() {
+    if (state.look.theme === 'night') {
+      var base = mixHex(PAL.night, PAL.onDark, 0.11);
+      return {
+        night: true,
+        bg: PAL.night,
+        ink: PAL.onDark,
+        faceLo: base,
+        faceHi: PAL.brand,
+        rampDeep: PAL.brandSoft,
+        rim: PAL.onDark,
+        wallMix: PAL.night, wallAmt: 0.42,
+        stroke: PAL.onDark, strokeAmt: 0.42,
+        accent: PAL.brandSoft,
+        accentInk: PAL.night,
+        pill: mixHex(PAL.night, PAL.onDark, 0.14),
+        pillStroke: rgba(PAL.onDark, 0.26),
+        pillInk: PAL.onDark,
+        leader: rgba(PAL.onDark, 0.34),
+        note: rgba(PAL.onDark, 0.52),
+        shadow: '#000000'
+      };
+    }
+    return {
+      night: false,
+      bg: PAL.bg,
+      ink: PAL.ink,
+      faceLo: PAL.card,
+      faceHi: PAL.brand,
+      rampDeep: PAL.brandDeep,
+      rim: '#FFFFFF',
+      wallMix: PAL.brandDeep, wallAmt: 0.34,
+      stroke: PAL.brandDeep, strokeAmt: 0.50,
+      accent: PAL.brandDeep,
+      accentInk: PAL.card,
+      pill: PAL.card,
+      pillStroke: rgba(PAL.ink, 0.18),
+      pillInk: PAL.ink,
+      leader: rgba(PAL.brandDeep, 0.40),
+      note: rgba(PAL.ink, 0.55),
+      shadow: PAL.ink
+    };
+  }
+
+  // =====================================================================
+  // Состояние
+  // =====================================================================
+  var MAXL = 120;
+
+  var state = {
+    stack:  { layers: 7, profile: 'ball', radius: 0.30, height: 0.23, thickness: 0.07 },
+    view:   { tilt: 16.79, lean: 7, roll: 0, globe: 14, twist: 3.91, spin: 0, autoSpin: 6, scale: 0.95 },
+    build:  { dir: 'down', stagger: 0.10, dur: 0.75, rise: 130 },
+    spread: { fan: 0.50, fanAmp: 130, open: 0.26, openAmp: 0.71, breathe: 0.10, period: 12,
+              hoverFan: 0.22, hoverOpen: 0.41, focusPush: 91, dim: 0.42 },
+    mat:    { render: 'solid', mode: 'solid', density: 6, tone: 0.62, ramp: 1.00, rim: 0.45,
+              edge: 0.55, shadow: 0.55 },
+    open:   { push: 130, spread: 0.55, face: 0.30, card: 1 },
+    sel:    { hue: 0, scale: 1, mat: 'inherit', push: 0 },
+    img:    { rest: 0.06, hover: 0.40, open: 1.00, fit: 'cover', scale: 1, tray: 1 },
+    label:  { mode: 'pills', side: 'both', every: 2, size: 11, leader: 26, corridor: 64,
+              lift: 26, notes: 'hover', edit: 0 },
+    look:   { theme: 'light', grain: 0.07 },
+    _paused: false
+  };
+
+  // подписи, сноски и мета-строки карточки живут отдельно от параметров — их правит рука
+  var labels = [], notes = [], meta = [];
+  function ensureText(n) {
+    for (var i = labels.length; i < n; i++) {
+      labels.push('Слой ' + (i + 1 < 10 ? '0' : '') + (i + 1));
+      notes.push('короткая сноска');
+      meta.push(['метрика — 128', 'доля — 24%', 'статус — активен']);
+    }
+  }
+  ensureText(MAXL);
+
+  // картинки слоёв: по одной на блинчик, грузятся с диска (blob: — канвас не пачкается)
+  var imgs = [];
+
+  // персональные правки диска: применяются поверх общих ручек, живут только у выделенного
+  var over = [];
+  function ov(i) {
+    if (!over[i]) over[i] = { hue: 0, scale: 1, mat: 'inherit', push: 0 };
+    return over[i];
+  }
+
+  // =====================================================================
+  // Холст
+  // =====================================================================
+  var canvas = document.getElementById('cv');
+  var g = canvas.getContext('2d');
+  var W = 0, H = 0, DPR = 1;
+
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = canvas.clientWidth || window.innerWidth;
+    H = canvas.clientHeight || window.innerHeight;
+    canvas.width = Math.max(1, Math.round(W * DPR));
+    canvas.height = Math.max(1, Math.round(H * DPR));
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    grainTile = null;
+  }
+  window.addEventListener('resize', resize);
+
+  // =====================================================================
+  // Профиль радиуса — чем набирается силуэт
+  // =====================================================================
+  function profileAt(t, kind) {
+    var th = t * Math.PI;
+    if (kind === 'ball')   return Math.sin(th);
+    if (kind === 'lens')   return Math.pow(Math.sin(th), 0.55);
+    if (kind === 'barrel') return 0.58 + 0.42 * Math.sin(th);
+    if (kind === 'drum')   return 1;
+    if (kind === 'cone')   return Math.max(0.04, 1 - t);
+    if (kind === 'drop')   return Math.pow(Math.sin(th), 0.8) * (1 - 0.35 * t);
+    return Math.sin(th);
+  }
+
+  // =====================================================================
+  // Часы: время сцены, сборка, ховер-переходы
+  // =====================================================================
+  var tNow = 0, tPrev = 0, buildT = 0;
+  var scrollDriven = false;          // прогресс сборки ведёт родитель, а не таймер
+  var hoverEase = 0;                 // 0..1 — насколько стопка «раскрыта» под рукой
+  var focusEase = new Float64Array(MAXL);
+  var openEase = new Float64Array(MAXL);
+  var openMax = 0;
+  var hoverIdx = -1, pinIdx = -1;
+  var pointer = { x: -1e6, y: -1e6, inside: false };
+
+  var REDUCE = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  function reduced() { return !!(REDUCE && REDUCE.matches); }
+
+  function replay() {
+    buildT = 0;
+    if (reduced()) buildT = 999;
+  }
+
+  // =====================================================================
+  // Раскладка кадра: всё, что нужно нарисовать, считается здесь
+  // =====================================================================
+  var discs = [];
+
+  function frameBox() {
+    var embed = document.documentElement.classList.contains('es-embed');
+    return { l: 12, r: W - (embed ? 12 : 278) };
+  }
+
+  function layout() {
+    var S = Math.min(W, H);
+    var L = Math.min(MAXL, Math.max(2, Math.round(state.stack.layers)));
+    var fb = frameBox();
+    var cx = (fb.l + fb.r) / 2, cy = H / 2;
+
+    var tiltR = clamp(state.view.tilt, 2, 80) * D2R;
+    var cosT = Math.cos(tiltR);
+
+    // дыхание — амбиентная петля, ничего не дёргает рывком
+    var br = reduced() ? 0 : state.spread.breathe *
+      Math.sin(TAU * tNow / Math.max(1, state.spread.period));
+
+    var openAmt = clamp01(state.spread.open + hoverEase * state.spread.hoverOpen
+                          + openMax * state.open.spread);
+    var fanAmt  = clamp01(state.spread.fan  + hoverEase * state.spread.hoverFan);
+
+    var R = state.stack.radius * S * state.view.scale;
+    var vSpan = state.stack.height * S * state.view.scale * cosT
+              * (1 + openAmt * state.spread.openAmp + br);
+
+    var step = (2 * vSpan) / L;
+    var wallPx = Math.max(0, state.stack.thickness * step);
+    var leanTan = Math.tan(clamp(state.view.lean, -60, 60) * D2R);
+
+    // разворот всей стопки в плоскости экрана: и позиции, и сами эллипсы, и вектор толщины —
+    // одним углом, иначе тело «разъедется» на несогласованные части
+    var roll = clamp(state.view.roll, -80, 80) * D2R;
+    var cosR = Math.cos(roll), sinR = Math.sin(roll);
+    var wx = -wallPx * sinR, wy = wallPx * cosR;
+
+    var totalBuild = (L - 1) * state.build.stagger + state.build.dur;
+    var buildDone = buildT >= totalBuild;
+
+    // ГЛОБУС — перспектива по стопке. Без неё все эллипсы одинаковы и верх с низом
+    // читаются «на одном уровне». Ниже по стопке блинчик дальше от линии глаз →
+    // развёрнут сильнее, а вертикальный шаг там короче. Общая высота не едет:
+    // ручка меняет РАСПРЕДЕЛЕНИЕ, а не габарит.
+    var globe = clamp(state.view.globe, 0, 60);
+    var tEff = new Float64Array(L), kOf = new Float64Array(L), dRaw = new Float64Array(L);
+    var acc = 0, prevD = 0, prevW = 1, ii;
+    for (ii = 0; ii < L; ii++) {
+      var tt = (ii + 0.5) / L;
+      tEff[ii] = clamp(state.view.tilt + globe * tt, 2, 86);
+      kOf[ii] = Math.sin(tEff[ii] * D2R);
+      var dd = (1 - Math.cos(tt * Math.PI)) / 2;        // 0 сверху … 1 снизу
+      var ww = Math.cos(tEff[ii] * D2R) / (cosT || 1e-6);
+      if (ii === 0) { acc = 0; } else { acc += (dd - prevD) * (ww + prevW) * 0.5; }
+      dRaw[ii] = acc; prevD = dd; prevW = ww;
+    }
+    var dLo = (1 - Math.cos((0.5 / L) * Math.PI)) / 2;
+    var dHi = (1 - Math.cos(((L - 0.5) / L) * Math.PI)) / 2;
+    var rawSpan = dRaw[L - 1] - dRaw[0] || 1;
+
+    discs.length = 0;
+    for (var i = 0; i < L; i++) {
+      var t = (i + 0.5) / L;                     // 0 сверху … 1 снизу
+      var u = t * 2 - 1;                         // -1 … +1
+      var r = R * profileAt(t, state.stack.profile);
+      var dNorm = dLo + (dHi - dLo) * ((dRaw[i] - dRaw[0]) / rawSpan);
+      var yUnit = 1 - 2 * dNorm;                 // +1 верх … -1 низ, уже с перспективой
+      var k = kOf[i];                            // свой разворот у каждого блинчика
+
+      // сборка: очередь по направлению
+      var oi = state.build.dir === 'down' ? i : (L - 1 - i);
+      var p = clamp01((buildT - oi * state.build.stagger) / Math.max(0.01, state.build.dur));
+      var e = reduced() ? 1 : easeOut(p);
+      var dirSign = state.build.dir === 'down' ? -1 : 1;
+
+      var fe = focusEase[i] || 0;
+      var oe = openEase[i] || 0;
+      var o = ov(i);
+      var side = sideOf(i, labelSeq(i, L));
+
+      var cxs = cx
+        + yUnit * vSpan * leanTan                       // крен стопки
+        + fanAmt * state.spread.fanAmp * u              // веерный разлёт
+        + fe * state.spread.focusPush * side            // выдвижение наведённого
+        + oe * state.open.push * side                   // раскрытие по клику — дальше и виднее
+        + o.push;                                       // персональный сдвиг диска
+
+      var cys = cy - yUnit * vSpan + (1 - e) * state.build.rise * dirSign;
+
+      var rx0 = cxs - cx, ry0 = cys - cy;
+      var px = cx + rx0 * cosR - ry0 * sinR;
+      var py = cy + rx0 * sinR + ry0 * cosR;
+
+      var sc = lerp(0.86, 1, e) * lerp(1, 1.05, fe) * lerp(1, 0.90, oe) * o.scale;
+      var A = Math.max(1.5, r * sc);
+      // раскрытый диск доворачивается лицом к зрителю — видно, что внутри
+      var kOpen = oe > 0.001
+        ? Math.sin(clamp(tEff[i] + oe * state.open.face * (74 - tEff[i]), 2, 86) * D2R)
+        : k;
+      var B = Math.max(0.6, A * kOpen);
+
+      discs.push({
+        i: i, t: t, u: u, cx: px, cy: py, A: A, B: B,
+        wall: wallPx, wx: wx, wy: wy, rot: roll, cosR: cosR, sinR: sinR,
+        alpha: e, focus: fe, open: oe, ovr: o, side: side,
+        seen: e > 0.02
+      });
+    }
+    return { L: L, wallPx: wallPx, buildDone: buildDone, totalBuild: totalBuild };
+  }
+
+  // порядковый номер диска среди ПОДПИСАННЫХ — от него и пляшет сторона
+  function labelSeq(i, L) {
+    var every = Math.max(1, Math.round(state.label.every));
+    return Math.floor(i / every);
+  }
+  function sideOf(i, seq) {
+    if (state.label.side === 'left') return -1;
+    if (state.label.side === 'right') return 1;
+    return (seq % 2 === 0) ? -1 : 1;
+  }
+
+  // =====================================================================
+  // Материя внутри грани — та же матрица, что и у грани (иначе текстура «плывёт»)
+  // =====================================================================
+  function drawMaterial(d, TH, faceHex) {
+    var mode = (d.ovr && d.ovr.mat && d.ovr.mat !== 'inherit') ? d.ovr.mat : state.mat.mode;
+    if (mode === 'solid') return;
+    var n = Math.max(2, Math.round(state.mat.density));
+    var rot = (state.view.spin + state.view.twist * d.i) * D2R;
+    var lineCol = TH.night ? rgba(PAL.onDark, 0.16) : rgba(PAL.brandDeep, 0.20);
+    var dotCol  = TH.night ? rgba(PAL.onDark, 0.22) : rgba(PAL.brandDeep, 0.26);
+
+    g.save();
+    g.beginPath();
+    g.ellipse(d.cx, d.cy, d.A, d.B, d.rot, 0, TAU);
+    g.clip();
+    g.translate(d.cx, d.cy);
+    g.rotate(d.rot);
+    g.scale(1, d.B / d.A);        // ← весь паттерн получает ровно ту же проекцию
+    g.rotate(rot);
+
+    var A = d.A, j, rr;
+    if (mode === 'rings') {
+      g.strokeStyle = lineCol; g.lineWidth = 1;
+      for (j = 1; j <= n; j++) {
+        rr = A * j / n;
+        g.beginPath(); g.arc(0, 0, rr, 0, TAU); g.stroke();
+      }
+    } else if (mode === 'grid') {
+      g.strokeStyle = lineCol; g.lineWidth = 1;
+      var stp = (A * 2) / n;
+      for (j = -n; j <= n; j++) {
+        var q = j * stp;
+        g.beginPath(); g.moveTo(q, -A); g.lineTo(q, A); g.stroke();
+        g.beginPath(); g.moveTo(-A, q); g.lineTo(A, q); g.stroke();
+      }
+    } else if (mode === 'dots') {
+      g.fillStyle = dotCol;
+      var s2 = (A * 2) / n;
+      for (var a = -n; a <= n; a++) for (var b = -n; b <= n; b++) {
+        var px = a * s2, py = b * s2;
+        if (px * px + py * py > A * A) continue;
+        g.beginPath(); g.arc(px, py, Math.max(0.7, A / n * 0.14), 0, TAU); g.fill();
+      }
+    } else if (mode === 'radial') {
+      g.strokeStyle = lineCol; g.lineWidth = 1;
+      for (j = 0; j < n * 2; j++) {
+        var an = j / (n * 2) * TAU;
+        g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(an) * A, Math.sin(an) * A); g.stroke();
+      }
+    } else if (mode === 'glass') {
+      var gr = g.createLinearGradient(-A * 0.7, -A * 0.7, A * 0.5, A * 0.6);
+      gr.addColorStop(0, rgba(TH.night ? PAL.onDark : '#FFFFFF', 0.30));
+      gr.addColorStop(0.42, rgba(TH.night ? PAL.onDark : '#FFFFFF', 0.02));
+      gr.addColorStop(1, rgba(TH.night ? PAL.night : PAL.brandDeep, 0.10));
+      g.fillStyle = gr;
+      g.beginPath(); g.arc(0, 0, A, 0, TAU); g.fill();
+    }
+    g.restore();
+  }
+
+  // Картинка слоя. Эллипс работает маской-окном: сам снимок не наклоняем и не мнём —
+  // он лежит ровно, а видно ровно столько, сколько открывает блинчик.
+  // Покой — еле-еле, ховер — заметнее, раскрытие — целиком.
+  function drawLayerImage(d) {
+    var rec = imgs[d.i];
+    if (!rec || !rec.ready) return;
+    var a = lerp(state.img.rest, state.img.hover, clamp01(d.focus));
+    a = lerp(a, state.img.open, clamp01(d.open));
+    if (a < 0.005) return;
+
+    var iw = rec.img.naturalWidth || 1, ih = rec.img.naturalHeight || 1;
+    var bw = d.A * 2, bh = Math.max(d.B * 2, d.B * 2 + d.wall);
+    var sc = state.img.fit === 'contain'
+      ? Math.min(bw / iw, bh / ih)
+      : Math.max(bw / iw, bh / ih);
+    sc *= state.img.scale;
+    var w = iw * sc, h = ih * sc;
+
+    g.save();
+    g.beginPath();
+    g.ellipse(d.cx, d.cy, d.A, d.B, d.rot, 0, TAU);
+    g.clip();
+    g.globalAlpha = clamp01(g.globalAlpha * a);
+    g.drawImage(rec.img, d.cx - w / 2, d.cy - h / 2, w, h);
+    g.restore();
+  }
+
+  // =====================================================================
+  // Один диск: боковая грань (толщина) → верхняя грань → материя → контур
+  // =====================================================================
+  function drawDisc(d, TH) {
+    if (!d.seen) return;
+    var render = state.mat.render;
+    var outline = render === 'outline', ghost = render === 'ghost';
+
+    // Градация: ramp разносит соседние блинчики по светлоте. ramp=0 — все одинаковые,
+    // ramp=1 — от самого светлого сверху до полной бронзы снизу.
+    var ramp = clamp01(state.mat.ramp);
+    var lo = 0.5 - ramp * 0.5, hi = 0.5 + ramp * 0.5;
+    var mixT = state.mat.tone * (lo + (hi - lo) * d.t);
+    var face = mixHex(TH.faceLo, TH.faceHi, clamp01(mixT));
+    if (d.ovr.hue > 0.001)  face = mixHex(face, TH.rampDeep, clamp01(d.ovr.hue) * 0.85);
+    if (d.ovr.hue < -0.001) face = mixHex(face, TH.faceLo, clamp01(-d.ovr.hue) * 0.90);
+    if (d.focus > 0.01) face = mixHex(face, TH.accent, d.focus * (TH.night ? 0.34 : 0.42));
+
+    // Гашение прочих — ЦВЕТОМ к фону, не прозрачностью. Прозрачность у сплошных
+    // тел рвёт painter: стопка становится стеклянной кашей (наступали на ховере).
+    var dimAmt = clamp01(state.spread.dim * hoverEase * (1 - d.focus));
+    if (dimAmt > 0.002) face = mixHex(face, TH.bg, dimAmt * 0.82);
+    var wall = mixHex(face, TH.wallMix, TH.wallAmt);
+
+    var edgeA = state.mat.edge * TH.strokeAmt * 2 * (0.55 + 0.45 * d.t) * (1 - dimAmt * 0.65);
+    g.globalAlpha = clamp01(d.alpha * 1.35);   // альфа только на приезде
+
+    // 1. боковая грань: передняя дуга низа + передняя дуга верха
+    if (d.wall > 0.4 && !outline) {
+      if (state.mat.shadow > 0.01 && !ghost) {
+        g.shadowColor = rgba(TH.shadow, 0.22 * state.mat.shadow * (1 - dimAmt * 0.8));
+        g.shadowBlur = 20; g.shadowOffsetY = 9;
+      }
+      if (ghost) g.globalAlpha *= 0.26;
+      g.fillStyle = wall;
+      g.beginPath();
+      g.ellipse(d.cx, d.cy, d.A, d.B, d.rot, 0, Math.PI);
+      g.ellipse(d.cx + d.wx, d.cy + d.wy, d.A, d.B, d.rot, Math.PI, 0, true);
+      g.closePath();
+      g.fill();
+      g.shadowColor = 'transparent'; g.shadowBlur = 0; g.shadowOffsetY = 0;
+      if (ghost) g.globalAlpha = clamp01(d.alpha * 1.35);
+    }
+
+    // 2. верхняя грань
+    if (!outline) {
+      if (ghost) g.globalAlpha *= 0.34;
+      g.fillStyle = face;
+      g.beginPath(); g.ellipse(d.cx, d.cy, d.A, d.B, d.rot, 0, TAU); g.fill();
+      // светлый кант по верхней кромке — соседние блинчики читаются раздельно
+      if (state.mat.rim > 0.01 && !ghost && d.B > 2) {
+        g.strokeStyle = rgba(TH.rim, state.mat.rim * 0.55 * (1 - dimAmt * 0.8));
+        g.lineWidth = 1.2;
+        g.beginPath();
+        g.ellipse(d.cx, d.cy, Math.max(1, d.A - 0.9), Math.max(0.5, d.B - 0.9), d.rot, Math.PI, TAU);
+        g.stroke();
+      }
+      if (ghost) g.globalAlpha = clamp01(d.alpha * 1.35);
+    }
+
+    // 3. картинка слоя, затем материя поверх неё
+    if (!outline) drawLayerImage(d);
+    if (!outline || state.mat.mode !== 'solid') drawMaterial(d, TH, face);
+
+    // 4. контур верхней грани + рёбра боковой
+    var lw = outline ? (d.focus > 0.35 ? 2 : 1.25) : 1;
+    g.strokeStyle = outline
+      ? rgba(d.focus > 0.35 ? TH.accent : TH.stroke, clamp01(0.30 + edgeA))
+      : rgba(TH.stroke, clamp01(edgeA));
+    g.lineWidth = lw;
+    g.beginPath(); g.ellipse(d.cx, d.cy, d.A, d.B, d.rot, 0, TAU); g.stroke();
+    if (d.wall > 0.4) {
+      g.beginPath(); g.ellipse(d.cx + d.wx, d.cy + d.wy, d.A, d.B, d.rot, 0, Math.PI); g.stroke();
+      var ax1 = d.cx + d.A * d.cosR, ay1 = d.cy + d.A * d.sinR;
+      var ax2 = d.cx - d.A * d.cosR, ay2 = d.cy - d.A * d.sinR;
+      g.beginPath();
+      g.moveTo(ax1, ay1); g.lineTo(ax1 + d.wx, ay1 + d.wy);
+      g.moveTo(ax2, ay2); g.lineTo(ax2 + d.wx, ay2 + d.wy);
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+
+  // =====================================================================
+  // Выноски: коридор по стороне, сортировка по Y → линии не пересекаются
+  // =====================================================================
+  var pillBoxes = [];
+
+  function layoutPills() {
+    pillBoxes.length = 0;
+    if (state.label.mode === 'none') return;
+    var every = Math.max(1, Math.round(state.label.every));
+    var gap = Math.max(0, state.label.corridor);
+    var fs = clamp(state.label.size, 8, 24);
+    var pillH = Math.round(fs * 2.0);
+    var lift = state.label.lift;
+    var fb = frameBox();
+
+    // коридор отмеряется от габарита стопки, а не от края кадра —
+    // иначе выноска тянется через весь экран и композиция рассыпается
+    var minX = 1e9, maxX = -1e9;
+    for (var q = 0; q < discs.length; q++) {
+      if (!discs[q].seen) continue;
+      minX = Math.min(minX, discs[q].cx - discs[q].A);
+      maxX = Math.max(maxX, discs[q].cx + discs[q].A);
+    }
+    if (minX > maxX) { minX = W * 0.4; maxX = W * 0.6; }
+
+    var sides = { '-1': [], '1': [] };
+    for (var n = 0; n < discs.length; n++) {
+      var d = discs[n];
+      if (d.i % every !== 0 && d.focus < 0.2) continue;
+      if (d.alpha < 0.35) continue;
+      sides[d.side < 0 ? '-1' : '1'].push(d);
+    }
+
+    g.font = '600 ' + fs + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+
+    ['-1', '1'].forEach(function (key) {
+      var arr = sides[key], s = key === '-1' ? -1 : 1;
+      arr.sort(function (a, b) { return a.cy - b.cy; });
+      var prevBottom = -1e6;
+      for (var m = 0; m < arr.length; m++) {
+        var d = arr[m];
+        var txt = labels[d.i] || '';
+        var wTxt = g.measureText(txt).width;
+        var pw = Math.round(wTxt + fs * 1.8);
+        var y = d.cy - lift;
+        if (y - pillH / 2 < prevBottom + 6) y = prevBottom + 6 + pillH / 2;
+        prevBottom = y + pillH / 2;
+        var x = s < 0 ? (minX - gap - pw) : (maxX + gap);
+        x = clamp(x, fb.l, Math.max(fb.l, fb.r - pw));
+        pillBoxes.push({ i: d.i, d: d, x: x, y: y - pillH / 2, w: pw, h: pillH, side: s, text: txt });
+      }
+      // если коридор переполнил кадр — подтягиваем всю колонку вверх
+      var overflow = prevBottom - (H - 10);
+      if (overflow > 0) {
+        for (var q = 0; q < pillBoxes.length; q++)
+          if (pillBoxes[q].side === s) pillBoxes[q].y -= overflow;
+      }
+    });
+  }
+
+  function drawPills(TH) {
+    if (state.label.mode === 'none' || !pillBoxes.length) return;
+    var fs = clamp(state.label.size, 8, 24);
+    var lead = Math.max(0, state.label.leader);
+
+    for (var n = 0; n < pillBoxes.length; n++) {
+      var p = pillBoxes[n], d = p.d;
+      var isFocus = d.focus > 0.35;
+      var a = clamp01(d.alpha);
+      if (a < 0.02) continue;
+      g.globalAlpha = a;
+
+      // выноска: короткий отвод от кромки + один излом в коридор
+      var ax = d.cx + p.side * d.A * d.cosR, ay = d.cy + p.side * d.A * d.sinR;
+      var innerX = p.side < 0 ? p.x + p.w : p.x;
+      var ex = ax + p.side * lead;
+      ex = p.side < 0 ? Math.max(ex, innerX) : Math.min(ex, innerX);
+      g.strokeStyle = isFocus ? rgba(TH.night ? PAL.brandSoft : PAL.brandDeep, 0.85) : TH.leader;
+      g.lineWidth = isFocus ? 1.4 : 1;
+      g.beginPath();
+      g.moveTo(ax, ay); g.lineTo(ex, ay); g.lineTo(innerX, p.y + p.h / 2);
+      g.stroke();
+      g.fillStyle = isFocus ? (TH.night ? PAL.brandSoft : PAL.brandDeep) : TH.leader;
+      g.beginPath(); g.arc(ax, ay, isFocus ? 2.6 : 1.8, 0, TAU); g.fill();
+
+      // пилюля
+      var rr = p.h / 2;
+      g.beginPath();
+      g.moveTo(p.x + rr, p.y);
+      g.arcTo(p.x + p.w, p.y, p.x + p.w, p.y + p.h, rr);
+      g.arcTo(p.x + p.w, p.y + p.h, p.x, p.y + p.h, rr);
+      g.arcTo(p.x, p.y + p.h, p.x, p.y, rr);
+      g.arcTo(p.x, p.y, p.x + p.w, p.y, rr);
+      g.closePath();
+      g.fillStyle = isFocus ? (TH.night ? PAL.brandSoft : PAL.brandDeep) : TH.pill;
+      g.fill();
+      g.strokeStyle = isFocus ? 'transparent' : TH.pillStroke;
+      g.lineWidth = 1;
+      if (!isFocus) g.stroke();
+
+      // на бронзе — только белое (жёсткое правило client)
+      g.fillStyle = isFocus ? (TH.night ? PAL.night : PAL.card) : TH.pillInk;
+      g.font = '600 ' + fs + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(p.text, p.x + p.w / 2, p.y + p.h / 2 + 0.5);
+
+      // сноска
+      var cardShows = state.open.card && pinIdx === d.i && d.open > 0.25;
+      var showNote = !cardShows &&
+        (state.label.notes === 'all' || (state.label.notes === 'hover' && isFocus));
+      if (showNote && notes[d.i]) {
+        g.globalAlpha = a * (state.label.notes === 'all' ? 0.75 : clamp01(d.focus));
+        g.fillStyle = TH.note;
+        g.font = '500 ' + Math.round(fs * 0.85) + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+        g.textAlign = p.side < 0 ? 'left' : 'right';
+        g.fillText(notes[d.i], p.side < 0 ? p.x + 2 : p.x + p.w - 2, p.y + p.h + fs * 0.95);
+      }
+      g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+      g.globalAlpha = 1;
+    }
+  }
+
+  // =====================================================================
+  // Карточка раскрытия — то, что вылезает по клику на блинчик
+  // =====================================================================
+  var cardBox = null, cardLines = [];
+
+  function roundRect(x, y, w, h, r) {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  }
+
+  function drawCard(TH) {
+    cardBox = null; cardLines.length = 0;
+    if (!state.open.card || pinIdx < 0) return;
+    var host = null, d = null;
+    for (var n = 0; n < pillBoxes.length; n++) if (pillBoxes[n].i === pinIdx) { host = pillBoxes[n]; break; }
+    for (var m = 0; m < discs.length; m++) if (discs[m].i === pinIdx) { d = discs[m]; break; }
+    if (!host || !d) return;
+
+    var a = clamp01(d.open * 1.4);
+    if (a < 0.02) return;
+
+    var fs = clamp(state.label.size, 8, 24);
+    var pad = Math.round(fs * 1.0);
+    var lh = Math.round(fs * 1.7);
+    var rows = meta[pinIdx] || [];
+    var w = Math.max(host.w, Math.round(fs * 15));
+    var h = pad + lh + Math.round(fs * 0.6) + rows.length * lh + pad + Math.round(fs * 0.9);
+    var x = host.side < 0 ? (host.x + host.w - w) : host.x;
+    x = clamp(x, frameBox().l, Math.max(frameBox().l, frameBox().r - w));
+    var y = host.y + host.h + Math.round(fs * 0.7);
+    if (y + h > H - 12) y = Math.max(12, H - 12 - h);
+
+    g.save();
+    g.globalAlpha = a;
+    g.translate(0, (1 - a) * 8);
+
+    g.shadowColor = rgba(TH.shadow, TH.night ? 0.45 : 0.14);
+    g.shadowBlur = 22; g.shadowOffsetY = 8;
+    roundRect(x, y, w, h, 10);
+    g.fillStyle = TH.pill; g.fill();
+    g.shadowColor = 'transparent'; g.shadowBlur = 0; g.shadowOffsetY = 0;
+    g.strokeStyle = TH.pillStroke; g.lineWidth = 1; g.stroke();
+
+    var cy2 = y + pad;
+    // сноска
+    g.fillStyle = TH.pillInk;
+    g.font = '500 ' + fs + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+    g.textAlign = 'left'; g.textBaseline = 'top';
+    g.fillText(notes[pinIdx] || '', x + pad, cy2);
+    cardLines.push({ kind: 'note', i: pinIdx, x: x + pad, y: cy2 - 3, w: w - pad * 2, h: lh });
+    cy2 += lh;
+
+    // разделитель
+    g.strokeStyle = TH.pillStroke;
+    g.beginPath(); g.moveTo(x + pad, cy2); g.lineTo(x + w - pad, cy2); g.stroke();
+    cy2 += Math.round(fs * 0.6);
+
+    // мета-строки: ключ слева, значение справа
+    g.font = '500 ' + Math.round(fs * 0.92) + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+    for (var r = 0; r < rows.length; r++) {
+      var parts = String(rows[r]).split('—');
+      g.fillStyle = TH.note;
+      g.fillText((parts[0] || '').trim(), x + pad, cy2);
+      if (parts.length > 1) {
+        g.fillStyle = TH.pillInk;
+        g.textAlign = 'right';
+        g.fillText(parts.slice(1).join('—').trim(), x + w - pad, cy2);
+        g.textAlign = 'left';
+      }
+      cardLines.push({ kind: 'meta', i: pinIdx, mi: r, x: x + pad, y: cy2 - 3, w: w - pad * 2, h: lh });
+      cy2 += lh;
+    }
+
+    // полоска — место слоя в стопке
+    var L = discs.length || 1;
+    var bx = x + pad, bw = w - pad * 2, by = y + h - pad - 3;
+    g.fillStyle = rgba(TH.night ? PAL.onDark : PAL.ink, 0.12);
+    roundRect(bx, by, bw, 3, 1.5); g.fill();
+    g.fillStyle = TH.night ? PAL.brandSoft : PAL.brandDeep;
+    roundRect(bx, by, Math.max(4, bw * ((pinIdx + 1) / L)), 3, 1.5); g.fill();
+
+    g.textBaseline = 'alphabetic';
+    g.restore();
+    cardBox = { x: x, y: y, w: w, h: h };
+  }
+
+  function cardLineAt(px, py) {
+    if (!cardBox) return null;
+    for (var n = 0; n < cardLines.length; n++) {
+      var l = cardLines[n];
+      if (px >= l.x && px <= l.x + l.w && py >= l.y && py <= l.y + l.h) return l;
+    }
+    return null;
+  }
+  function inCard(px, py) {
+    return !!(cardBox && px >= cardBox.x && px <= cardBox.x + cardBox.w &&
+              py >= cardBox.y && py <= cardBox.y + cardBox.h);
+  }
+
+  // =====================================================================
+  // Зерно — дешёвый пост-пасс из кэшированного тайла
+  // =====================================================================
+  var grainTile = null;
+  function drawGrain(TH) {
+    var amt = state.look.grain;
+    if (amt < 0.01) return;
+    if (!grainTile) {
+      var s = 128, c = document.createElement('canvas');
+      c.width = c.height = s;
+      var gc = c.getContext('2d'), img = gc.createImageData(s, s);
+      for (var i = 0; i < img.data.length; i += 4) {
+        var v = 128 + (Math.random() - 0.5) * 255;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+        img.data[i + 3] = 26;
+      }
+      gc.putImageData(img, 0, 0);
+      grainTile = g.createPattern(c, 'repeat');
+    }
+    g.save();
+    g.globalAlpha = clamp01(amt);
+    g.globalCompositeOperation = TH.night ? 'lighten' : 'multiply';
+    g.fillStyle = grainTile;
+    g.fillRect(0, 0, W, H);
+    g.restore();
+  }
+
+  // =====================================================================
+  // Попадание указателя: сверху вниз, потому что верхний диск ближе
+  // =====================================================================
+  function hitTest(px, py) {
+    for (var i = 0; i < discs.length; i++) {
+      var d = discs[i];
+      if (!d.seen || d.alpha < 0.4) continue;
+      var ry = d.B + d.wall * 0.5;
+      var qx = px - (d.cx + d.wx * 0.5), qy = py - (d.cy + d.wy * 0.5);
+      var dx = qx * d.cosR + qy * d.sinR;          // обратный поворот на -rot
+      var dy = -qx * d.sinR + qy * d.cosR;
+      if ((dx * dx) / (d.A * d.A) + (dy * dy) / (ry * ry) <= 1) return i;
+    }
+    for (var n = 0; n < pillBoxes.length; n++) {
+      var p = pillBoxes[n];
+      if (px >= p.x && px <= p.x + p.w && py >= p.y && py <= p.y + p.h) return p.i;
+    }
+    return -1;
+  }
+
+  function pillAt(px, py) {
+    for (var n = 0; n < pillBoxes.length; n++) {
+      var p = pillBoxes[n];
+      if (px >= p.x && px <= p.x + p.w && py >= p.y && py <= p.y + p.h) return p;
+    }
+    return null;
+  }
+
+  // =====================================================================
+  // Кадр
+  // =====================================================================
+  function frame(ts) {
+    var tSec = ts / 1000;
+    if (!tPrev) tPrev = tSec;
+    var dt = Math.min(0.05, tSec - tPrev);
+    tPrev = tSec;
+
+    if (!state._paused) {
+      tNow += dt;
+      if (!scrollDriven) buildT += dt;
+      if (!reduced()) state.view.spin += state.view.autoSpin * dt;
+    }
+
+    // плавные переходы 180–420 мс — без рывков
+    var wantHover = (hoverIdx >= 0 || pinIdx >= 0) ? 1 : 0;
+    hoverEase += (wantHover - hoverEase) * Math.min(1, dt / 0.28);
+    var act = pinIdx >= 0 ? pinIdx : hoverIdx;
+    openMax = 0;
+    for (var i = 0; i < MAXL; i++) {
+      var want = (i === act) ? 1 : 0;
+      focusEase[i] += (want - focusEase[i]) * Math.min(1, dt / 0.26);
+      var wantOpen = (i === pinIdx) ? 1 : 0;
+      openEase[i] += (wantOpen - openEase[i]) * Math.min(1, dt / 0.34);
+      if (openEase[i] > openMax) openMax = openEase[i];
+    }
+
+    var TH = theme();
+    try {
+      g.setTransform(DPR, 0, 0, DPR, 0, 0);
+      g.fillStyle = TH.bg;
+      g.fillRect(0, 0, W, H);
+
+      layout();
+      layoutPills();
+
+      // painter: снизу вверх — верхние диски ближе к камере
+      for (var n = discs.length - 1; n >= 0; n--) drawDisc(discs[n], TH);
+
+      drawPills(TH);
+      drawCard(TH);
+      drawGrain(TH);
+
+      window.__ES_FRAMES++;
+    } catch (err) {
+      console.error('ELLIPSE SPHERE draw error:', err);
+    }
+    window.__ES_READY = true;
+    requestAnimationFrame(frame);
+  }
+
+  // =====================================================================
+  // Панель — только декларации, грамматика рядов принадлежит kit-panel
+  // =====================================================================
+  var GROUPS = [
+    { name: 'Стопка', rows: [
+      ['stack.layers', 'Слоёв', 3, 40, 1],
+      ['stack.profile', 'Силуэт', ['ball', 'lens', 'barrel', 'drum', 'cone', 'drop']],
+      ['stack.radius', 'Радиус', 0.10, 0.48, 0.005],
+      ['stack.height', 'Высота', 0.10, 0.60, 0.005],
+      ['stack.thickness', 'Толщина диска', 0, 1.4, 0.01]
+    ]},
+    { name: 'Вид', rows: [
+      ['view.tilt', 'Наклон °', 6, 60, 0.5],
+      ['view.lean', 'Крен стопки °', -40, 40, 0.5],
+      ['view.roll', 'Разворот °', -45, 45, 0.5],
+      ['view.globe', 'Глобус °', 0, 45, 0.5],
+      ['view.twist', 'Твист/слой °', 0, 24, 0.5],
+      ['view.autoSpin', 'Вращение °/с', 0, 40, 0.5],
+      ['view.scale', 'Масштаб', 0.5, 1.6, 0.01]
+    ]},
+    { name: 'Сборка', rows: [
+      ['build.dir', 'Направление', ['down', 'up']],
+      ['build.stagger', 'Шаг очереди с', 0, 0.40, 0.005],
+      ['build.dur', 'Приезд с', 0.2, 2.0, 0.05],
+      ['build.rise', 'Разбег px', 0, 400, 5],
+      ['@replay', 'Пересобрать ↺', 'action']
+    ]},
+    { name: 'Разъезд', rows: [
+      ['spread.fan', 'Веер', 0, 1, 0.01],
+      ['spread.fanAmp', 'Веер px', 0, 400, 5],
+      ['spread.open', 'Раскрытие', 0, 1, 0.01],
+      ['spread.openAmp', 'Раскрытие ×', 0, 2, 0.01],
+      ['spread.breathe', 'Дыхание', 0, 0.40, 0.005],
+      ['spread.period', 'Период с', 4, 24, 0.5]
+    ]},
+    { name: 'Под рукой', rows: [
+      ['spread.hoverFan', 'Ховер: веер', 0, 1, 0.01],
+      ['spread.hoverOpen', 'Ховер: раскрытие', 0, 1, 0.01],
+      ['spread.focusPush', 'Выдвиг px', 0, 240, 2],
+      ['spread.dim', 'Гашение прочих', 0, 0.9, 0.01],
+      ['open.push', 'Клик: выдвиг px', 0, 320, 5],
+      ['open.spread', 'Клик: раскрытие', 0, 1, 0.01],
+      ['open.face', 'Клик: разворот лицом', 0, 1, 0.01],
+      ['open.card', 'Клик: карточка', 0, 1, 1]
+    ]},
+    { name: 'Выделенный диск', rows: [
+      ['sel.hue', 'Свой тон', -1, 1, 0.01],
+      ['sel.scale', 'Свой радиус ×', 0.4, 1.8, 0.01],
+      ['sel.mat', 'Своя материя', ['inherit', 'solid', 'rings', 'grid', 'dots', 'radial', 'glass']],
+      ['sel.push', 'Свой сдвиг px', -220, 220, 2],
+      ['@selReset', 'Сбросить кастом ↺', 'action']
+    ]},
+    { name: 'Материя', rows: [
+      ['mat.render', 'Отрисовка', ['solid', 'ghost', 'outline']],
+      ['mat.mode', 'Материя', ['solid', 'rings', 'grid', 'dots', 'radial', 'glass']],
+      ['mat.density', 'Плотность', 2, 24, 1],
+      ['mat.tone', 'Тон бронзы', 0, 1, 0.01],
+      ['mat.ramp', 'Градация', 0, 1, 0.01],
+      ['mat.rim', 'Кант', 0, 1, 0.01],
+      ['mat.edge', 'Контур', 0, 1, 0.01],
+      ['mat.shadow', 'Тень', 0, 1, 0.01]
+    ]},
+    { name: 'Подписи', rows: [
+      ['label.mode', 'Подписи', ['none', 'pills']],
+      ['label.side', 'Сторона', ['both', 'left', 'right']],
+      ['label.every', 'Каждый N-й', 1, 6, 1],
+      ['label.size', 'Кегль', 8, 20, 1],
+      ['label.leader', 'Отвод px', 0, 120, 2],
+      ['label.corridor', 'Отступ коридора px', 0, 300, 2],
+      ['label.lift', 'Подъём пилюли px', -80, 160, 2],
+      ['label.notes', 'Сноски', ['off', 'hover', 'all']],
+      ['label.edit', 'Правка подписей', 0, 1, 1]
+    ]},
+    { name: 'Картинки', rows: [
+      ['img.rest', 'Покой', 0, 1, 0.01],
+      ['img.hover', 'Ховер', 0, 1, 0.01],
+      ['img.open', 'Раскрыто', 0, 1, 0.01],
+      ['img.fit', 'Вписать', ['cover', 'contain']],
+      ['img.scale', 'Масштаб', 0.5, 2.5, 0.01],
+      ['img.tray', 'Полка снизу', 0, 1, 1]
+    ]},
+    { name: 'Вид кадра', rows: [
+      ['look.theme', 'Тема', ['light', 'night']],
+      ['look.grain', 'Зерно', 0, 0.5, 0.01],
+      ['@export', 'Снимок PNG ↓', 'action']
+    ]}
+  ];
+
+  function flatten() {
+    var out = {};
+    ['stack', 'view', 'build', 'spread', 'open', 'mat', 'label', 'img', 'look', 'sel'].forEach(function (grp) {
+      Object.keys(state[grp]).forEach(function (key) { out[grp + '.' + key] = state[grp][key]; });
+    });
+    return out;
+  }
+
+  // Зеркало выделенного диска: ряды группы «Выделенный диск» показывают его личные правки
+  // и пишут их в over[pinIdx]. Ничего не выделено — ряды крутятся вхолостую.
+  function syncSel() {
+    var o = pinIdx >= 0 ? ov(pinIdx) : { hue: 0, scale: 1, mat: 'inherit', push: 0 };
+    state.sel.hue = o.hue; state.sel.scale = o.scale;
+    state.sel.mat = o.mat; state.sel.push = o.push;
+    try {
+      DG.panel.setValue('sel.hue', o.hue);
+      DG.panel.setValue('sel.scale', o.scale);
+      DG.panel.setValue('sel.mat', o.mat);
+      DG.panel.setValue('sel.push', o.push);
+    } catch (e) {}
+  }
+
+  function onPanelChange(path, v) {
+    if (path === '@export') { exportPNG(); return; }
+    if (path === '@replay') { replay(); return; }
+    if (path === '@selReset') {
+      if (pinIdx >= 0) over[pinIdx] = { hue: 0, scale: 1, mat: 'inherit', push: 0 };
+      syncSel();
+      return;
+    }
+    var dot = path.indexOf('.');
+    if (dot < 0) return;
+    var grp = path.slice(0, dot), key = path.slice(dot + 1);
+    if (state[grp] && (key in state[grp])) state[grp][key] = v;
+    if (grp === 'sel' && pinIdx >= 0) ov(pinIdx)[key] = v;
+    if (path === 'look.theme') document.documentElement.classList.toggle('es-night', v === 'night');
+    if (path === 'stack.layers') { pinIdx = -1; hoverIdx = -1; syncTray(); }
+    if (path === 'img.tray') syncTray();
+  }
+
+  DG.panel.build({
+    mount: document.getElementById('panelMount'),
+    groups: GROUPS,
+    values: flatten(),
+    onChange: onPanelChange
+  });
+
+  // =====================================================================
+  // Полка картинок: по слоту на слой. Клик — выбрать файл, перетаскивание — бросить,
+  // Alt-клик — снять. Наведение на слот подсвечивает свой блинчик.
+  // =====================================================================
+  var trayEl = document.getElementById('tray');
+  var fileIn = document.getElementById('fileIn');
+  var traySlots = [], trayTarget = -1;
+
+  function setLayerImage(i, file) {
+    if (!file || !/^image\//.test(file.type)) return;
+    var url = URL.createObjectURL(file);          // blob: — канвас не пачкается, PNG-экспорт живёт
+    var im = new Image();
+    im.onload = function () {
+      if (imgs[i] && imgs[i].url) URL.revokeObjectURL(imgs[i].url);
+      imgs[i] = { img: im, url: url, ready: true };
+      paintSlot(i);
+    };
+    im.onerror = function () { URL.revokeObjectURL(url); };
+    im.src = url;
+  }
+
+  function clearLayerImage(i) {
+    if (imgs[i] && imgs[i].url) URL.revokeObjectURL(imgs[i].url);
+    imgs[i] = null;
+    paintSlot(i);
+  }
+
+  function paintSlot(i) {
+    var b = traySlots[i];
+    if (!b) return;
+    var rec = imgs[i];
+    b.style.backgroundImage = rec && rec.ready ? 'url(' + rec.url + ')' : '';
+    b.classList.toggle('has-img', !!(rec && rec.ready));
+    b.title = (rec && rec.ready ? 'Слой ' + (i + 1) + ' — Alt-клик снять' : 'Слой ' + (i + 1) + ' — добавить картинку');
+  }
+
+  function syncTray() {
+    if (!trayEl) return;
+    var L = Math.min(MAXL, Math.max(2, Math.round(state.stack.layers)));
+    trayEl.classList.toggle('is-off', !state.img.tray);
+    if (traySlots.length === L) { for (var q = 0; q < L; q++) paintSlot(q); return; }
+    trayEl.innerHTML = ''; traySlots.length = 0;
+    for (var i = 0; i < L; i++) traySlots.push(makeSlot(i));
+    for (var m = 0; m < L; m++) { trayEl.appendChild(traySlots[m]); paintSlot(m); }
+  }
+
+  function makeSlot(i) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'es-slot';
+    b.innerHTML = '<span>' + (i + 1) + '</span>';
+    b.addEventListener('click', function (e) {
+      if (e.altKey) { clearLayerImage(i); return; }
+      trayTarget = i; fileIn.value = ''; fileIn.click();
+    });
+    b.addEventListener('mouseenter', function () { hoverIdx = i; });
+    b.addEventListener('mouseleave', function () { if (hoverIdx === i) hoverIdx = -1; });
+    b.addEventListener('dragover', function (e) { e.preventDefault(); b.classList.add('is-over'); });
+    b.addEventListener('dragleave', function () { b.classList.remove('is-over'); });
+    b.addEventListener('drop', function (e) {
+      e.preventDefault(); b.classList.remove('is-over');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) setLayerImage(i, e.dataTransfer.files[0]);
+    });
+    return b;
+  }
+
+  fileIn.addEventListener('change', function () {
+    if (trayTarget >= 0 && fileIn.files && fileIn.files[0]) setLayerImage(trayTarget, fileIn.files[0]);
+    trayTarget = -1;
+  });
+
+  // бросок прямо на сцену кладёт картинку в блинчик под курсором
+  canvas.addEventListener('dragover', function (e) { e.preventDefault(); });
+  canvas.addEventListener('drop', function (e) {
+    e.preventDefault();
+    if (!(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0])) return;
+    var r = canvas.getBoundingClientRect();
+    var i = hitTest(e.clientX - r.left, e.clientY - r.top);
+    if (i >= 0) setLayerImage(i, e.dataTransfer.files[0]);
+  });
+
+  // Наружный API: чтобы лендинг (или харнесс) мог гнать сцену без панели.
+  // ES.set() идёт через ту же ручку, что и панель — одна дорога в состояние.
+  // Приезд блинчиков можно вести снаружи: 0 — стопка не собрана, 1 — собрана.
+  // Родитель гонит прогресс скроллом; таймер при этом отключается.
+  function setProgress(p) {
+    scrollDriven = true;
+    var L = Math.min(MAXL, Math.max(2, Math.round(state.stack.layers)));
+    var total = (L - 1) * state.build.stagger + Math.max(0.01, state.build.dur);
+    buildT = clamp01(p) * total;
+  }
+  window.addEventListener('message', function (e) {
+    var d = e && e.data;
+    if (d && d.type === 'es:progress' && typeof d.value === 'number') setProgress(d.value);
+    if (d && d.type === 'es:replay') { scrollDriven = false; replay(); }
+  });
+
+  window.ES = {
+    state: state,
+    setProgress: setProgress,
+    labels: labels,
+    notes: notes,
+    meta: meta,
+    set: function (path, v) { onPanelChange(path, v); try { DG.panel.setValue(path, v); } catch (e) {} },
+    replay: replay,
+    frames: function () { return window.__ES_FRAMES; }
+  };
+
+  // =====================================================================
+  // Панель: показ/скрытие, хоткеи, экспорт
+  // =====================================================================
+  var panelWrap = document.getElementById('panelWrap');
+  var panelFab = document.getElementById('panelFab');
+  var panelHead = document.getElementById('panelHead');
+
+  function setPanelVisible(v) {
+    panelWrap.classList.toggle('is-hidden', !v);
+    panelFab.classList.toggle('is-visible', !v);
+  }
+  panelHead.addEventListener('click', function () { setPanelVisible(false); });
+  panelFab.addEventListener('click', function () { setPanelVisible(true); });
+
+  function toggleTheme() {
+    state.look.theme = state.look.theme === 'light' ? 'night' : 'light';
+    DG.panel.setValue('look.theme', state.look.theme);
+    document.documentElement.classList.toggle('es-night', state.look.theme === 'night');
+  }
+
+  function exportPNG() {
+    try { canvas.toBlob(onBlob, 'image/png'); }
+    catch (err) { console.warn('PNG-экспорт недоступен: канвас помечен грязным', err); }
+    function onBlob(blob) {
+      if (!blob) return;
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'client-ellipse-sphere-' + Date.now() + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    }
+  }
+
+  function isTyping(el) {
+    return !!(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable));
+  }
+  function withinPanel(el) { return !!(el && el.closest && el.closest('#panelWrap')); }
+
+  window.addEventListener('keydown', function (e) {
+    var act = document.activeElement;
+    if (isTyping(act) || withinPanel(act)) return;
+    var k = e.key.toLowerCase();
+    if (k === 'p') { e.preventDefault(); setPanelVisible(panelWrap.classList.contains('is-hidden')); }
+    else if (e.key === ' ') { e.preventDefault(); state._paused = !state._paused; }
+    else if (k === 'i') { e.preventDefault(); toggleTheme(); }
+    else if (k === 's') { e.preventDefault(); exportPNG(); }
+    else if (k === 'r') { e.preventDefault(); replay(); }
+    else if (k === 'm') {
+      e.preventDefault();
+      state.img.tray = state.img.tray ? 0 : 1;
+      DG.panel.setValue('img.tray', state.img.tray);
+      syncTray();
+    }
+    else if (e.key === 'Escape') { pinIdx = -1; syncSel(); }
+  });
+
+  // =====================================================================
+  // Указатель: ховер, пин по клику, правка подписи
+  // =====================================================================
+  var editEl = document.getElementById('labelEdit');
+  var editing = null;
+
+  function openEditor(p) {
+    editing = p;
+    editEl.value = p.kind === 'note' ? (notes[p.i] || '')
+                 : p.kind === 'meta' ? String((meta[p.i] || [])[p.mi] || '')
+                 : (labels[p.i] || '');
+    editEl.style.display = 'block';
+    editEl.style.left = Math.round(p.x) + 'px';
+    editEl.style.top = Math.round(p.y) + 'px';
+    editEl.style.width = Math.max(90, Math.round(p.w)) + 'px';
+    editEl.style.height = Math.round(p.h) + 'px';
+    editEl.style.textAlign = p.kind === 'label' ? 'center' : 'left';
+    editEl.focus();
+    editEl.select();
+  }
+  function commitEditor(save) {
+    if (!editing) return;
+    var v = editEl.value.trim();
+    if (save && v) {
+      if (editing.kind === 'note') notes[editing.i] = v;
+      else if (editing.kind === 'meta') meta[editing.i][editing.mi] = v;
+      else labels[editing.i] = v;
+    }
+    editing = null;
+    editEl.style.display = 'none';
+  }
+  editEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); commitEditor(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); commitEditor(false); }
+  });
+  editEl.addEventListener('blur', function () { commitEditor(true); });
+
+  // Живой вьюпорт: угол настраивается рукой прямо по полю, а не только ползунками.
+  // Значения едут в те же параметры и отражаются в панели — одна правда на сцену.
+  var VIEW_HOME = { tilt: state.view.tilt, lean: state.view.lean, roll: state.view.roll };
+  var drag = null;
+
+  function syncView(keys) {
+    for (var n = 0; n < keys.length; n++) DG.panel.setValue('view.' + keys[n], state.view[keys[n]]);
+  }
+
+  canvas.addEventListener('pointerdown', function (e) {
+    if (e.button !== 0) return;
+    var r = canvas.getBoundingClientRect();
+    drag = { x: e.clientX, y: e.clientY, moved: 0, sx: e.clientX - r.left, sy: e.clientY - r.top };
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+
+  canvas.addEventListener('pointermove', function (e) {
+    var r = canvas.getBoundingClientRect();
+    pointer.x = e.clientX - r.left; pointer.y = e.clientY - r.top; pointer.inside = true;
+
+    if (drag) {
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.moved += Math.abs(dx) + Math.abs(dy);
+      drag.x = e.clientX; drag.y = e.clientY;
+      if (e.shiftKey) {
+        state.view.roll = clamp(state.view.roll + dx * 0.12, -80, 80);
+        syncView(['roll']);
+      } else {
+        state.view.tilt = clamp(state.view.tilt - dy * 0.10, 4, 78);
+        state.view.lean = clamp(state.view.lean + dx * 0.10, -55, 55);
+        syncView(['tilt', 'lean']);
+      }
+      canvas.style.cursor = 'grabbing';
+      return;
+    }
+
+    hoverIdx = hitTest(pointer.x, pointer.y);
+    canvas.style.cursor = hoverIdx >= 0 ? 'pointer' : 'grab';
+  });
+
+  function endDrag(e) {
+    if (!drag) return;
+    var wasDrag = drag.moved > 5;
+    drag = null;
+    canvas.style.cursor = 'grab';
+    if (wasDrag) return true;
+    return false;
+  }
+  canvas.addEventListener('pointerup', function (e) {
+    var r = canvas.getBoundingClientRect();
+    var px = e.clientX - r.left, py = e.clientY - r.top;
+    if (endDrag(e)) return;                       // тянули вид — это не клик по диску
+    if (inCard(px, py)) {                         // внутри карточки выделение не сбрасываем
+      var cl = cardLineAt(px, py);
+      if (cl && state.label.edit) openEditor(cl);
+      return;
+    }
+    var p = pillAt(px, py);
+    if (p && state.label.edit) { openEditor({ i: p.i, kind: 'label', x: p.x, y: p.y, w: p.w, h: p.h }); return; }
+    var i = hitTest(px, py);
+    pinIdx = (i >= 0 && i === pinIdx) ? -1 : i;
+    syncSel();
+  });
+  canvas.addEventListener('pointercancel', endDrag);
+
+  canvas.addEventListener('pointerleave', function () {
+    pointer.inside = false; hoverIdx = -1; canvas.style.cursor = 'default';
+  });
+
+  canvas.addEventListener('dblclick', function (e) {
+    var r = canvas.getBoundingClientRect();
+    var px = e.clientX - r.left, py = e.clientY - r.top;
+    var cl = cardLineAt(px, py);
+    if (cl) { openEditor(cl); return; }
+    var p = pillAt(px, py);
+    if (p) { openEditor({ i: p.i, kind: 'label', x: p.x, y: p.y, w: p.w, h: p.h }); return; }
+    state.view.tilt = VIEW_HOME.tilt;             // двойной клик по пустому — вид домой
+    state.view.lean = VIEW_HOME.lean;
+    state.view.roll = VIEW_HOME.roll;
+    syncView(['tilt', 'lean', 'roll']);
+  });
+
+  // =====================================================================
+  // Старт
+  // =====================================================================
+  var q = new URLSearchParams(location.search);
+  if (q.get('embed') === '1') {
+    document.documentElement.classList.add('es-embed');
+    setPanelVisible(false);
+  }
+  if (q.get('theme') === 'night') {
+    state.look.theme = 'night';
+    DG.panel.setValue('look.theme', 'night');
+    document.documentElement.classList.add('es-night');
+  }
+
+  resize();
+  syncTray();
+  replay();
+  requestAnimationFrame(frame);
+
+})();
+
+/* ── оверрайд секции ── */
+/* ═══════════════════════════════════════════════════════════════════════
+   ФРАГМЕНТ 03 · THE PLATFORM — «Introducing the client OS»
+   Семь блинчиков = семь пунктов стека client. Пресет ЗАМОРОЖЕН: этот файл
+   вставляется в страницу как есть, ручки внутри трогать не нужно.
+   Тексты — дословно с client.ai, ничего не сочинено.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  var STACK = [
+    { label: 'LLM',
+      note: 'Model-agnostic routing',
+      meta: ['роль — маршрутизация', 'выбор — лучшая модель под задачу', 'замена — по мере улучшения'] },
+    { label: 'Agentic Harness',
+      note: 'Transaction orchestrator',
+      meta: ['машина состояний — на сделку', 'агенты — compliance · документы · комms', 'чекпойнт — человек на каждом шаге'] },
+    { label: 'Context & Knowledge',
+      note: 'Market memory on day one',
+      meta: ['история сделок', 'аналитика района · компы', 'трек-рекорд застройщика'] },
+    { label: 'Data & Integrations',
+      note: "Wired into Dubai's official rails",
+      meta: ['DLD · Dubai Pulse · UAE Pass', 'платежи — лицензированные провайдеры', 'без API — агент работает как человек'] },
+    { label: 'Real Estate Capabilities',
+      note: 'Permit-aware by design',
+      meta: ['листинг — с учётом пермита', 'оценка — автоматическая', 'размещение — по районам'] },
+    { label: 'Interface',
+      note: 'Web & mobile, their channels',
+      meta: ['поверхности — под каждый шаг', 'листинг · цена · согласование', 'выдача клиенту'] },
+    { label: 'Security & Governance',
+      note: 'Nothing runs unattended',
+      meta: ['план → одобрение → действие', 'аудит-трейл — полный', 'доступ по ролям · потолок трат'] }
+  ];
+
+  function apply() {
+    if (!window.ES || !window.ES.set) { setTimeout(apply, 40); return; }
+
+    for (var i = 0; i < STACK.length; i++) {
+      ES.labels[i] = STACK[i].label;
+      ES.notes[i]  = STACK[i].note;
+      if (ES.meta) ES.meta[i] = STACK[i].meta.slice();
+    }
+
+    // ── ЗАМОРОЖЕННЫЙ ПРЕСЕТ СЕКЦИИ. Меняется только пересборкой фрагмента.
+    var P = {
+      'stack.layers': 7,
+      'stack.profile': 'ball',
+      'stack.radius': 0.30,
+      'stack.height': 0.23,
+      'stack.thickness': 0.07,
+      'view.tilt': 16.79,
+      'view.lean': 7,
+      'view.roll': 0,
+      'view.globe': 14,
+      'view.twist': 3.91,
+      'view.autoSpin': 6,
+      'view.scale': 0.95,
+      'build.dir': 'down',
+      'build.stagger': 0.10,
+      'build.dur': 0.75,
+      'build.rise': 130,
+      'spread.fan': 0.50,
+      'spread.fanAmp': 130,
+      'spread.open': 0.26,
+      'spread.openAmp': 0.71,
+      'spread.breathe': 0.10,
+      'spread.period': 12,
+      'spread.hoverFan': 0.22,
+      'spread.hoverOpen': 0.41,
+      'spread.focusPush': 91,
+      'spread.dim': 0.42,
+      'open.push': 130,
+      'open.spread': 0.55,
+      'open.face': 0.30,
+      'open.card': 1,
+      'mat.render': 'solid',
+      'mat.mode': 'solid',
+      'mat.density': 6,
+      'mat.tone': 0.62,
+      'mat.ramp': 1.00,
+      'mat.rim': 0.45,
+      'mat.edge': 0.55,
+      'mat.shadow': 0.55,
+      'label.mode': 'pills',
+      'label.side': 'both',
+      'label.every': 1,
+      'label.size': 12,
+      'label.leader': 26,
+      'label.corridor': 64,
+      'label.lift': 26,
+      'label.notes': 'hover',
+      'label.edit': 0,
+      'img.rest': 0.06,
+      'img.hover': 0.40,
+      'img.open': 1.00,
+      'img.tray': 0,
+      'look.grain': 0.07
+    };
+    Object.keys(P).forEach(function (k) { try { ES.set(k, P[k]); } catch (e) {} });
+
+    // тема из адреса: ?theme=night
+    var q = new URLSearchParams(location.search);
+    if (q.get('theme') === 'night') ES.set('look.theme', 'night');
+
+    // прогресс из адреса — чтобы Design мог проверить кадр без скролла
+    var p0 = parseFloat(q.get('p'));
+    if (!isNaN(p0)) ES.setProgress(p0);
+  }
+
+  apply();
+})();
+
+</script>
+</body>
+</html>

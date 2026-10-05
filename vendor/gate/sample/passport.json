@@ -1,0 +1,165 @@
+{
+  "id": "sample",
+  "title": "Образец модуля арсенала",
+  "blurb": "Положительный контроль гейта и читаемый образец контракта: кит панели, рельс сцены, сид, экспорт.",
+  "version": "1.0.0",
+  "engineHash": "ed8f1f893968a3faafafcbe23ca71611fb6e0ae5cd3c4b4b44b136bdf0031cf7",
+  "kind": "engine",
+  "contract": {
+    "embed": {
+      "params": [
+        "embed",
+        "theme",
+        "p",
+        "seed",
+        "preset",
+        "mode",
+        "reduced"
+      ],
+      "aliases": [
+        "noui",
+        "panel=off"
+      ]
+    },
+    "postMessage": {
+      "out": [
+        "ready",
+        "frame"
+      ],
+      "in": [
+        "es:progress",
+        "es:replay",
+        "pause",
+        "play"
+      ],
+      "selfplay": true
+    },
+    "api": [
+      "Scene.set",
+      "Scene.get",
+      "Scene.export",
+      "KIT.scene.register",
+      "KIT.scene.start"
+    ]
+  },
+  "params": [
+    {
+      "id": "rings",
+      "label": "Колец",
+      "type": "number",
+      "default": 18,
+      "min": 4,
+      "max": 48,
+      "step": 1
+    },
+    {
+      "id": "spread",
+      "label": "Разбег",
+      "type": "number",
+      "default": 12,
+      "min": 2,
+      "max": 40,
+      "step": 0.5
+    },
+    {
+      "id": "wobble",
+      "label": "Дрожь",
+      "type": "number",
+      "default": 0.9,
+      "min": 0,
+      "max": 3,
+      "step": 0.05
+    },
+    {
+      "id": "speed",
+      "label": "Темп",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 4,
+      "step": 0.05
+    },
+    {
+      "id": "dense",
+      "label": "Плотно",
+      "type": "boolean",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    {
+      "id": "look",
+      "label": "Вид",
+      "type": "select",
+      "default": "кольца",
+      "options": [
+        "кольца",
+        "дуги"
+      ]
+    },
+    {
+      "id": "marks",
+      "label": "Метки",
+      "type": "select",
+      "default": [
+        "центр"
+      ],
+      "options": [
+        "центр",
+        "края",
+        "узлы"
+      ]
+    },
+    {
+      "id": "grid",
+      "label": "Сетка",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "group": "studio"
+    }
+  ],
+  "presets": [],
+  "frozen": [],
+  "aspect": "auto",
+  "minHeight": 240,
+  "hover": "ничего",
+  "click": "клик по скрабу без протяжки открывает ввод числа; S переключает studio/client, H прячет панель",
+  "reducedMotion": "ход снят, рисуется один кадр",
+  "narrow390": "панель на месте, сцена ужимается по коробке; в embed панель не строится вовсе",
+  "forbidden": [
+    "класть на цветной грунт",
+    "растягивать неравномерно",
+    "править собранный index.html вместо index.src.html"
+  ],
+  "export": {
+    "png": true,
+    "svg": false,
+    "pdf": false,
+    "zpl": false
+  },
+  "fonts": [
+    {
+      "family": "ui-monospace / системная",
+      "license": "системная",
+      "embedded": "none"
+    }
+  ],
+  "tokensIn": [
+    "--paper",
+    "--panel",
+    "--ink",
+    "--muted",
+    "--line",
+    "--accent"
+  ],
+  "brandFree": true,
+  "gate": {
+    "date": "2026-09-10",
+    "score": "10/10",
+    "report": "gate/acceptance.json"
+  }
+}

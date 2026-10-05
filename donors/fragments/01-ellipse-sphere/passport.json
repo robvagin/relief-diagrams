@@ -1,0 +1,208 @@
+{
+  "id": "ellipse-sphere",
+  "title": "Фрагмент 01 · сфера из эллипсов",
+  "blurb": "Стопка эллипсов, собранная в глобус перспективой, креном и распределением слоёв.",
+  "version": "1.0.0",
+  "engineHash": "b6f5a360efaf4a818656beb8fd466e3ed5e2567a955c82ed9df945a21789f058",
+  "kind": "fragment",
+  "contract": {
+    "embed": {
+      "params": [
+        "embed",
+        "theme",
+        "p",
+        "seed",
+        "preset",
+        "mode",
+        "reduced"
+      ],
+      "aliases": [
+        "noui",
+        "panel=off"
+      ]
+    },
+    "postMessage": {
+      "out": [
+        "ready",
+        "frame"
+      ],
+      "in": [
+        "es:progress",
+        "es:replay",
+        "pause",
+        "play"
+      ],
+      "selfplay": true
+    },
+    "api": [
+      "Scene.set",
+      "Scene.get",
+      "Scene.export",
+      "KIT.scene.register",
+      "KIT.scene.start"
+    ]
+  },
+  "params": [
+    {
+      "id": "layers",
+      "label": "Слоёв",
+      "type": "number",
+      "default": 34,
+      "min": 6,
+      "max": 96,
+      "step": 1
+    },
+    {
+      "id": "radius",
+      "label": "Радиус",
+      "type": "number",
+      "default": 0.3,
+      "min": 0.08,
+      "max": 0.48,
+      "step": 0.005
+    },
+    {
+      "id": "height",
+      "label": "Высота",
+      "type": "number",
+      "default": 0.3,
+      "min": 0.05,
+      "max": 0.6,
+      "step": 0.005
+    },
+    {
+      "id": "tilt",
+      "label": "Наклон",
+      "type": "number",
+      "default": 26,
+      "min": 2,
+      "max": 80,
+      "step": 1
+    },
+    {
+      "id": "globe",
+      "label": "Глобус",
+      "type": "number",
+      "default": 34,
+      "min": 0,
+      "max": 60,
+      "step": 1
+    },
+    {
+      "id": "roll",
+      "label": "Крен",
+      "type": "number",
+      "default": 0,
+      "min": -60,
+      "max": 60,
+      "step": 1
+    },
+    {
+      "id": "wall",
+      "label": "Стенка",
+      "type": "number",
+      "default": 0.3,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "breathe",
+      "label": "Дыхание",
+      "type": "number",
+      "default": 0.06,
+      "min": 0,
+      "max": 0.3,
+      "step": 0.005
+    },
+    {
+      "id": "period",
+      "label": "Период",
+      "type": "number",
+      "default": 12,
+      "min": 2,
+      "max": 30,
+      "step": 0.5
+    },
+    {
+      "id": "accentAt",
+      "label": "Акцент",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 96,
+      "step": 1
+    },
+    {
+      "id": "jitter",
+      "label": "Разброс",
+      "type": "number",
+      "default": 0.18,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "fillTop",
+      "label": "Заливка",
+      "type": "boolean",
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    }
+  ],
+  "presets": [
+    {
+      "schema": 1,
+      "id": "hero",
+      "engine": "ellipse-sphere",
+      "seed": "arsenal",
+      "values": {
+        "layers": 34,
+        "tilt": 26,
+        "globe": 34,
+        "wall": 0.3
+      }
+    }
+  ],
+  "frozen": [
+    "пресет hero: слои, наклон, глобус и стенка зафиксированы под первый экран"
+  ],
+  "aspect": "auto",
+  "minHeight": 320,
+  "hover": "ничего",
+  "click": "клик по скрабу без протяжки открывает ввод числа",
+  "reducedMotion": "дыхание снято, рисуется один кадр",
+  "narrow390": "сфера ужимается по меньшей стороне; в embed панели нет",
+  "forbidden": [
+    "класть на цветной грунт",
+    "растягивать неравномерно",
+    "набирать толщину пера при масштабе"
+  ],
+  "export": {
+    "png": true,
+    "svg": false,
+    "pdf": false,
+    "zpl": false
+  },
+  "fonts": [
+    {
+      "family": "ui-monospace / системная",
+      "license": "системная",
+      "embedded": "none"
+    }
+  ],
+  "tokensIn": [
+    "--paper",
+    "--ink",
+    "--line",
+    "--accent"
+  ],
+  "brandFree": true,
+  "gate": {
+    "date": "2026-09-10",
+    "score": "10/10",
+    "report": "gate/acceptance.json"
+  }
+}

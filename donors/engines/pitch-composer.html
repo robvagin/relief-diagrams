@@ -1,0 +1,938 @@
+<!doctype html>
+<!--
+  Pitch Composer — Skeleton. Build a pitch from animated blocks.
+  Vocabulary: text · pill · chip(stat) · arrow (straight / spring-bounce, arrowhead
+  grows as a continuation of the line) · ellipse (traced path) · scribble · draw · cycle.
+  cycle = ring that auto-divides N nodes, curved arrows between them, edge captions,
+  a title in the middle — a whole "loop of actions" in one animated block.
+  A slide is one message; several slides = a pitch. Blocks enter on a stagger:
+  pills/chips elastic-pop, paths DRAW THEMSELVES. Everything grayscale by default.
+  Loop cycles the CURRENT slide only. Grammar: config-merge, PNG, WebM, H hides UI.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pitch Composer</title>
+<style>
+  :root{
+    --paper:#f6f5f2; --ink:#1a1a1a; --muted:#6f6d67; --line:#dcdad4; --panel:#fdfdfc;
+    --accent:#0b0b0c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);
+    font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
+  canvas{display:block}
+  #panel{position:fixed;top:16px;left:16px;width:288px;max-height:calc(100vh - 32px);
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    display:flex;flex-direction:column;overflow:hidden;z-index:10}
+  #slideNav{display:flex;align-items:center;gap:4px;padding:8px 10px;
+    border-bottom:1px solid var(--line);background:var(--paper)}
+  #slideNav>button{background:none;border:1px solid var(--line);border-radius:6px;
+    font:inherit;color:var(--ink);cursor:pointer;padding:4px 9px}
+  #slideNav>button:hover{border-color:var(--ink)}
+  #slideSegWrap{flex:1;overflow-x:auto}
+  #slideSeg button{min-width:26px}
+  #tabs{display:flex;border-bottom:1px solid var(--line)}
+  #tabs button{flex:1;padding:10px 0;background:none;border:0;font:inherit;color:var(--muted);
+    cursor:pointer;text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+  #tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 -2px var(--ink)}
+  #body{overflow-y:auto;padding:12px 14px 16px}
+  .tab{display:none}.tab.on{display:block}
+  fieldset{border:0;margin:0 0 14px;padding:0}
+  legend{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    margin-bottom:8px;cursor:pointer;user-select:none}
+  legend::before{content:'▾ ';font-size:8px;color:var(--muted)}
+  fieldset.closed>legend::before{content:'▸ '}
+  fieldset.closed>*:not(legend){display:none}
+  .row{display:grid;grid-template-columns:1fr 64px 48px;gap:8px;align-items:center;margin:5px 0}
+  .row label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row input[type=range]{width:100%;accent-color:var(--ink);height:2px}
+  .row input[type=number]{width:100%;font:10px ui-monospace,monospace;color:var(--muted);
+    background:var(--paper);border:1px solid var(--line);border-radius:4px;
+    text-align:right;padding:3px 4px}
+  .row input[type=number]:focus{color:var(--ink);outline:none;border-color:var(--ink)}
+  .row input[type=number]::-webkit-inner-spin-button{display:none}
+  .seg{display:flex;gap:4px;margin:2px 0 10px;flex-wrap:wrap}
+  .seg button,.btn{padding:6px 9px;font:inherit;font-size:11px;background:none;
+    border:1px solid var(--line);border-radius:6px;cursor:pointer;color:var(--muted)}
+  .seg button[aria-pressed="true"]{border-color:var(--ink);color:var(--ink)}
+  .btn{color:var(--ink);margin:3px 4px 3px 0}
+  .btn:hover{border-color:var(--ink)}
+  .btn.acc{border-color:var(--ink);color:var(--ink)}
+  .note{color:var(--muted);font-size:10px;margin:6px 0;line-height:1.5}
+  .tin{font:10px ui-monospace,monospace;border:1px solid var(--line);border-radius:4px;
+    background:var(--paper);color:var(--ink);padding:4px 6px;width:100%}
+  .tin:focus{outline:none;border-color:var(--ink)}
+  textarea.tin{resize:vertical;min-height:44px;line-height:1.5}
+  .crow{display:grid;grid-template-columns:16px 1fr;gap:6px;align-items:center;margin:4px 0}
+  .chip{width:14px;height:14px;border-radius:4px;border:1px solid var(--line)}
+  .brow{border:1px solid var(--line);border-radius:6px;margin:5px 0;padding:4px 6px}
+  .brow .bh{display:grid;grid-template-columns:56px 1fr 18px;gap:4px;align-items:center}
+  .brow .bh b{font-weight:400;font-size:9px;text-transform:uppercase;color:var(--muted)}
+  .brow .nums{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:4px}
+  .brow .nums label{display:flex;flex-direction:column;font-size:8px;color:var(--muted);
+    text-transform:uppercase;gap:2px}
+  .brow .nums input{font:10px ui-monospace,monospace;border:1px solid var(--line);
+    border-radius:4px;background:var(--paper);color:var(--ink);padding:3px 3px;width:100%;text-align:right}
+  .brow .nums input::-webkit-inner-spin-button{display:none}
+  .brow .nodes{margin-top:5px}
+  .idel{background:none;border:0;color:var(--muted);cursor:pointer;font-size:13px;padding:0}
+  .idel:hover{color:var(--ink)}
+  #hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);color:var(--muted);
+    font-size:10px;letter-spacing:.04em;z-index:5;pointer-events:none}
+  #transport{position:fixed;bottom:34px;left:50%;transform:translateX(-50%);
+    display:flex;gap:8px;align-items:center;z-index:9;
+    background:var(--panel);border:1px solid var(--line);border-radius:99px;
+    padding:6px 12px;box-shadow:0 2px 10px rgba(20,20,25,.06)}
+  #transport button{padding:5px 10px;font:inherit;font-size:11px;background:none;
+    border:1px solid transparent;border-radius:99px;cursor:pointer;color:var(--muted)}
+  #transport button[aria-pressed="true"]{border-color:var(--ink);color:var(--ink)}
+  #transport #tPlay{color:var(--ink);border-color:var(--ink)}
+  #transport .tlab{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+  #transport input[type=range]{width:60px;accent-color:var(--ink);height:2px}
+  body.noui #panel,body.noui #hint,body.noui #transport{display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="panel">
+  <div id="slideNav">
+    <button id="hPrev">‹</button>
+    <div id="slideSegWrap"><div class="seg" id="slideSeg" style="margin:0"></div></div>
+    <button id="hNext">›</button>
+  </div>
+  <div id="tabs">
+    <button data-tab="scene" aria-selected="true">Show</button>
+    <button data-tab="data">Slides</button>
+    <button data-tab="io">Export</button>
+  </div>
+  <div id="body">
+    <div class="tab on" data-tab="scene">
+      <fieldset id="gShow"><legend>Timing</legend></fieldset>
+      <fieldset><legend>Palette · grayscale</legend>
+        <div class="crow"><div class="chip" id="ch0"></div><input class="tin pal" data-i="0"></div>
+        <div class="crow"><div class="chip" id="ch1"></div><input class="tin pal" data-i="1"></div>
+        <div class="crow"><div class="chip" id="ch2"></div><input class="tin pal" data-i="2"></div>
+        <div class="crow"><div class="chip" id="ch3"></div><input class="tin pal" data-i="3"></div>
+        <p class="note">Slide background is any of the four; ink is picked by lightness automatically.</p>
+      </fieldset>
+    </div>
+    <div class="tab" data-tab="data">
+      <fieldset><legend>Slide</legend>
+        <div>
+          <button class="btn" id="slAdd">+ Slide</button>
+          <button class="btn" id="slDup">Dup</button>
+          <button class="btn" id="slDel">×</button>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <label>Background (0–3)</label>
+          <input type="range" id="slBgR" min="0" max="3" step="1">
+          <input type="number" id="slBgN" min="0" max="3" step="1" class="val">
+        </div>
+      </fieldset>
+      <fieldset><legend>Blocks · order = entrance queue</legend>
+        <div id="blocksList"></div>
+        <div class="seg" id="addSeg">
+          <button data-t="text">+Text</button><button data-t="pill">+Pill</button>
+          <button data-t="chip">+Chip</button><button data-t="arrow">+Arrow</button>
+          <button data-t="ellipse">+Ellipse</button><button data-t="cycle">+Cycle</button>
+          <button data-t="scribble">+Scrib</button><button data-t="draw">✏ Draw</button>
+        </div>
+        <p class="note">Drag on the scene: click a block, then drag its dots to move it, re-aim an arrow's tip, or bend it — no need to type X/Y.
+          Arrow Env: 0 flat · 1 rise · 2 fall · 3 settle · 4 serpentine (Bounce = number of jumps; the arrowhead grows off the last jump).
+          Line: 0 solid · 1 dashed · 2 dotted. Ease: 0 Cubic · 1 Elastic · 2 Back · 3 Bounce · 4 Expo.
+          Cycle: nodes one per line, "label | edge caption". ✏ Draw — sketch on the scene; it becomes a block that draws itself.</p>
+      </fieldset>
+    </div>
+    <div class="tab" data-tab="io">
+      <fieldset><legend>Config</legend>
+        <button class="btn" id="saveCfg">Save JSON</button>
+        <button class="btn" id="loadCfg">Load JSON</button>
+        <input type="file" id="loadFile" accept=".json" hidden>
+      </fieldset>
+      <fieldset><legend>Media</legend>
+        <button class="btn" id="pngBtn">Export PNG</button>
+        <button class="btn acc" id="recBtn">● Rec WebM (this slide)</button>
+      </fieldset>
+      <fieldset><legend>UI</legend>
+        <button class="btn" id="hideBtn">Hide UI (H)</button>
+      </fieldset>
+    </div>
+  </div>
+</div>
+
+<div id="transport">
+  <button id="tPlay">⟲ Replay</button>
+  <button id="tLoop">Loop</button>
+  <label class="tlab">Hold<input type="range" id="tHold" min="0.5" max="8" step="0.1"></label>
+  <label class="tlab">Speed<input type="range" id="tSpeed" min="0.4" max="2" step="0.05" value="1"></label>
+</div>
+<div id="hint">←/→ slides · click a block, drag its handles to move · ⟲ replay · Loop cycles this slide · H hides UI</div>
+
+<script>
+/* ================= @core-begin — pure math, no DOM ================= */
+const TAU = Math.PI * 2;
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const easeOutElastic = t => t <= 0 ? 0 : t >= 1 ? 1 :
+  Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * (TAU / 3)) + 1;
+const easeOutCubic = t => 1 - Math.pow(1 - clamp01(t), 3);
+const easeInCubic = t => Math.pow(clamp01(t), 3);
+/* GSAP-flavour presets: 0 Cubic · 1 Elastic · 2 Back · 3 Bounce · 4 Expo */
+const easeOutBack = t => { t = clamp01(t); const c1 = 1.70158, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+const easeOutBounce = t => { t = clamp01(t); const n = 7.5625, d = 2.75;
+  if (t < 1/d) return n*t*t;
+  if (t < 2/d) return n*(t -= 1.5/d)*t + 0.75;
+  if (t < 2.5/d) return n*(t -= 2.25/d)*t + 0.9375;
+  return n*(t -= 2.625/d)*t + 0.984375; };
+const easeOutExpo = t => t >= 1 ? 1 : t <= 0 ? 0 : 1 - Math.pow(2, -10 * t);
+const EASE_FNS = [easeOutCubic, easeOutElastic, easeOutBack, easeOutBounce, easeOutExpo];
+
+function hexRGB(h){ h = String(h).replace('#',''); if (h.length < 6) h = h.padEnd(6, '0');
+  return [parseInt(h.slice(0,2),16)||0, parseInt(h.slice(2,4),16)||0, parseInt(h.slice(4,6),16)||0]; }
+const luma = h => { const [r, g, b] = hexRGB(h); return (0.299*r + 0.587*g + 0.114*b) / 255; };
+
+/* slide phases: entrance (stagger) → hold → (loop) exit → gap → repeat SAME slide */
+function slidePhase(t, nBlocks, stagger, hold, mode){
+  const inDur = nBlocks * stagger + 1.0, OUT = 0.45, GAP = 0.35;
+  const cycle = inDur + hold + OUT + GAP;
+  if (mode !== 'loop'){
+    return { local: Math.min(t, inDur + 0.001), exit: 0, cycle };
+  }
+  const tt = ((t % cycle) + cycle) % cycle;
+  const exit = tt > inDur + hold ? easeInCubic((tt - inDur - hold) / OUT) : 0;
+  return { local: Math.min(tt, inDur), exit: Math.min(1, exit), cycle };
+}
+/* progress of block i */
+const blockP = (local, i, stagger, dur) => clamp01((local - i * stagger) / dur);
+
+/* polyline length + sub-polyline up to arc-length (used for smooth self-draw) */
+function pathLen(pts){ let L = 0;
+  for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+  return L; }
+function subPolyline(pts, upto){
+  const out = [pts[0]]; let acc = 0;
+  for (let i = 1; i < pts.length; i++){
+    const dx = pts[i].x - pts[i-1].x, dy = pts[i].y - pts[i-1].y, d = Math.hypot(dx, dy);
+    if (acc + d >= upto){ const f = d ? (upto - acc) / d : 0;
+      const x = pts[i-1].x + dx*f, y = pts[i-1].y + dy*f;
+      out.push({ x, y }); return { pts: out, tip: { x, y, a: Math.atan2(dy, dx) } }; }
+    out.push(pts[i]); acc += d;
+  }
+  const a = pts[pts.length-1], b = pts[pts.length-2] || a;
+  return { pts: out, tip: { x: a.x, y: a.y, a: Math.atan2(a.y-b.y, a.x-b.x) } };
+}
+/* spring / bounce path: many compressed parabolic humps between P0 and P1.
+   bounce = number of jumps (0 = smooth curve, amp = bend).
+   amp = signed amplitude (sign chooses the side). env: 0 flat 1 rise 2 fall 3 settle 4 serpentine */
+function springPath(x0, y0, x1, y1, bounce, amp, env){
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1;
+  const ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+  const pts = [];
+  if (bounce < 1){
+    const mx = (x0 + x1)/2 + nx*amp, my = (y0 + y1)/2 + ny*amp;
+    for (let i = 0; i <= 40; i++){ const t = i/40;
+      pts.push({ x: (1-t)*(1-t)*x0 + 2*(1-t)*t*mx + t*t*x1,
+                 y: (1-t)*(1-t)*y0 + 2*(1-t)*t*my + t*t*y1 }); }
+    return pts;
+  }
+  const N = Math.round(bounce), seg = Math.max(48, N * 16);
+  for (let i = 0; i <= seg; i++){ const t = i/seg; let off;
+    if (env === 4){ off = Math.sin(t * N * Math.PI) * amp; }
+    else {
+      const fN = t * N, bi = Math.min(N-1, Math.floor(fN)), u = fN - Math.floor(fN);
+      let sc = 1;
+      if (env === 1) sc = lerp(0.4, 1.3, N > 1 ? bi/(N-1) : 1);
+      else if (env === 2) sc = lerp(1.3, 0.4, N > 1 ? bi/(N-1) : 1);
+      else if (env === 3) sc = Math.pow(0.62, bi);
+      off = Math.sin(Math.PI * u) * amp * sc;
+    }
+    pts.push({ x: lerp(x0, x1, t) + nx*off, y: lerp(y0, y1, t) + ny*off });
+  }
+  return pts;
+}
+/* ================= @core-end ================= */
+
+const state = {
+  show: { stagger: 0.28, hold: 2.2, speed: 1 },
+  // grayscale ramp: 0 paper · 1 near-black · 2 mid gray · 3 pale gray
+  palette: ['#f6f5f2', '#1a1a1a', '#8f8f8a', '#d9d8d3'],
+  slides: [
+    { bg: 0, blocks: [ // 1 — process: ONE bouncing line that ends in an arrowhead
+      { type: 'pill', text: 'initializing', x: 15, y: 51, a: 15, c: 0, e: 1 },
+      { type: 'arrow', text: '', x: 27, y: 51, a: 80, b: 44, c: 5, d: 9, f: 3, g: 0, e: 0 },
+      { type: 'chip', text: '78%', x: 53, y: 39, a: 22, b: 1, e: 1 },
+      { type: 'pill', text: 'analyzing', x: 87, y: 43, a: 15, c: 1, e: 1 }
+    ]},
+    { bg: 0, blocks: [ // 2 — virtuous cycle (cycle block)
+      { type: 'cycle', text: 'virtuous cycle\nmarket growth', x: 50, y: 52,
+        a: 29, b: 30, c: -90, d: 0.3, f: 0, g: 0, e: 0,
+        nodes: ['idus', 'customer', 'artist'],
+        caps: ['various and unique works, buy and write reviews',
+               'communication of customer requests, sharing of the production process',
+               'delivery of artworks, support for production environment'] }
+    ]},
+    { bg: 3, blocks: [ // 3 — ellipse portals
+      { type: 'ellipse', text: '', x: 29, y: 55, a: 13, b: 6, c: -8, d: 0, e: 0 },
+      { type: 'pill', text: 'entities', x: 29, y: 55, a: 14, c: 1, e: 1 },
+      { type: 'ellipse', text: '', x: 62, y: 33, a: 11, b: 7, c: 16, d: 0, e: 0 },
+      { type: 'pill', text: 'fact table', x: 62, y: 33, a: 14, c: 1, e: 1 },
+      { type: 'pill', text: 'actions', x: 44, y: 54, a: 13, c: 2, e: 1 },
+      { type: 'ellipse', text: '', x: 70, y: 72, a: 16, b: 8, c: -6, d: 0, e: 0 },
+      { type: 'pill', text: 'metrics', x: 70, y: 72, a: 14, c: 1, e: 1 },
+      { type: 'arrow', text: '', x: 38, y: 51, a: 55, b: 38, c: 0, d: -9, f: 0, g: 0, e: 0 }
+    ]},
+    { bg: 0, blocks: [ // 4 — title
+      { type: 'text', text: 'One message.\nOne slide.', x: 50, y: 40, a: 44, e: 0 },
+      { type: 'draw', text: '', x: 0, y: 0, a: 2.4, b: 0, e: 4,
+        pts: [[37,53],[44,52.2],[51,53.2],[58,52.2],[63,53]] },
+      { type: 'pill', text: 'core · pitch', x: 50, y: 63, a: 14, c: 0, e: 1 }
+    ]},
+    { bg: 1, blocks: [ // 5 — accent number
+      { type: 'text', text: '×3.4', x: 38, y: 47, a: 86, e: 0 },
+      { type: 'pill', text: 'growth / quarter', x: 38, y: 66, a: 15, c: 1, e: 1 },
+      { type: 'arrow', text: '', x: 52, y: 41, a: 64, b: 33, c: 0, d: -7, f: 0, g: 0, e: 0 },
+      { type: 'chip', text: '!', x: 68, y: 30, a: 17, b: 3, e: 1 }
+    ]},
+    { bg: 0, blocks: [ // 6 — problem → solution (tangled path)
+      { type: 'pill', text: 'problem', x: 22, y: 50, a: 16, c: 1, e: 1 },
+      { type: 'arrow', text: '', x: 30, y: 50, a: 70, b: 50, c: 5, d: 8, f: 4, g: 0, e: 0 },
+      { type: 'pill', text: 'solution', x: 78, y: 50, a: 16, c: 0, e: 1 }
+    ]},
+    { bg: 0, blocks: [ // 7 — process cycle template
+      { type: 'cycle', text: 'process\ncycle', x: 50, y: 52,
+        a: 26, b: 29, c: -90, d: 0.3, f: 0, g: 1, e: 0,
+        nodes: ['discover', 'define', 'build', 'ship'], caps: ['', '', '', ''] }
+    ]}
+  ],
+  cur: 0,
+  anim: { t: 0, playing: 1, mode: 'once' }
+};
+
+/* ===== canvas ===== */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, lastT = performance.now();
+function resize(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', resize); resize();
+const K = () => Math.min(W, H) / 800;      // composition scale
+const px = v => v / 100 * W, py = v => v / 100 * H;
+const SANS = "system-ui, -apple-system, 'Segoe UI', sans-serif";
+
+function dashOf(style){ return style === 1 ? [6, 5] : style === 2 ? [2, 5] : null; }
+/* self-drawing stroke: reveals up to a fraction of the path, dash pattern stays stable
+   (no snap from solid to dashed). Returns the moving tip {x,y,a} for arrowheads. */
+function strokeReveal(pts, p, color, width, dash){
+  if (!pts || pts.length < 2 || p <= 0) return null;
+  const rp = clamp01(p), L = pathLen(pts);
+  let seg, tip;
+  if (rp >= 1){ seg = pts; const a = pts[pts.length-1], b = pts[pts.length-2] || a;
+    tip = { x: a.x, y: a.y, a: Math.atan2(a.y-b.y, a.x-b.x) }; }
+  else { const r = subPolyline(pts, L * rp); seg = r.pts; tip = r.tip; }
+  ctx.beginPath();
+  seg.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y));
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.setLineDash(dash && dash.length ? dash : []);
+  ctx.stroke(); ctx.setLineDash([]);
+  return tip;
+}
+/* arrowhead that rides the drawing tip and scales in over the last stretch (continuation) */
+function arrowHead(tip, prog, fg, k){
+  if (!tip) return;
+  const s = 7.5 * k, grow = clamp01((prog - 0.7) / 0.3), ss = s * (0.4 + 0.6 * grow);
+  ctx.beginPath();
+  ctx.moveTo(tip.x - ss * Math.cos(tip.a - 0.42), tip.y - ss * Math.sin(tip.a - 0.42));
+  ctx.lineTo(tip.x, tip.y);
+  ctx.lineTo(tip.x - ss * Math.cos(tip.a + 0.42), tip.y - ss * Math.sin(tip.a + 0.42));
+  ctx.strokeStyle = fg; ctx.lineWidth = 1.6 * k; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.stroke();
+}
+
+function drawBlock(b, p, exit, fg, bg, idx){
+  if (p <= 0) return;
+  const k = K(), fade = 1 - exit;
+  const E = b.e !== undefined && EASE_FNS[Math.round(b.e)]
+    ? EASE_FNS[Math.round(b.e)]
+    : (b.type === 'pill' || b.type === 'chip' ? easeOutElastic : easeOutCubic);
+  // gentle idle float once a block has settled (subtle life)
+  const bob = Math.sin(state.anim.t * 1.25 + (idx || 0) * 1.7) * 2.0 * k * clamp01(p);
+  ctx.globalAlpha = fade;
+
+  if (b.type === 'draw'){
+    if (!b.pts || b.pts.length < 2){ ctx.globalAlpha = 1; return; }
+    const pts = b.pts.map(q => ({ x: px(q[0]), y: py(q[1]) }));
+    strokeReveal(pts, E(p), fg, (b.a || 2) * k, dashOf(Math.round(b.b || 0)));
+    ctx.globalAlpha = 1; return;
+  }
+  if (b.type === 'text'){
+    const e = E(p);
+    ctx.globalAlpha = fade * e;
+    ctx.font = `600 ${(b.a || 40) * k}px ${SANS}`;
+    ctx.fillStyle = fg; ctx.textAlign = 'center';
+    const lines = String(b.text).split('\\n').join('\n').split('\n');
+    lines.forEach((ln, i) =>
+      ctx.fillText(ln, px(b.x), py(b.y) + (1 - e) * 24 * k +
+        (i - (lines.length - 1) / 2) * (b.a || 40) * 1.15 * k));
+    ctx.textAlign = 'left';
+  }
+  else if (b.type === 'pill'){
+    const e = E(p);
+    const fs = (b.a || 15) * k, style = Math.round(b.c || 0);
+    ctx.font = `${fs}px ui-monospace, monospace`;
+    const tw = ctx.measureText(b.text).width, w = tw + fs * 1.6, h = fs * 2.1;
+    const cx = px(b.x), cy = py(b.y) + bob;
+    ctx.save();
+    ctx.translate(cx, cy); ctx.scale(Math.max(0.01, e), Math.max(0.01, e));
+    ctx.beginPath(); ctx.roundRect(-w/2, -h/2, w, h, h/2);
+    if (style === 0){ ctx.fillStyle = fg; ctx.fill(); ctx.fillStyle = bg; }
+    else {
+      ctx.fillStyle = bg; ctx.globalAlpha = fade * 0.9; ctx.fill(); ctx.globalAlpha = fade;
+      ctx.strokeStyle = fg; ctx.lineWidth = 1.4;
+      if (style === 2) ctx.setLineDash([3, 3]);
+      ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = fg;
+    }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(b.text, 0, 1);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+  else if (b.type === 'chip'){
+    const e = E(p), r = (b.a || 26) * k * Math.max(0, e);
+    const cx = px(b.x), cy = py(b.y) + bob;
+    const fill = state.palette[Math.max(0, Math.min(3, Math.round(b.b || 0)))];
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(0.5, r), 0, TAU);
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.strokeStyle = fg; ctx.globalAlpha = fade * 0.7; ctx.stroke(); ctx.globalAlpha = fade;
+    ctx.font = `${(b.a || 26) * 0.62 * k * e}px ui-monospace, monospace`;
+    ctx.fillStyle = luma(fill) > 0.6 ? '#1a1a1a' : '#f6f5f2';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(b.text, cx, cy + 1);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+  else if (b.type === 'ellipse'){
+    const e = E(p);
+    const cx = px(b.x), cy = py(b.y), rx = px(b.a || 12) * 0.9, ry = px(b.b || 6) * 0.9;
+    const rot = (b.c || 0) * Math.PI / 180;
+    const pts = [];
+    for (let i = 0; i <= 64; i++){
+      const a = i / 64 * TAU;
+      const ex = Math.cos(a) * rx, ey = Math.sin(a) * ry;
+      pts.push({ x: cx + ex * Math.cos(rot) - ey * Math.sin(rot),
+                 y: cy + ex * Math.sin(rot) + ey * Math.cos(rot) });
+    }
+    strokeReveal(pts, e, fg, 1.4 * k, dashOf(Math.round(b.d || 0)));
+  }
+  else if (b.type === 'arrow'){
+    const e = E(p);
+    const x0 = px(b.x), y0 = py(b.y), x1 = px(b.a ?? 50), y1 = py(b.b ?? 50);
+    const bounce = Math.max(0, Math.round(b.c || 0));
+    const amp = (b.d || 0) * k;
+    const env = Math.round(b.f || 0);
+    const pts = springPath(x0, y0, x1, y1, bounce, amp, env);
+    const tip = strokeReveal(pts, e, fg, 1.6 * k, dashOf(Math.round(b.g || 0)));
+    arrowHead(tip, e, fg, k);
+  }
+  else if (b.type === 'scribble'){
+    const e = E(p);
+    const x0 = px(b.x), y0 = py(b.y), x1 = px(b.a || 70), y1 = py(b.b || 50);
+    const loops = Math.max(1, Math.round(b.c || 5)), amp = py(b.d || 14);
+    const pts = []; const N = loops * 24;
+    for (let i = 0; i <= N; i++){ const t = i / N;
+      pts.push({ x: lerp(x0, x1, t) + Math.sin(t * loops * TAU) * (x1 - x0) / loops * 0.18,
+                 y: lerp(y0, y1, t) - Math.cos(t * loops * TAU) * amp }); }
+    strokeReveal(pts, e, fg, 1.3 * k, null);
+  }
+  else if (b.type === 'cycle'){
+    drawCycle(b, p, fade, fg, bg, k);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* cycle: ring auto-divides N nodes, curved arrows between them, edge captions, center title.
+   internal phases derived from the block's own progress p (ring → nodes → arcs → title) */
+function drawCycle(b, p, fade, fg, bg, k){
+  const cx = px(b.x), cy = py(b.y);
+  const rx = px(b.a || 28), ry = py(b.b || 30);
+  const nodes = (b.nodes && b.nodes.length) ? b.nodes : ['A', 'B', 'C'];
+  const caps = b.caps || [];
+  const N = nodes.length;
+  const start = (b.c === undefined ? -90 : b.c) * Math.PI / 180;
+  const dir = Math.round(b.f || 0) === 1 ? -1 : 1;
+  const pRing  = clamp01(p / 0.26);
+  const pNodes = clamp01((p - 0.12) / 0.6);
+  const pArcs  = clamp01((p - 0.34) / 0.58);
+  const pTitle = clamp01((p - 0.58) / 0.42);
+  const ang = i => start + dir * (i / N) * TAU;
+  const pos = i => ({ x: cx + Math.cos(ang(i)) * rx, y: cy + Math.sin(ang(i)) * ry });
+
+  // faint guide ring (optional)
+  if (Math.round(b.g || 0) === 1 && pRing > 0){
+    const gp = [];
+    for (let i = 0; i <= 80; i++){ const a = i / 80 * TAU;
+      gp.push({ x: cx + Math.cos(a) * rx, y: cy + Math.sin(a) * ry }); }
+    ctx.globalAlpha = fade * 0.16; strokeReveal(gp, pRing, fg, 1 * k, [2, 6]); ctx.globalAlpha = fade;
+  }
+
+  // arcs between consecutive nodes (bowed outside the ring) + edge captions
+  const gap = 0.20 * (TAU / N), rr = 1.13;
+  for (let i = 0; i < N; i++){
+    const ap = clamp01((pArcs - (i / N) * 0.5) / 0.5);
+    if (ap <= 0) continue;
+    const a0 = ang(i), a1 = ang(i) + dir * (1 / N) * TAU;
+    const arc = []; const steps = 30;
+    for (let s = 0; s <= steps; s++){ const aa = lerp(a0 + dir*gap, a1 - dir*gap, s/steps);
+      arc.push({ x: cx + Math.cos(aa) * rx * rr, y: cy + Math.sin(aa) * ry * rr }); }
+    const tip = strokeReveal(arc, ap, fg, 1.4 * k, null);
+    arrowHead(tip, ap, fg, k);
+    // caption near the arc midpoint, pushed outward
+    if (caps[i] && ap > 0.45){
+      const am = a0 + dir * (0.5 / N) * TAU;
+      const lx = cx + Math.cos(am) * rx * 1.34, ly = cy + Math.sin(am) * ry * 1.34;
+      const parts = String(caps[i]).split(',');
+      const lines = parts.map((s, j) => j < parts.length - 1 ? s.trim() + ',' : s.trim()).filter(Boolean);
+      ctx.globalAlpha = fade * clamp01((ap - 0.45) / 0.4);
+      ctx.font = `${11 * k}px ${SANS}`; ctx.fillStyle = fg;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      lines.forEach((ln, j) => ctx.fillText(ln, lx, ly + (j - (lines.length - 1) / 2) * 14 * k));
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.globalAlpha = fade;
+    }
+  }
+
+  // nodes (back-pop, staggered)
+  for (let i = 0; i < N; i++){
+    const np = clamp01((pNodes - (i / N) * 0.5) / 0.5);
+    if (np <= 0) continue;
+    const e = easeOutBack(np), pt = pos(i);
+    ctx.save();
+    ctx.globalAlpha = fade * clamp01(np * 2);
+    ctx.font = `600 ${18 * k}px ${SANS}`; ctx.fillStyle = fg;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.translate(pt.x, pt.y); ctx.scale(Math.max(0.01, e), Math.max(0.01, e));
+    ctx.fillText(nodes[i], 0, 0);
+    ctx.restore();
+  }
+
+  // center title
+  const title = String(b.text || '').trim();
+  if (pTitle > 0 && title){
+    const e = easeOutCubic(pTitle);
+    ctx.globalAlpha = fade * e;
+    const ts = Math.max(18, Math.min(rx, ry) * 0.19);
+    ctx.font = `600 ${ts}px ${SANS}`; ctx.fillStyle = fg;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const lines = title.split('\\n').join('\n').split('\n');
+    lines.forEach((ln, i) =>
+      ctx.fillText(ln, cx, cy + (i - (lines.length - 1) / 2) * ts * 1.2));
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+  ctx.globalAlpha = 1;
+}
+
+function frame(now){
+  const dt = Math.min((now - lastT) / 1000, 0.05); lastT = now;
+  if (state.anim.playing) state.anim.t += dt * state.show.speed;
+  const sl = state.slides[state.cur];
+  if (!sl){ requestAnimationFrame(frame); return; }
+  const bg = state.palette[Math.max(0, Math.min(3, sl.bg || 0))];
+  const fg = luma(bg) > 0.55 ? '#1a1a1a' : '#f6f5f2';
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  const ph = slidePhase(state.anim.t, sl.blocks.length,
+    state.show.stagger, state.show.hold, state.anim.mode);
+  sl.blocks.forEach((b, i) =>
+    drawBlock(b, blockP(ph.local, i, state.show.stagger, 0.9), ph.exit, fg, bg, i));
+
+  // live preview of the sketch being drawn
+  if (drawMode && drawing && drawing.length > 1){
+    const pts = drawing.map(q => ({ x: px(q[0]), y: py(q[1]) }));
+    strokeReveal(pts, 1, fg, 2 * K(), null);
+  }
+  // selected block's drag handles (editing aid — never recorded, hidden with UI)
+  if (sel != null && !recorder && !document.body.classList.contains('noui')){
+    const b = sl.blocks[sel];
+    if (b) anchorsOf(b).forEach(an => {
+      ctx.beginPath(); ctx.arc(an.x, an.y, 5, 0, TAU);
+      ctx.fillStyle = bg; ctx.strokeStyle = fg; ctx.lineWidth = 1.5;
+      ctx.fill(); ctx.stroke();
+    });
+  }
+  cv.style.cursor = drawMode ? 'crosshair' : drag ? 'grabbing' : hovering ? 'move' : 'default';
+
+  // slide number
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.fillStyle = fg; ctx.globalAlpha = 0.5; ctx.textAlign = 'right';
+  ctx.fillText((state.cur + 1) + ' / ' + state.slides.length, W - 16, 26);
+  ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* navigation */
+function goTo(i){
+  state.cur = ((i % state.slides.length) + state.slides.length) % state.slides.length;
+  state.anim.t = 0; state.anim.playing = 1; sel = null;
+  syncSlideUI(); buildBlocks();
+}
+addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if (e.key === 'ArrowRight') goTo(state.cur + 1);
+  if (e.key === 'ArrowLeft') goTo(state.cur - 1);
+  if (e.key.toLowerCase() === 'h') toggleUI();
+});
+
+/* ===== panel ===== */
+const $ = s => document.querySelector(s);
+const getPath = k => k.split('.').reduce((o, p) => o[p], state);
+const setPath = (k, v) => { const ps = k.split('.'), last = ps.pop();
+  ps.reduce((o, p) => o[p], state)[last] = v; };
+const sliderDefs = {
+  gShow: [
+    ['show.stagger', 'Stagger', 0.05, 0.8, 0.01],
+    ['show.hold',    'Hold (loop)', 0.5, 8, 0.1],
+    ['show.speed',   'Speed', 0.4, 2, 0.05]
+  ]
+};
+function buildSliders(elId, defs){
+  const el = typeof elId === 'string' ? $('#' + elId) : elId;
+  [...el.querySelectorAll('.row')].forEach(r => r.remove());
+  for (const [key, name, min, max, step] of defs){
+    const row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = `<label>${name}</label><input type="range" min="${min}" max="${max}" step="${step}"><input type="number" class="val" min="${min}" max="${max}" step="${step}">`;
+    const inp = row.querySelector('input[type=range]'), val = row.querySelector('input[type=number]');
+    const fmt = x => +(+x).toFixed(step < 1 ? 2 : 0);
+    inp.value = getPath(key); val.value = fmt(getPath(key)); inp.dataset.key = key;
+    inp.addEventListener('input', () => { setPath(key, +inp.value); val.value = fmt(inp.value); syncTransport(); });
+    val.addEventListener('change', () => { const x = parseFloat(val.value);
+      if (isFinite(x)){ setPath(key, x); inp.value = x; syncTransport(); } });
+    el.appendChild(row);
+  }
+}
+buildSliders('gShow', sliderDefs.gShow);
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === b.dataset.tab));
+});
+document.querySelectorAll('#panel legend').forEach(lg =>
+  lg.addEventListener('click', () => lg.parentElement.classList.toggle('closed')));
+
+/* palette */
+function syncPalette(){
+  document.querySelectorAll('.pal').forEach(inp => {
+    const i = +inp.dataset.i;
+    inp.value = state.palette[i];
+    $('#ch' + i).style.background = state.palette[i];
+  });
+}
+document.querySelectorAll('.pal').forEach(inp => {
+  inp.addEventListener('change', () => {
+    const i = +inp.dataset.i, v = inp.value.trim();
+    if (/^#?[0-9a-fA-F]{6}$/.test(v)){ state.palette[i] = v.startsWith('#') ? v : '#' + v; syncPalette(); }
+  });
+});
+syncPalette();
+
+/* slides */
+function syncSlideUI(){
+  const seg = $('#slideSeg'); seg.innerHTML = '';
+  state.slides.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.textContent = i + 1;
+    b.setAttribute('aria-pressed', i === state.cur);
+    b.addEventListener('click', () => goTo(i));
+    seg.appendChild(b);
+  });
+  $('#slBgR').value = state.slides[state.cur].bg;
+  $('#slBgN').value = state.slides[state.cur].bg;
+}
+$('#slBgR').addEventListener('input', e => {
+  state.slides[state.cur].bg = +e.target.value; $('#slBgN').value = e.target.value; });
+$('#slBgN').addEventListener('change', e => {
+  const v = Math.max(0, Math.min(3, Math.round(+e.target.value)));
+  state.slides[state.cur].bg = v; $('#slBgR').value = v; });
+$('#slAdd').addEventListener('click', () => {
+  state.slides.push({ bg: 0, blocks: [] }); goTo(state.slides.length - 1); });
+$('#slDup').addEventListener('click', () => {
+  state.slides.splice(state.cur + 1, 0, JSON.parse(JSON.stringify(state.slides[state.cur])));
+  goTo(state.cur + 1); });
+$('#slDel').addEventListener('click', () => {
+  if (state.slides.length <= 1) return;
+  state.slides.splice(state.cur, 1); goTo(Math.max(0, state.cur - 1)); });
+
+/* blocks: field captions per type ('—' = hidden).
+   keys order: x y a b c d f g e */
+const FIELDS = {
+  text:     ['X','Y','Size','—','—','—','—','—','Ease'],
+  pill:     ['X','Y','Font','—','Style','—','—','—','Ease'],
+  chip:     ['X','Y','R','Fill','—','—','—','—','Ease'],
+  ellipse:  ['X','Y','RX','RY','Rot','Line','—','—','Ease'],
+  arrow:    ['X','Y','X2','Y2','Bounce','Amp','Env','Line','Ease'],
+  scribble: ['X','Y','X2','Y2','Loops','Amp','—','—','Ease'],
+  cycle:    ['X','Y','RadX','RadY','Start','Bow','Dir','Ring','Ease'],
+  draw:     ['—','—','Width','Line','—','—','—','—','Ease']
+};
+const KEYS = ['x','y','a','b','c','d','f','g','e'];
+function buildBlocks(){
+  const box = $('#blocksList'); box.innerHTML = '';
+  const sl = state.slides[state.cur];
+  sl.blocks.forEach((b, i) => {
+    const row = document.createElement('div'); row.className = 'brow';
+    if (i === sel) row.style.borderColor = 'var(--ink)';
+    const head = document.createElement('div'); head.className = 'bh';
+    const tag = document.createElement('b'); tag.textContent = b.type;
+    const txt = document.createElement('input'); txt.className = 'tin'; txt.value = b.text || '';
+    txt.placeholder = b.type === 'cycle' ? 'center title' : 'text';
+    txt.addEventListener('input', () => b.text = txt.value);
+    const del = document.createElement('button'); del.className = 'idel'; del.textContent = '×';
+    del.addEventListener('click', () => { sl.blocks.splice(i, 1); buildBlocks(); });
+    head.append(tag, txt, del); row.appendChild(head);
+    const nums = document.createElement('div'); nums.className = 'nums';
+    const caps = FIELDS[b.type] || ['X','Y','A','B','C','D','F','G','Ease'];
+    KEYS.forEach((key, ci) => {
+      const cap = caps[ci]; if (cap === '—' || cap === undefined) return;
+      const lab = document.createElement('label');
+      const span = document.createElement('span'); span.textContent = cap;
+      const inp = document.createElement('input'); inp.type = 'number'; inp.step = 'any';
+      inp.value = b[key] ?? 0;
+      inp.addEventListener('change', () => { const v = parseFloat(inp.value);
+        if (isFinite(v)) b[key] = v; });
+      lab.append(span, inp); nums.appendChild(lab);
+    });
+    row.appendChild(nums);
+    if (b.type === 'cycle'){                 // nodes editor: "label | edge caption" per line
+      const ta = document.createElement('textarea'); ta.className = 'tin nodes'; ta.rows = 3;
+      ta.placeholder = 'node label | edge caption';
+      const nn = b.nodes || [], cc = b.caps || [];
+      ta.value = nn.map((n, j) => cc[j] ? `${n} | ${cc[j]}` : n).join('\n');
+      ta.addEventListener('input', () => {
+        const ns = [], cs = [];
+        ta.value.split('\n').forEach(line => {
+          if (!line.trim()) return;
+          const parts = line.split('|');
+          ns.push(parts[0].trim()); cs.push((parts[1] || '').trim());
+        });
+        b.nodes = ns; b.caps = cs;
+      });
+      row.appendChild(ta);
+    }
+    box.appendChild(row);
+  });
+}
+const DEFAULTS = {
+  text:     { a: 40, c: 0, d: 0, e: 0, text: 'Message' },
+  pill:     { a: 15, c: 0, d: 0, e: 1, text: 'label' },
+  chip:     { a: 26, b: 1, c: 0, d: 0, e: 1, text: '00%' },
+  ellipse:  { a: 14, b: 6, c: 0, d: 0, e: 0, text: '' },
+  arrow:    { a: 70, b: 50, c: 0, d: 8, f: 0, g: 0, e: 0, text: '' },
+  scribble: { a: 72, b: 50, c: 5, d: 14, e: 0, text: '' },
+  cycle:    { a: 26, b: 30, c: -90, d: 0.3, f: 0, g: 1, e: 0, text: 'cycle',
+              nodes: ['step one','step two','step three','step four'], caps: ['','','',''] }
+};
+$('#addSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const t = b.dataset.t;
+  if (t === 'draw'){ drawMode = !drawMode; b.setAttribute('aria-pressed', drawMode); return; }
+  const def = JSON.parse(JSON.stringify(DEFAULTS[t] || {}));
+  state.slides[state.cur].blocks.push({ type: t, x: 50, y: 50, ...def });
+  buildBlocks();
+  state.anim.t = 0; state.anim.playing = 1;
+});
+
+/* ===== sketch capture (vector) ===== */
+let drawMode = false, drawing = null;
+cv.addEventListener('pointerdown', e => {
+  if (!drawMode) return;
+  drawing = [[e.clientX / W * 100, e.clientY / H * 100]];
+});
+addEventListener('pointermove', e => {
+  if (!drawMode || !drawing) return;
+  const last = drawing[drawing.length - 1];
+  const nx = e.clientX / W * 100, ny = e.clientY / H * 100;
+  if (Math.hypot((nx - last[0]) * W / 100, (ny - last[1]) * H / 100) > 4)
+    drawing.push([+nx.toFixed(2), +ny.toFixed(2)]);
+});
+addEventListener('pointerup', () => {
+  if (!drawMode || !drawing) { drawing = null; return; }
+  if (drawing.length >= 3){
+    const sm = [drawing[0]];                 // Chaikin smoothing: keeps character, drops hand jitter
+    for (let i = 0; i < drawing.length - 1; i++){
+      const a = drawing[i], b = drawing[i + 1];
+      sm.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25]);
+      sm.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+    }
+    sm.push(drawing[drawing.length - 1]);
+    state.slides[state.cur].blocks.push({
+      type: 'draw', text: '', x: 0, y: 0, a: 2, b: 0, e: 4,
+      pts: sm.map(q => [+q[0].toFixed(2), +q[1].toFixed(2)])
+    });
+    buildBlocks();
+    state.anim.t = 0; state.anim.playing = 1;
+  }
+  drawing = null; drawMode = false;
+  document.querySelector('#addSeg [data-t=draw]').setAttribute('aria-pressed', false);
+});
+
+/* ===== human input: select a block and drag its handles on the scene ===== */
+let sel = null, drag = null, hovering = false;
+const HIT = 16;
+function anchorsOf(b){
+  const A = [];
+  if (b.type === 'arrow' || b.type === 'scribble'){
+    A.push({ kind: 'pos', x: px(b.x), y: py(b.y) });          // start
+    A.push({ kind: 'end', x: px(b.a), y: py(b.b) });          // end / aim
+    if (b.type === 'arrow'){                                  // bend / amplitude handle
+      const x0 = px(b.x), y0 = py(b.y), x1 = px(b.a), y1 = py(b.b);
+      const dx = x1-x0, dy = y1-y0, L = Math.hypot(dx,dy) || 1, nx = -dy/L, ny = dx/L, amp = (b.d||0)*K();
+      A.push({ kind: 'amp', x: (x0+x1)/2 + nx*amp, y: (y0+y1)/2 + ny*amp });
+    }
+  } else if (b.type === 'cycle' || b.type === 'ellipse'){
+    A.push({ kind: 'pos', x: px(b.x), y: py(b.y) });          // centre
+    A.push({ kind: 'rad', x: px(b.x) + px(b.a || 10), y: py(b.y) }); // radius
+  } else {
+    A.push({ kind: 'pos', x: px(b.x), y: py(b.y) });          // move
+  }
+  return A;
+}
+function hitTest(mx, my){
+  const sl = state.slides[state.cur]; let best = null, bd = HIT;
+  sl.blocks.forEach((b, i) => anchorsOf(b).forEach(an => {
+    const d = Math.hypot(mx - an.x, my - an.y);
+    if (d < bd){ bd = d; best = { i, kind: an.kind }; }
+  }));
+  return best;
+}
+cv.addEventListener('pointerdown', e => {
+  if (drawMode) return;
+  const hit = hitTest(e.clientX, e.clientY);
+  if (hit){ sel = hit.i; drag = { b: state.slides[state.cur].blocks[hit.i], kind: hit.kind };
+    state.anim.t = 999; state.anim.playing = 0;   // freeze fully-entered layout while editing
+    buildBlocks();
+  } else { sel = null; buildBlocks(); }
+});
+addEventListener('pointermove', e => {
+  if (!drag){ if (!drawMode) hovering = !!hitTest(e.clientX, e.clientY); return; }
+  const b = drag.b, mxp = e.clientX / W * 100, myp = e.clientY / H * 100;
+  if (drag.kind === 'pos'){ b.x = +mxp.toFixed(1); b.y = +myp.toFixed(1); }
+  else if (drag.kind === 'end'){ b.a = +mxp.toFixed(1); b.b = +myp.toFixed(1); }
+  else if (drag.kind === 'rad'){ b.a = Math.max(2, +Math.abs(mxp - b.x).toFixed(1)); }
+  else if (drag.kind === 'amp'){
+    const x0 = px(b.x), y0 = py(b.y), x1 = px(b.a), y1 = py(b.b);
+    const dx = x1-x0, dy = y1-y0, L = Math.hypot(dx,dy) || 1, nx = -dy/L, ny = dx/L;
+    const proj = (e.clientX - (x0+x1)/2) * nx + (e.clientY - (y0+y1)/2) * ny;
+    b.d = +(proj / K()).toFixed(1);
+  }
+});
+addEventListener('pointerup', () => { if (drag){ drag = null; buildBlocks(); } });
+
+syncSlideUI(); buildBlocks();
+
+/* header nav + transport (Replay / Loop / Hold / Speed) */
+function setLoop(on){
+  state.anim.mode = on ? 'loop' : 'once';
+  if (on){ state.anim.t = 0; state.anim.playing = 1; }
+  $('#tLoop').setAttribute('aria-pressed', on);
+}
+function syncTransport(){
+  $('#tHold').value = state.show.hold;
+  $('#tSpeed').value = state.show.speed;
+}
+$('#hPrev').addEventListener('click', () => goTo(state.cur - 1));
+$('#hNext').addEventListener('click', () => goTo(state.cur + 1));
+$('#tPlay').addEventListener('click', () => { state.anim.t = 0; state.anim.playing = 1; });
+$('#tLoop').addEventListener('click', () => setLoop(state.anim.mode !== 'loop'));
+$('#tHold').addEventListener('input', e => { state.show.hold = +e.target.value;
+  const r = document.querySelector('#gShow input[data-key="show.hold"]');
+  if (r){ r.value = state.show.hold; r.nextElementSibling.value = (+state.show.hold).toFixed(1); } });
+$('#tSpeed').addEventListener('input', e => { state.show.speed = +e.target.value;
+  const r = document.querySelector('#gShow input[data-key="show.speed"]');
+  if (r){ r.value = state.show.speed; r.nextElementSibling.value = (+state.show.speed).toFixed(2); } });
+syncTransport();
+
+/* record one full breath of the current slide */
+let recorder = null;
+$('#recBtn').addEventListener('click', () => {
+  if (recorder) return;
+  const stream = cv.captureStream(60);
+  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+    ? 'video/webm;codecs=vp9' : 'video/webm';
+  recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8e6 });
+  const chunks = [];
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = () => {
+    const a = document.createElement('a');
+    a.download = 'pitch.webm';
+    a.href = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
+    a.click(); recorder = null;
+  };
+  const sl = state.slides[state.cur];
+  const cyc = slidePhase(0, sl.blocks.length, state.show.stagger, state.show.hold, 'loop').cycle;
+  const prevMode = state.anim.mode;
+  state.anim.mode = 'loop'; state.anim.t = 0; state.anim.playing = 1;
+  recorder.start();
+  setTimeout(() => {
+    if (recorder && recorder.state === 'recording') recorder.stop();
+    state.anim.mode = prevMode;
+    $('#tLoop').setAttribute('aria-pressed', prevMode === 'loop');
+  }, (cyc / state.show.speed) * 1000 + 250);
+});
+
+/* config / png / ui */
+$('#saveCfg').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = 'pitch-composer.json';
+  a.href = URL.createObjectURL(new Blob(
+    [JSON.stringify({ version: 2, show: state.show, palette: state.palette,
+      slides: state.slides }, null, 1)], { type: 'application/json' }));
+  a.click();
+});
+$('#loadCfg').addEventListener('click', () => $('#loadFile').click());
+$('#loadFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => {
+    const cfg = JSON.parse(t);
+    if (cfg.show) state.show = { ...state.show, ...cfg.show };   // merge, not replace
+    if (cfg.palette) state.palette = cfg.palette;
+    if (cfg.slides && cfg.slides.length) state.slides = cfg.slides;
+    state.cur = 0; state.anim.t = 0; state.anim.playing = 1;
+    syncPalette(); syncSlideUI(); buildBlocks();
+    document.querySelectorAll('#gShow input[type=range]').forEach(inp => {
+      const key = inp.dataset.key; if (!key) return;
+      inp.value = getPath(key); inp.nextElementSibling.value = getPath(key);
+    });
+    syncTransport();
+  });
+});
+$('#pngBtn').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = 'pitch-slide.png'; a.href = cv.toDataURL('image/png'); a.click();
+});
+function toggleUI(){ document.body.classList.toggle('noui'); }
+$('#hideBtn').addEventListener('click', toggleUI);
+</script>
+
+<!-- @scene-invert: flips ONLY the #cv scene (panel/nav untouched). Button or 'I'. -->
+<style>#cv.__scninv{filter:invert(1) hue-rotate(180deg)}
+#__invBtn{position:fixed;right:16px;bottom:16px;z-index:20;width:34px;height:34px;border-radius:99px;
+  border:1px solid var(--line,#dcdad4);background:var(--panel,#fdfdfc);color:var(--ink,#1a1a1a);
+  font:14px/1 ui-monospace,monospace;cursor:pointer;box-shadow:0 2px 10px rgba(20,20,25,.06)}
+#__invBtn[aria-pressed="true"]{background:var(--ink,#1a1a1a);color:var(--panel,#fdfdfc)}
+body.noui #__invBtn{display:none}</style>
+<button id="__invBtn" aria-pressed="false" title="Invert scene (I)">◑</button>
+<script>(function(){var c=document.getElementById('cv'),b=document.getElementById('__invBtn');
+if(!c||!b)return;function t(){var on=c.classList.toggle('__scninv');b.setAttribute('aria-pressed',on);}
+b.addEventListener('click',t);
+addEventListener('keydown',function(e){var g=e.target&&e.target.tagName;
+ if(g==='INPUT'||g==='TEXTAREA'||g==='SELECT')return;
+ if(e.key&&e.key.toLowerCase()==='i')t();});})();</script>
+
+</body>
+</html>

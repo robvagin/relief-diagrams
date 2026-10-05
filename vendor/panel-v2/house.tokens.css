@@ -1,0 +1,42 @@
+:root{
+  --nh:80;--brand-hue:182;
+  --bg:#f6f5f2;--side:rgba(246,245,242,.86);--card:#ecebe6;--field:#ffffff;--stage:#ffffff;
+  --ink:#1a1a1a;--ink2:#3d3c39;--ink3:#5c5b57;--on-ink:#ffffff;--on-ink-muted:rgba(255,255,255,.72);--knob:#ffffff;
+  --fill:rgba(26,26,26,.07);--fill-hover:rgba(26,26,26,.10);--fill-strong:rgba(26,26,26,.15);--fill-active:rgba(26,26,26,.24);--line-strong:rgba(26,26,26,.28);
+  --line:rgba(26,26,26,.14);--line-ctl:rgba(26,26,26,.28);--hair:rgba(26,26,26,.10);--hover:rgba(26,26,26,.055);
+  --sel:oklch(.49 .08 var(--brand-hue));--selfg:#ffffff;--ring:oklch(.49 .08 var(--brand-hue));--seg-on:#ffffff;--track-s:.02em;
+  --m-wait:oklch(.76 .12 78);--m-work:oklch(.52 .085 var(--brand-hue));--m-pause:#b9b8b2;--m-done:#d9d8d2;
+  --st-ok:oklch(.6 .09 145);--st-run:oklch(.55 .09 var(--brand-hue));--st-wait:oklch(.74 .13 75);--st-bad:oklch(.56 .15 40);--st-sched:oklch(.6 .05 230);--st-info:oklch(.66 .07 205);
+  --t-bad:oklch(.52 .12 45);--t-wait:oklch(.5 .09 70);--on-wait:oklch(.26 .05 75);
+  --scrim:rgba(20,20,20,.36);--shadow:rgba(20,20,20,.28);--shadow-s:rgba(20,20,20,.10);
+  --bt:.24;--btc:.03;
+  --ground-light:#ffffff;--ground-light-muted:rgba(0,0,0,.55);--ground-dark:#141414;--ground-dark-muted:rgba(255,255,255,.62);
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --display:"Inter Tight",-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;
+  --t1:11.67px;--t2:14px;--t3:16.8px;--t4:20.16px;--t5:24.19px;--t6:29.03px;--t7:34.84px;--t8:41.8px;
+  --r-ctl:4px;--r:6px;--r-card:6px;--r-pill:999px;--ease:cubic-bezier(.23,1,.32,1);--dur-press:140ms;--dur-pop:180ms;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#161615;--side:rgba(22,22,21,.86);--card:#21211f;--field:#2b2b29;--stage:#2b2b29;
+  --ink:#ecebe6;--ink2:#cfcec8;--ink3:#a6a59f;--on-ink:#161615;--on-ink-muted:rgba(22,22,21,.68);--knob:#ecebe6;
+  --fill:rgba(255,255,255,.07);--fill-hover:rgba(255,255,255,.10);--fill-strong:rgba(255,255,255,.16);--fill-active:rgba(255,255,255,.26);--line-strong:rgba(255,255,255,.30);
+  --line:rgba(255,255,255,.14);--line-ctl:rgba(255,255,255,.30);--hair:rgba(255,255,255,.10);--hover:rgba(255,255,255,.06);
+  --sel:oklch(.78 .09 var(--brand-hue));--selfg:#161615;--ring:oklch(.78 .09 var(--brand-hue) / .7);--seg-on:#3d3d3a;--track-s:.025em;
+  --m-wait:oklch(.78 .12 78);--m-work:oklch(.74 .09 var(--brand-hue));--m-pause:#5d5c57;--m-done:#3b3b38;
+  --st-ok:oklch(.76 .08 145);--st-run:oklch(.78 .09 var(--brand-hue));--st-wait:oklch(.8 .12 78);--st-bad:oklch(.72 .13 45);--st-sched:oklch(.72 .05 230);--st-info:oklch(.76 .07 205);
+  --t-bad:oklch(.74 .11 50);--t-wait:oklch(.82 .1 78);--on-wait:oklch(.22 .04 75);
+  --scrim:rgba(0,0,0,.55);--shadow:rgba(0,0,0,.5);--shadow-s:rgba(0,0,0,.3);
+  --bt:.95;--btc:.012;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#161615;--side:rgba(22,22,21,.86);--card:#21211f;--field:#2b2b29;--stage:#2b2b29;
+  --ink:#ecebe6;--ink2:#cfcec8;--ink3:#a6a59f;--on-ink:#161615;--on-ink-muted:rgba(22,22,21,.68);--knob:#ecebe6;
+  --fill:rgba(255,255,255,.07);--fill-hover:rgba(255,255,255,.10);--fill-strong:rgba(255,255,255,.16);--fill-active:rgba(255,255,255,.26);--line-strong:rgba(255,255,255,.30);
+  --line:rgba(255,255,255,.14);--line-ctl:rgba(255,255,255,.30);--hair:rgba(255,255,255,.10);--hover:rgba(255,255,255,.06);
+  --sel:oklch(.78 .09 var(--brand-hue));--selfg:#161615;--ring:oklch(.78 .09 var(--brand-hue) / .7);--seg-on:#3d3d3a;--track-s:.025em;
+  --m-wait:oklch(.78 .12 78);--m-work:oklch(.74 .09 var(--brand-hue));--m-pause:#5d5c57;--m-done:#3b3b38;
+  --st-ok:oklch(.76 .08 145);--st-run:oklch(.78 .09 var(--brand-hue));--st-wait:oklch(.8 .12 78);--st-bad:oklch(.72 .13 45);--st-sched:oklch(.72 .05 230);--st-info:oklch(.76 .07 205);
+  --t-bad:oklch(.74 .11 50);--t-wait:oklch(.82 .1 78);--on-wait:oklch(.22 .04 75);
+  --scrim:rgba(0,0,0,.55);--shadow:rgba(0,0,0,.5);--shadow-s:rgba(0,0,0,.3);
+  --bt:.95;--btc:.012;color-scheme:dark}

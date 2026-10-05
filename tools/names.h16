@@ -1,0 +1,45 @@
+# hashed forbidden words: sha256(lowercase word or word pair)[:16]
+# kinds: name = never in any tracked file · font = never in code (html/js/css/svg)
+# add one: python3 tools/clean_check.py --add "word"  (run it from a private shell; do not commit the plain word)
+name 2194ac0480764499
+name f980d3c8a641f31c
+name d7021bbb6fc8224f
+name fc52fabe94c0e037
+name 5ef68465886fa04d
+name 470adaa55fab37a1
+name cbde66cdb61b4f59
+name d5c196115b189bc8
+name b643bb79110ffc11
+name 7a9160cf04bf591d
+name fdf39ad1193ef9e2
+name 4a528aaf09707f66
+name b26bbadb89cc3e2c
+name 5bd0165fef97c2a8
+name db30c4677e7c26fe
+name f2fcef7b00dc5960
+name 8ba15281a8f04acc
+name 46e0eca2b986b8d8
+name f42d8067275ff4c3
+name 44df2b768f9be5af
+name 161b19f8fc0910a3
+name 6deb28064af98dec
+name 7823e6a48507fa30
+name bc5e7d5e345e3445
+name a74a69dbe57949c1
+name e1ade689c78ccd5c
+name 29f592f7cb640920
+name 272793945c899b70
+name e379fb90f44707b2
+name f112b8cd3c14a99f
+name af2145e496e1eab2
+name 56cd2e9217ec81bd
+name 617cce8d875e0f70
+name d3d41a9b253741b2
+name 3203ffed3626a8da
+name db02f20e1939beca
+font f5a351ed7dbf1adb
+font 1ab254fb03b52e91
+font 2221e424a73f688a
+font 956e22b93147d413
+font 63e00133baf50a87
+font 3046171bb41d80e6

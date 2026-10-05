@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Particle Dance - Skeleton</title>
+<style>
+:root{--paper:#f6f5f2;--ink:#1a1a1a;--muted:#8b8880;--line:#dcdad4;--accent:#f0435c;--panel:#fdfdfc}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+body.dark{background:#10100f;color:#f6f5f2}
+#stage{position:fixed;inset:0}
+canvas{display:block;width:100vw;height:100vh;cursor:grab}
+canvas:active{cursor:grabbing}
+#panel{position:fixed;top:16px;left:16px;width:272px;max-height:calc(100vh - 32px);
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  display:flex;flex-direction:column;overflow:hidden;z-index:10}
+body.dark #panel{background:#151513;border-color:#383631;color:#f6f5f2}
+#tabs{display:flex;border-bottom:1px solid var(--line)}
+#tabs button{flex:1;padding:10px 0;background:none;border:0;font:inherit;color:var(--muted);
+  cursor:pointer;text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+#tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 -2px var(--ink)}
+body.dark #tabs button[aria-selected="true"]{color:#f6f5f2;box-shadow:inset 0 -2px #f6f5f2}
+#body{overflow-y:auto;overflow-x:hidden;padding:12px 14px 16px}
+.tab{display:none}.tab.on{display:block}
+fieldset{border:0;margin:0 0 14px;padding:0}
+legend{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+  padding:0;margin-bottom:8px;cursor:pointer;user-select:none}
+legend::before{content:'▾ ';font-size:8px;color:var(--muted)}
+fieldset.closed>legend::before{content:'▸ '}
+fieldset.closed>*:not(legend){display:none}
+.row{display:grid;grid-template-columns:1fr 64px 48px;gap:8px;align-items:center;margin:5px 0}
+.row label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row input[type=range]{width:100%;accent-color:var(--ink);height:2px}
+.row input[type=number]{width:100%;font:10px ui-monospace,monospace;color:var(--muted);
+  background:var(--paper);border:1px solid var(--line);border-radius:4px;text-align:right;padding:3px 4px}
+.row input[type=number]:focus{color:var(--ink);outline:none;border-color:var(--ink)}
+.row input[type=number]::-webkit-inner-spin-button{display:none}
+.row.toggle{grid-template-columns:1fr auto}
+.sw{appearance:none;-webkit-appearance:none;width:30px;height:16px;margin:0;cursor:pointer;
+  border:1px solid var(--line);border-radius:99px;background:var(--paper);position:relative}
+.sw::before{content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;
+  border-radius:50%;background:var(--muted);transition:left .15s,background .15s}
+.sw:checked{border-color:var(--ink);background:var(--ink)}
+.sw:checked::before{left:16px;background:var(--paper)}
+.tin,.sel{font:10px ui-monospace,monospace;border:1px solid var(--line);border-radius:4px;
+  background:var(--paper);color:var(--ink);padding:4px 6px;width:100%}
+.tin:focus,.sel:focus{outline:none;border-color:var(--ink)}
+.seg{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 12px}
+.seg button{flex:1 1 calc(50% - 4px);min-width:0;padding:7px 4px;font:inherit;font-size:10px;background:none;
+  border:1px solid var(--line);border-radius:6px;cursor:pointer;color:var(--muted)}
+.seg button[aria-selected=true],.seg button[aria-pressed=true]{border-color:var(--ink);color:var(--ink)}
+body.dark .seg button[aria-selected=true],body.dark .seg button[aria-pressed=true]{border-color:#f6f5f2;color:#f6f5f2}
+.mpad{position:relative;width:100%;aspect-ratio:1;touch-action:none;cursor:crosshair;margin:2px 0 4px}
+.mpad canvas{position:absolute;inset:0;width:100%;height:100%;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:crosshair}
+body.dark .mpad canvas{background:#151513;border-color:#383631}
+.mcn{position:absolute;font-size:9px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;pointer-events:none;user-select:none}
+.mcn.nw{left:7px;top:6px}.mcn.ne{right:7px;top:6px}.mcn.swc{left:7px;bottom:6px}.mcn.se{right:7px;bottom:6px}
+.selectRow{display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:center;margin:5px 0}
+.selectRow label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.selectRow select{font:10px ui-monospace,monospace;border:1px solid var(--line);border-radius:4px;background:var(--paper);color:var(--ink);padding:4px 6px;width:100%}
+.hint,.note{color:var(--muted);font-size:10px;margin:6px 0}
+.btn{display:inline-block;padding:8px 12px;border:1px solid var(--line);border-radius:6px;
+  background:none;font:inherit;font-size:11px;cursor:pointer;margin:3px 4px 3px 0;color:var(--ink)}
+.btn:hover{border-color:var(--ink)}
+.btn.acc{border-color:var(--accent);color:var(--accent)}
+.colorRow{display:grid;grid-template-columns:1fr 28px 78px;gap:8px;align-items:center;margin:5px 0}
+.colorRow label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.colorRow input[type=color]{width:28px;height:22px;padding:0;border:1px solid var(--line);border-radius:4px;background:var(--paper)}
+#hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);color:var(--muted);
+  font-size:10px;letter-spacing:.04em;z-index:5;pointer-events:none;text-align:center}
+#mtrans{position:fixed;bottom:34px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:11}
+#mtrans button{font:inherit;font-size:10px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:6px 12px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
+#mtrans button[aria-pressed="true"]{border-color:var(--ink)}
+#mtrans .msp{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:4px 12px}
+#mtrans .msp label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+#mtrans .msp input[type=range]{width:74px;accent-color:var(--ink);height:2px}
+body.dark #mtrans button,body.dark #mtrans .msp{background:#151513;color:#f6f5f2;border-color:#383631}
+body.noui #panel,body.noui #hint,body.noui #mtrans{display:none}
+#uitoggle{position:fixed;top:16px;right:16px;z-index:30;width:38px;height:38px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;font-size:16px;display:none;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+body.noui #uitoggle{display:flex}
+body.dark #uitoggle{background:#151513;color:#f6f5f2;border-color:#383631}
+#selftest{position:fixed;right:16px;bottom:16px;background:#111;color:#0f0;padding:6px 8px;border-radius:6px;display:none;z-index:6}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas></div>
+<div id="panel">
+  <div id="tabs">
+    <button data-tab="scene" aria-selected="true">Scene</button>
+    <button data-tab="data">Data</button>
+    <button data-tab="io">Export</button>
+  </div>
+  <div id="body">
+    <div class="tab on" data-tab="scene">
+      <fieldset>
+        <legend>Pattern</legend>
+        <div class="seg" id="patterns"></div>
+        <div class="note" id="patternNote"></div>
+      </fieldset>
+      <fieldset id="gForm" class="closed"><legend>3D form</legend></fieldset>
+      <fieldset id="gScene"><legend>Particles</legend></fieldset>
+      <fieldset id="gObjects" class="closed"><legend>Objects</legend></fieldset>
+      <fieldset id="gColors" class="closed"><legend>Colors</legend></fieldset>
+      <fieldset id="gLook" class="closed"><legend>Look</legend></fieldset>
+      <fieldset id="gMotion">
+        <legend>Motion pad</legend>
+        <div class="mpad" id="mpad">
+          <canvas id="mpadc"></canvas>
+          <span class="mcn nw">soft</span><span class="mcn ne">raw</span>
+          <span class="mcn swc">slow</span><span class="mcn se">fast</span>
+        </div>
+        <div id="gMotionSliders"></div>
+        <div style="margin-top:7px"><select class="tin" id="easePreset">
+          <option value="balanced">Balanced — center</option>
+          <option value="slow">Slow — calm orbit</option>
+          <option value="fast">Fast — active dance</option>
+          <option value="soft">Soft — floating cushion</option>
+          <option value="raw">Raw — linear motion</option>
+          <option value="snappy">Snappy — crisp pulse</option>
+        </select></div>
+      </fieldset>
+      <fieldset id="gCamera"><legend>Camera</legend><div class="note">Perspective: 0 = flat &amp; stable (no depth warp) · 1 = natural 3D. Lower it if rotating feels disorienting. Auto yaw = idle spin (0 to stop).</div></fieldset>
+    </div>
+    <div class="tab" data-tab="data">
+      <fieldset>
+        <legend>Seed</legend>
+        <div class="row"><label>Seed</label><input class="tin" id="seedInput" type="number"><button class="btn" id="reseed">Reseed</button></div>
+        <div class="note">Same seed gives the same particle identities. Pattern motion stays live.</div>
+      </fieldset>
+      <fieldset><legend>Data input</legend>
+        <div id="dataRows"></div>
+        <div class="row"><label>Label</label><input class="tin" id="dataLabel" spellcheck="false" style="grid-column:span 2"></div>
+        <div class="note">Each value scales one colour group live — feed your own metrics. Example preset loaded. Saved in config &amp; embed.</div>
+      </fieldset>
+      <fieldset><legend>Config</legend>
+        <button class="btn" id="saveCfg">Save JSON</button>
+        <label class="btn" for="loadFile">Load JSON</label>
+        <input id="loadFile" type="file" accept="application/json" hidden>
+        <div class="note">Config load deep-merges into current defaults.</div>
+      </fieldset>
+    </div>
+    <div class="tab" data-tab="io">
+      <fieldset>
+        <legend>Image</legend>
+        <button class="btn acc" id="savePng">Export PNG</button>
+        <div class="note">Snapshot of the current frame.</div>
+      </fieldset>
+      <fieldset><legend>Embed (web)</legend>
+        <button class="btn acc" id="embedCode">Copy iframe</button>
+        <button class="btn" id="embedHtml">Standalone HTML</button>
+        <textarea class="tin" id="embedOut" rows="3" readonly style="width:100%;margin-top:8px;display:none;resize:vertical"></textarea>
+        <div class="note">Responsive iframe with your current settings baked in (adapts to its container). Standalone = self-contained .html to host anywhere.</div>
+      </fieldset>
+      <fieldset><legend>UI</legend>
+        <button class="btn" id="hideBtn">Hide UI (H)</button>
+      </fieldset>
+    </div>
+  </div>
+</div>
+<button id="uitoggle" title="Show panel">☰</button>
+<div id="hint">drag — rotate · wheel — zoom · H / ☰ — toggle UI</div>
+<div id="mtrans"><button id="replay">⟲ Replay</button><button id="loop" aria-pressed="true">Loop</button><span class="msp"><label>Hold</label><input type="range" id="holdRange" min="0.4" max="8" step="0.1" value="1"></span></div>
+<div id="selftest">SELFTEST_OK</div>
+<script>
+/* ================= @core-begin ================= */
+function rng(seed){
+  let s = (seed >>> 0) || 1;
+  return function(){ s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+const TAU = Math.PI * 2;
+const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
+const lerp = (a,b,t) => a + (b - a) * t;
+function mixColor(a,b,t){
+  const pa = hexRGB(a), pb = hexRGB(b);
+  return rgbHex(
+    Math.round(lerp(pa[0],pb[0],t)),
+    Math.round(lerp(pa[1],pb[1],t)),
+    Math.round(lerp(pa[2],pb[2],t))
+  );
+}
+function hexRGB(h){
+  h = String(h || '#000').replace('#','');
+  if (h.length === 3) h = h.split('').map(x => x + x).join('');
+  const n = parseInt(h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbHex(r,g,b){
+  return '#' + [r,g,b].map(x => clamp(x,0,255).toString(16).padStart(2,'0')).join('');
+}
+function rotY(p,a){ const c=Math.cos(a), s=Math.sin(a); return {x:p.x*c+p.z*s, y:p.y, z:-p.x*s+p.z*c}; }
+function rotX(p,a){ const c=Math.cos(a), s=Math.sin(a); return {x:p.x, y:p.y*c-p.z*s, z:p.y*s+p.z*c}; }
+function project(p, cam, W, H){
+  let q = rotX(rotY(p, cam.yaw), cam.tilt * Math.PI / 180);
+  const d = 4.2, z = q.z * (cam.persp==null?1:cam.persp) + d, k = (cam.scale || 1) / Math.max(0.25, z);
+  return {x: W/2 + (cam.offsetX || 0) + q.x * k * cam.zoom, y: H/2 + (cam.offsetY || 0) + q.y * k * cam.zoom, z:q.z, k};
+}
+function baseParticle(i, seed){
+  const r = rng(seed + i * 1013);
+  const a = r() * TAU, u = r() * 2 - 1, rr = Math.cbrt(r());
+  return {
+    id:i,
+    x: Math.cos(a) * Math.sqrt(1 - u*u) * rr,
+    y: u * rr,
+    z: Math.sin(a) * Math.sqrt(1 - u*u) * rr,
+    phase: r() * TAU,
+    band: Math.floor(r() * 7),
+    size: 0.55 + r() * 1.25,
+    shape: Math.floor(r() * 12),
+    axis: Math.floor(r() * 13),
+    lane: r() * 2 - 1
+  };
+}
+function randomAxis(seed, index){
+  const r = rng(seed + index * 65537 + 313);
+  const a = r() * TAU;
+  const z = r() * 2 - 1;
+  const m = Math.sqrt(Math.max(0.0001, 1 - z * z));
+  return {x:Math.cos(a) * m, y:z, z:Math.sin(a) * m, phase:r() * TAU, offset:r() * 2 - 1};
+}
+function axisPoint(p, t, opts){
+  const axes = Math.max(2, Math.round(opts.axes || 9));
+  const ax = randomAxis(opts.seed || 1, p.axis % axes);
+  const u = p.lane;
+  const pulse = Math.sin(t * (opts.dance || 1) + ax.phase + p.phase);
+  const orbit = {
+    x: Math.cos(ax.phase) * 0.24 * pulse,
+    y: Math.sin(ax.phase * 1.7) * 0.24 * Math.cos(pulse),
+    z: Math.sin(ax.phase) * 0.24 * pulse
+  };
+  return {
+    x:(ax.x * u * 1.48 + orbit.x) * (opts.spread || 1),
+    y:(ax.y * u * 1.06 + orbit.y) * (opts.spread || 1),
+    z:(ax.z * u * 1.48 + orbit.z) * (opts.spread || 1)
+  };
+}
+/* 3D forms: particles BIND to edges of an occluded contour object (near faces shown, far culled) */
+const FORMS = {
+  cross:{ verts:[{x:0,y:0,z:0},{x:1,y:0,z:0},{x:-1,y:0,z:0},{x:0,y:1,z:0},{x:0,y:-1,z:0},{x:0,y:0,z:1},{x:0,y:0,z:-1}],
+          edges:[[0,1],[0,2],[0,3],[0,4],[0,5],[0,6]], faces:null },
+  cube:{ verts:[{x:-1,y:-1,z:-1},{x:1,y:-1,z:-1},{x:1,y:1,z:-1},{x:-1,y:1,z:-1},{x:-1,y:-1,z:1},{x:1,y:-1,z:1},{x:1,y:1,z:1},{x:-1,y:1,z:1}],
+         edges:[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]],
+         faces:[[0,1,2,3],[4,5,6,7],[0,1,5,4],[3,2,6,7],[1,2,6,5],[0,3,7,4]] },
+  octa:{ verts:[{x:1,y:0,z:0},{x:-1,y:0,z:0},{x:0,y:1,z:0},{x:0,y:-1,z:0},{x:0,y:0,z:1},{x:0,y:0,z:-1}],
+         edges:[[0,2],[2,1],[1,3],[3,0],[0,4],[2,4],[1,4],[3,4],[0,5],[2,5],[1,5],[3,5]],
+         faces:[[0,2,4],[2,1,4],[1,3,4],[3,0,4],[0,2,5],[2,1,5],[1,3,5],[3,0,5]] },
+  pyramid:{ verts:[{x:-1,y:-1,z:-1},{x:1,y:-1,z:-1},{x:1,y:-1,z:1},{x:-1,y:-1,z:1},{x:0,y:1.3,z:0}],
+            edges:[[0,1],[1,2],[2,3],[3,0],[0,4],[1,4],[2,4],[3,4]],
+            faces:[[0,1,2,3],[0,1,4],[1,2,4],[2,3,4],[3,0,4]] },
+  check:{ verts:[{x:-0.95,y:0.15,z:0},{x:-0.15,y:-0.6,z:0},{x:1.0,y:0.72,z:0}], edges:[[0,1],[1,2]], faces:null },
+  tetra:{ verts:[{x:1,y:1,z:1},{x:-1,y:-1,z:1},{x:-1,y:1,z:-1},{x:1,y:-1,z:-1}],
+          faces:[[0,1,2],[0,1,3],[0,2,3],[1,2,3]] },
+  icosa:{ verts:[{x:0,y:0.526,z:0.851},{x:0,y:0.526,z:-0.851},{x:0,y:-0.526,z:0.851},{x:0,y:-0.526,z:-0.851},{x:0.526,y:0.851,z:0},{x:0.526,y:-0.851,z:0},{x:-0.526,y:0.851,z:0},{x:-0.526,y:-0.851,z:0},{x:0.851,y:0,z:0.526},{x:0.851,y:0,z:-0.526},{x:-0.851,y:0,z:0.526},{x:-0.851,y:0,z:-0.526}] },
+  custom:{ verts:[{x:1,y:0,z:0},{x:-1,y:0,z:0},{x:0,y:1,z:0},{x:0,y:-1,z:0},{x:0,y:0,z:1},{x:0,y:0,z:-1}] }
+};
+/* edges: explicit if given, else auto by nearest-neighbour distance (regular polyhedra + custom point clouds) */
+function formEdges(F){
+  if(F.edges) return F.edges; if(F._e) return F._e;
+  const v=F.verts, n=v.length; let mn=Infinity;
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){ const dx=v[i].x-v[j].x,dy=v[i].y-v[j].y,dz=v[i].z-v[j].z, d=dx*dx+dy*dy+dz*dz; if(d>1e-9&&d<mn) mn=d; }
+  const th=mn*1.12, e=[];
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){ const dx=v[i].x-v[j].x,dy=v[i].y-v[j].y,dz=v[i].z-v[j].z, d=dx*dx+dy*dy+dz*dz; if(d>1e-9&&d<=th) e.push([i,j]); }
+  F._e = e.length ? e : [[0, Math.min(1,n-1)]]; return F._e;
+}
+function loadCustomForm(txt){
+  try{ const j=JSON.parse(txt); const raw=j.verts||j; if(!Array.isArray(raw)||!raw.length) return false;
+    const verts=raw.map(v=>Array.isArray(v)?{x:+v[0]||0,y:+v[1]||0,z:+v[2]||0}:{x:+v.x||0,y:+v.y||0,z:+v.z||0});
+    let cx=0,cy=0,cz=0; verts.forEach(v=>{cx+=v.x;cy+=v.y;cz+=v.z;}); cx/=verts.length;cy/=verts.length;cz/=verts.length;
+    let mr=0; verts.forEach(v=>{v.x-=cx;v.y-=cy;v.z-=cz; mr=Math.max(mr,Math.hypot(v.x,v.y,v.z));}); mr=mr||1;
+    verts.forEach(v=>{v.x/=mr;v.y/=mr;v.z/=mr;});
+    FORMS.custom={verts, edges:(j.edges&&j.edges.length)?j.edges.map(e=>[e[0],e[1]]):null, faces:j.faces||null};
+    state.form.shape='custom'; return true;
+  }catch(e){ return false; }
+}
+function patternPoint(p, pattern, t, opts){
+  const spread = opts.spread || 1, dance = opts.dance || 1, idx = p.id, n = Math.max(1, opts.count || 1);
+  const ph = p.phase + t * dance;
+  const amp = opts.amplitude == null ? 1 : opts.amplitude;
+  const freq = opts.frequency == null ? 1 : opts.frequency;
+  const twist = opts.twist == null ? 1 : opts.twist;
+  const lanes = Math.max(2, Math.round(opts.lanes || 7));
+  if (pattern === 'wave'){
+    const u = idx / Math.max(1, n - 1), x = (u - .5) * 3.1;
+    const y = Math.sin(u * TAU * (1.35 + freq * 1.4) + ph) * .5 * amp;
+    const z = Math.cos(u * TAU * (.72 + freq) + ph * .7) * .55 * amp;
+    return {x:x*spread, y:y*spread, z:z*spread};
+  }
+  if (pattern === 'spring'){
+    const u = idx / n, a = u * TAU * (2.8 + freq * 3.2) + ph * .65;
+    const rad = (.42 + .18 * Math.sin(u * TAU * lanes + ph)) * amp;
+    return {x:(u - .5) * 2.75 * spread, y:Math.sin(a) * rad * spread, z:Math.cos(a) * rad * spread};
+  }
+  if (pattern === 'zigzag'){
+    const u = idx / Math.max(1, n - 1), seg = u * lanes, f = seg - Math.floor(seg);
+    const zz = (Math.floor(seg) % 2 ? 1 - f : f) * 2 - 1;
+    return {x:(u - .5) * 3 * spread, y:(zz * .72 * amp + Math.sin(ph + u*8)*.08) * spread, z:Math.sin(ph*.55 + u*TAU*twist) * .42 * spread};
+  }
+  if (pattern === 'check'){
+    const u = idx / Math.max(1, n - 1), split = .43, a = u < split ? u / split : (u - split) / (1 - split);
+    const x = u < split ? lerp(-1.15, -.18, a) : lerp(-.18, 1.22, a);
+    const y = u < split ? lerp(.1, .72, a) : lerp(.72, -.78, a);
+    return {x:(x + Math.sin(ph+u*8)*.08*amp)*spread, y:(y + Math.cos(ph*.8+u*6)*.08*amp)*spread, z:Math.sin(ph+u*TAU*twist)*.36*spread};
+  }
+  if (pattern === 'cross'){
+    const arm = idx % 4, u = ((idx / 4) | 0) / Math.max(1, Math.ceil(n / 4) - 1), v = (u - .5) * 2.3;
+    const wob = Math.sin(ph + u * TAU * freq) * .13 * amp;
+    if (arm === 0) return {x:v*spread, y:wob*spread, z:Math.cos(ph+u*5)*.35*spread};
+    if (arm === 1) return {x:wob*spread, y:v*spread, z:Math.sin(ph+u*5)*.35*spread};
+    if (arm === 2) return {x:v*.72*spread, y:v*.72*spread, z:wob*2.2*spread};
+    return {x:v*.72*spread, y:-v*.72*spread, z:wob*2.2*spread};
+  }
+  if (pattern === 'spiral'){
+    const u = idx / n, strand = idx % 2;
+    const a = u * TAU * (2 + twist * 4) + strand * Math.PI + ph * .5, rad = .5 * amp;
+    return {x:Math.cos(a)*rad*spread, y:(u-.5)*2.8*spread, z:Math.sin(a)*rad*spread};
+  }
+  if (pattern === 'form'){
+    const F = FORMS[opts.formShape] || FORMS.octa, EE = formEdges(F), E = EE.length;
+    const e = EE[idx % E], perEdge = Math.ceil(n / E), kk = (idx / E | 0), tt = (kk + 0.5) / perEdge;
+    const va = F.verts[e[0]], vb = F.verts[e[1]], sc = opts.formSize || 1.15;
+    const base = { x:lerp(va.x,vb.x,tt)*sc, y:lerp(va.y,vb.y,tt)*sc, z:lerp(va.z,vb.z,tt)*sc };
+    const rp = rotY(base, opts.formAngle || 0), dr = opts.formDrift == null ? 0.12 : opts.formDrift;
+    return { x:(rp.x + Math.sin(ph*1.3)*dr)*spread, y:(rp.y + Math.cos(ph*1.1)*dr)*spread, z:(rp.z + Math.sin(ph)*dr)*spread };
+  }
+  if (pattern === 'axes'){
+    return axisPoint(p, t, opts);
+  }
+  if (pattern === 'orbitals'){
+    const u = idx / n, shell = (p.band + 1) / 7;
+    const a = ph * (.55 + shell) + u * TAU * (1 + twist * 2);
+    const b = ph * .42 + p.phase;
+    const rx = (.42 + shell * .75) * amp;
+    const ry = (.25 + shell * .34) * amp;
+    return {x:Math.cos(a)*rx*spread, y:Math.sin(b)*ry*spread, z:Math.sin(a)*rx*.72*spread};
+  }
+  if (pattern === 'fan'){
+    const u = idx / Math.max(1, n - 1), blade = (idx % lanes) / Math.max(1, lanes - 1);
+    const angle = lerp(-1.05, 1.05, blade) + Math.sin(ph*.3)*.16;
+    const dist = (.16 + (u * lanes % 1) * 1.45) * amp;
+    return {x:Math.sin(angle)*dist*spread, y:(u-.5)*.42*spread + Math.cos(ph+blade*4)*.18*spread, z:Math.cos(angle)*dist*spread};
+  }
+  if (pattern === 'steps'){
+    const u = idx / Math.max(1, n - 1), col = Math.floor(u * lanes), local = (u * lanes) % 1;
+    const x = (col / Math.max(1, lanes - 1) - .5) * 2.7;
+    const y = (local - .5) * 1.6;
+    const z = (col % 2 ? .52 : -.52) + Math.sin(ph + local * TAU) * .18 * amp;
+    return {x:x*spread, y:y*spread, z:z*spread};
+  }
+  if (pattern === 'glyphs'){
+    const cols = Math.ceil(Math.sqrt(n)), gx = (idx % cols) / (cols - 1 || 1) - .5, gy = (Math.floor(idx / cols) / (cols - 1 || 1)) - .5;
+    const gate = Math.sin((Math.abs(gx)+Math.abs(gy))*TAU*freq + ph);
+    return {x:(gx*2.35 + gate*.12*amp)*spread, y:(gy*1.62 + Math.cos(ph+gx*7)*.1*amp)*spread, z:(gate*.58 + Math.sin(ph+gy*9)*.18)*spread};
+  }
+  if (pattern === 'lattice'){
+    const cols = Math.ceil(Math.sqrt(n)), gx = (idx % cols) / (cols - 1 || 1) - .5, gy = (Math.floor(idx / cols) / (cols - 1 || 1)) - .5;
+    const wave = Math.sin(ph + gx * 8 + gy * 5);
+    return {x:(gx * 2.2 + Math.sin(ph*.7)*.08) * spread, y:(gy * 1.55 + wave*.22) * spread, z:(wave*.62 + Math.cos(ph*.6 + gx*4)*.18) * spread};
+  }
+  if (pattern === 'vortex'){
+    const ring = (p.band + 1) / 7, a = ph + ring * 2.1 + idx * .017;
+    const rad = (.26 + ring * .88 + .08 * Math.sin(ph * 1.7)) * spread;
+    return {x:Math.cos(a)*rad, y:(p.y*.72 + Math.sin(ph + ring)*.34)*spread, z:Math.sin(a)*rad};
+  }
+  if (pattern === 'ribbon'){
+    const u = idx / n, a = u * TAU * 2.2 + t * dance * .75;
+    return {x:(u - .5) * 2.8 * spread, y:Math.sin(a + p.phase*.3) * .62 * spread, z:Math.cos(a*1.25) * .72 * spread};
+  }
+  if (pattern === 'burst'){
+    const pulse = .45 + .55 * (0.5 + 0.5 * Math.sin(ph * 1.2));
+    const rad = (0.32 + pulse * 1.22) * spread;
+    return {x:p.x*rad + Math.sin(ph+p.band)*.1, y:p.y*rad + Math.cos(ph*.8)*.1, z:p.z*rad};
+  }
+  const curl = Math.sin(ph + p.x*3) * Math.cos(ph*.7 + p.z*4);
+  return {x:(p.x + .24*Math.sin(ph+p.z))*spread, y:(p.y + .24*Math.cos(ph*.9+p.x))*spread, z:(p.z + curl*.32)*spread};
+}
+function makeParticles(count, seed){
+  const out = [];
+  for (let i=0;i<count;i++) out.push(baseParticle(i, seed));
+  return out;
+}
+function assertCore(){
+  const a = makeParticles(8, 42), b = makeParticles(8, 42);
+  if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error('seed is not deterministic');
+  const pats = ['cloud','lattice','vortex','ribbon','burst','wave','spring','zigzag','spiral','axes','orbitals','fan','steps','glyphs','form'];
+  for (const pat of pats){
+    for (let i=0;i<120;i++){
+      const q = patternPoint(baseParticle(i, 9), pat, i * .01, {spread:1.4,dance:1.2,count:120,seed:9,axes:9,amplitude:1,frequency:1,lanes:7,twist:1});
+      if (![q.x,q.y,q.z].every(Number.isFinite)) throw new Error('non-finite point ' + pat);
+      if (Math.max(Math.abs(q.x),Math.abs(q.y),Math.abs(q.z)) > 5) throw new Error('unbounded point ' + pat);
+    }
+  }
+  return true;
+}
+/* ================= @core-end ================= */
+
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const mpad = document.getElementById('mpadc'), mctx = mpad.getContext('2d');
+let W=0,H=0,DPR=1,last=performance.now(), particles=[], live=[];
+const PATTERNS = [
+  ['cloud','Cloud','free depth drift'],
+  ['lattice','Wave lattice','grid points breathing through z'],
+  ['vortex','Vortex','rings rotate around a vertical axis'],
+  ['ribbon','Ribbon','particles travel a loose brand ribbon'],
+  ['burst','Pulse burst','radial expansion and return'],
+  ['wave','Wave','long sine body with depth shimmer'],
+  ['spring','Spring','coiled line moving through space'],
+  ['zigzag','Zigzag','sharp folded path with depth wobble'],
+  ['spiral','Spiral','double helix · DNA'],
+  ['axes','Random axes','particles dance along seeded 3D axes'],
+  ['orbitals','Orbitals','nested ellipses with living parallax'],
+  ['fan','Fan','radial blades opening through depth'],
+  ['steps','Steps','stacked lanes with alternating depth'],
+  ['glyphs','Primitives','ordered primitive field with pulse'],
+  ['form','3D form','symbols bound to an occluded 3D object']
+];
+const state = {
+  version:1,
+  pattern:'form',
+  scene:{count:340, seed:77, spread:1.18, dance:1.0, follow:0.14, jitter:0.055, connect:0, linkAlpha:0.13, depthFade:0.35, size:0.82, mixed:1, shapeMode:'mixed', char:'✳', orientMode:'direction', stack:2, stackDepth:0.42, palette:'grays', paletteMix:0.05, amplitude:1, frequency:1, lanes:7, twist:1, axes:9, collide:0, avoid:0.6},
+  motion:{x:.2,y:.7,speed:.91},
+  cam:{yaw:-0.72, tilt:157, zoom:0.83, scale:480, offsetX:120, offsetY:0, autoYaw:-0.8, persp:0},
+  look:{dark:0, invert:0, trails:0.42, ink:'#161512', accent:'#f05d6f', sage:'#a8b6a1', gold:'#d8a44a', blue:'#5f8193', violet:'#8f7bb8', paper:'#f6f5f2', axes:0, axesMode:'classic', axisOpacity:0.16, axisCount:9, axisSpin:0.12, gizmo:1},
+  anim:{t:0, loop:1, hold:1},
+  data:{values:[8,5,13,21,3], label:'HEARTBEAT'},
+  form:{shape:'octa', size:2, drift:0.05, spin:0.3, fill:0, showContour:1, color:'#8c8c8c'}
+};
+
+const $ = s => document.querySelector(s);
+const getPath = k => k.split('.').reduce((o,p)=>o[p], state);
+const setPath = (k,v) => { const ps=k.split('.'), last=ps.pop(); ps.reduce((o,p)=>o[p], state)[last]=v; };
+function deepMerge(target, src){
+  for (const k in src){ if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])){
+    if (!target[k] || typeof target[k] !== 'object') target[k] = {};
+    deepMerge(target[k], src[k]);
+  } else target[k] = src[k]; }
+  return target;
+}
+function buildSliders(elId, defs){
+  const el = typeof elId === 'string' ? $('#'+elId) : elId;
+  [...el.querySelectorAll('.row')].forEach(r => r.remove());
+  for (const [key,name,min,max,step] of defs){
+    const row=document.createElement('div'); row.className='row';
+    if (min===0 && max===1 && step===1){
+      row.classList.add('toggle');
+      row.innerHTML=`<label>${name}</label><input type="checkbox" class="sw">`;
+      const cb=row.querySelector('input'); cb.checked=!!getPath(key); cb.dataset.key=key;
+      cb.addEventListener('change',()=>{ setPath(key, cb.checked?1:0); if(key==='look.dark') applyLook(); });
+      el.appendChild(row); continue;
+    }
+    row.innerHTML=`<label>${name}</label><input type="range" min="${min}" max="${max}" step="${step}"><input class="val" type="number" min="${min}" max="${max}" step="${step}">`;
+    const inp=row.querySelector('input[type=range]'), val=row.querySelector('.val');
+    const fmt=v=>+(+v).toFixed(step<1?2:0);
+    inp.value=getPath(key); val.value=fmt(getPath(key)); inp.dataset.key=key;
+    inp.addEventListener('input',()=>{ setPath(key,+inp.value); val.value=fmt(inp.value); if(key==='scene.count'||key==='scene.seed') reinit(); if(key==='look.dark') applyLook(); });
+    val.addEventListener('change',()=>{ const x=parseFloat(val.value); if(isFinite(x)){ setPath(key,x); inp.value=x; if(key==='scene.count'||key==='scene.seed') reinit(); if(key==='look.dark') applyLook(); }});
+    el.appendChild(row);
+  }
+}
+function buildColorRows(){
+  const el = $('#gColors');
+  [...el.querySelectorAll('.colorRow')].forEach(r => r.remove());
+  const defs = [
+    ['look.ink','Ink'],['look.accent','Coral'],['look.sage','Sage'],['look.gold','Gold'],['look.blue','Steel'],['look.violet','Violet'],['look.paper','Paper']
+  ];
+  for (const [key,name] of defs){
+    const row=document.createElement('div'); row.className='colorRow';
+    row.innerHTML=`<label>${name}</label><input type="color" data-color="${key}"><input class="tin" data-color="${key}" spellcheck="false">`;
+    const sw=row.querySelector('input[type=color]'), tx=row.querySelector('.tin');
+    const commit=v=>{
+      const m=String(v||'').trim();
+      if(!/^#[0-9a-fA-F]{6}$/.test(m)) return;
+      setPath(key,m); sw.value=m; tx.value=m; applyLook();
+    };
+    sw.value=getPath(key); tx.value=getPath(key);
+    sw.addEventListener('input',()=>commit(sw.value));
+    tx.addEventListener('change',()=>commit(tx.value));
+    el.appendChild(row);
+  }
+}
+function buildSelectRows(elId, defs){
+  const el = typeof elId === 'string' ? $('#'+elId) : elId;
+  [...el.querySelectorAll('.selectRow')].forEach(r => r.remove());
+  for (const [key,name,opts] of defs){
+    const row=document.createElement('div'); row.className='selectRow';
+    row.innerHTML=`<label>${name}</label><select data-key="${key}"></select>`;
+    const sel=row.querySelector('select');
+    for (const [value,label] of opts){
+      const o=document.createElement('option'); o.value=value; o.textContent=label; sel.appendChild(o);
+    }
+    sel.value=getPath(key);
+    sel.addEventListener('change',()=>{ setPath(key, sel.value); if(key === 'pattern') buildPatternButtons(); });
+    el.insertBefore(row, el.querySelector('.row') || null);
+  }
+}
+function syncPanel(){
+  document.querySelectorAll('#panel input[type=range]').forEach(inp=>{ const k=inp.dataset.key; if(!k)return; const v=getPath(k), step=+inp.step; inp.value=v; inp.nextElementSibling.value=+(+v).toFixed(step<1?2:0); });
+  document.querySelectorAll('#panel input.sw').forEach(cb=>{ if(cb.dataset.key) cb.checked=!!getPath(cb.dataset.key); });
+  document.querySelectorAll('#panel input[data-color]').forEach(inp=>{ inp.value = getPath(inp.dataset.color); });
+  document.querySelectorAll('#panel select[data-key]').forEach(sel=>{ sel.value = getPath(sel.dataset.key); });
+  $('#seedInput').value = state.scene.seed;
+  $('#loop').setAttribute('aria-pressed', String(!!state.anim.loop));
+  $('#holdRange').value = state.anim.hold;
+}
+
+const _mClamp = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const MOTION_ARCH = {
+  slow:{speed:.55,ease:t=>0.5*(1-Math.cos(Math.PI*t))},
+  fast:{speed:1.9,ease:t=>1-Math.pow(1-t,3)},
+  soft:{speed:.85,ease:t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2},
+  raw:{speed:1.3,ease:t=>t}
+};
+function motionResolve(x,y){
+  x=_mClamp(x); y=_mClamp(y);
+  const w={slow:(1-x)*(1-y),fast:x*(1-y),soft:(1-x)*y,raw:x*y}, A=MOTION_ARCH;
+  const speed=w.slow*A.slow.speed+w.fast*A.fast.speed+w.soft*A.soft.speed+w.raw*A.raw.speed;
+  const ease=t=>{t=_mClamp(t);return w.slow*A.slow.ease(t)+w.fast*A.fast.ease(t)+w.soft*A.soft.ease(t)+w.raw*A.raw.ease(t);};
+  return {speed,ease};
+}
+function speedToX(target,y){
+  const A=MOTION_ARCH,left=(1-y)*A.slow.speed+y*A.soft.speed,right=(1-y)*A.fast.speed+y*A.raw.speed;
+  return Math.abs(right-left)<1e-6?.5:_mClamp((target-left)/(right-left));
+}
+const MOTION_PRESETS={balanced:[.5,.5],slow:[.12,.12],fast:[.88,.12],soft:[.12,.88],raw:[.88,.88],snappy:[.72,.28]};
+
+function resize(){
+  DPR=Math.min(devicePixelRatio||1,2); W=innerWidth; H=innerHeight;
+  cv.width=Math.max(1,Math.floor(W*DPR)); cv.height=Math.max(1,Math.floor(H*DPR)); ctx.setTransform(DPR,0,0,DPR,0,0);
+  mpad.width=mpad.clientWidth*DPR; mpad.height=mpad.clientHeight*DPR; mctx.setTransform(DPR,0,0,DPR,0,0);
+  drawPad();
+}
+addEventListener('resize', resize);
+function applyLook(){
+  /* panel chrome stays light regardless of canvas Dark — do NOT toggle body.dark */
+  document.documentElement.style.setProperty('--accent', state.look.accent);
+  document.documentElement.style.setProperty('--paper', state.look.paper);
+}
+function reinit(){
+  const n=Math.round(clamp(state.scene.count,20,1400));
+  particles=makeParticles(n, Math.round(state.scene.seed));
+  live=particles.map(p=>{ const q=patternPoint(p,state.pattern,0,{...state.scene,count:n}); return {x:q.x,y:q.y,z:q.z,vx:0,vy:0,vz:0}; });
+  syncPanel();
+}
+/* Motion Primer glyph vocabulary: deliberate geometry + typed symbol */
+function drawShape(x,y,r,shape,color,alpha,rot){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot||0); ctx.globalAlpha=alpha; ctx.fillStyle=color; ctx.strokeStyle=color; ctx.lineWidth=1;
+  if(shape==='char'){ ctx.font=(r*2.3).toFixed(1)+'px ui-monospace, monospace'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(state.scene.char||'✳',0,0); }
+  else if(shape==='pill'){ ctx.beginPath(); ctx.roundRect(-r*.32,-r*1.35,r*.64,r*2.7,r*.32); ctx.fill(); }
+  else if(shape==='diamond'){ ctx.beginPath(); ctx.moveTo(0,-r); ctx.lineTo(r*.72,0); ctx.lineTo(0,r); ctx.lineTo(-r*.72,0); ctx.closePath(); ctx.fill(); }
+  else if(shape==='triangle'){ const h=r*1.1; ctx.beginPath(); ctx.moveTo(0,-h); ctx.lineTo(h*.87,h*.5); ctx.lineTo(-h*.87,h*.5); ctx.closePath(); ctx.fill(); }
+  else if(shape==='ring'){ ctx.lineWidth=Math.max(1,r*.42); ctx.beginPath(); ctx.arc(0,0,r*.82,0,TAU); ctx.stroke(); }
+  else if(shape==='plus'){ ctx.lineWidth=Math.max(1,r*.4); ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-r,0); ctx.lineTo(r,0); ctx.moveTo(0,-r); ctx.lineTo(0,r); ctx.stroke(); }
+  else { ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.fill(); }
+  ctx.restore();
+}
+const GLYPH_BASE = ['circle','pill','diamond','triangle'];
+function shapeForParticle(p){
+  const mode = state.scene.shapeMode || 'mixed';
+  if (mode === 'mixed') return state.scene.mixed ? GLYPH_BASE[p.shape % GLYPH_BASE.length] : 'circle';
+  return mode; // circle | pill | diamond | triangle | ring | plus | char
+}
+function drawAxes(cam){
+  if(!state.look.axes) return;
+  const mode = state.look.axesMode || 'classic';
+  const count = Math.max(3, Math.round(state.look.axisCount || 9));
+  const spin = (state.anim ? state.anim.t : 0) * (state.look.axisSpin || 0);
+  const ink = state.look.dark?state.look.paper:state.look.ink;
+  ctx.save(); ctx.globalAlpha=clamp(state.look.axisOpacity == null ? .16 : state.look.axisOpacity, 0, .5); ctx.strokeStyle=ink; ctx.lineWidth=1;
+  const drawLine = (a,b) => {
+    const pts=[project(a,cam,W,H),project(b,cam,W,H)];
+    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); ctx.lineTo(pts[1].x,pts[1].y); ctx.stroke();
+  };
+  if (mode === 'random'){
+    for(let i=0;i<count;i++){
+      const ax=randomAxis(state.scene.seed + 9000, i);
+      const roll=spin + ax.phase;
+      const side={x:Math.cos(roll)*.18,y:Math.sin(roll)*.18,z:Math.cos(roll*.7)*.18};
+      drawLine({x:-ax.x*1.72+side.x,y:-ax.y*1.16+side.y,z:-ax.z*1.72+side.z},{x:ax.x*1.72+side.x,y:ax.y*1.16+side.y,z:ax.z*1.72+side.z});
+    }
+  } else if (mode === 'radial'){
+    for(let i=0;i<count;i++){
+      const a=i/count*TAU+spin, ax={x:Math.cos(a),y:Math.sin(a)*.28,z:Math.sin(a)};
+      drawLine({x:0,y:0,z:0},{x:ax.x*1.8,y:ax.y*1.25,z:ax.z*1.8});
+    }
+  } else {
+    drawLine({x:-1.55,y:0,z:0},{x:1.55,y:0,z:0});
+    drawLine({x:0,y:-1.05,z:0},{x:0,y:1.05,z:0});
+    drawLine({x:0,y:0,z:-1.55},{x:0,y:0,z:1.55});
+  }
+  ctx.restore();
+}
+function particleColor(p, ink){
+  const palettes = {
+    studio:[state.look.accent, state.look.sage, state.look.gold, state.look.blue, ink],
+    mono:[ink, mixColor(ink, state.look.paper, .24), mixColor(ink, state.look.paper, .42)],
+    warm:[state.look.accent, state.look.gold, '#b95f43', ink],
+    cool:[state.look.blue, state.look.violet, state.look.sage, ink],
+    signal:[state.look.accent, '#ff9fb0', state.look.blue, '#fff0d0'],
+    dance:['#eb6e2c', '#8c8c8c', ink],
+    grays:['#1a1a1a','#454545','#6e6e6e','#9a9a9a','#c2c2c2']
+  };
+  const colors = palettes[state.scene.palette] || palettes.studio;
+  const base = colors[p.band % colors.length];
+  return mixColor(base, ink, clamp(state.scene.paletteMix,0,.9));
+}
+const GIZMO_R = 46;
+function gizmoCenter(){ return {x:W - 72, y:H - 72}; }
+function drawGizmo(cam){
+  if(!state.look.gizmo || document.body.classList.contains('noui')) return;
+  const g=gizmoCenter(), r=GIZMO_R, dark=!!state.look.dark;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(g.x,g.y,r,0,TAU);
+  ctx.fillStyle=dark?'#151513':state.look.paper; ctx.globalAlpha=.86; ctx.fill();
+  ctx.strokeStyle=dark?'#f6f5f2':state.look.ink; ctx.globalAlpha=.18; ctx.stroke();
+  const axes=[
+    {v:{x:1,y:0,z:0},t:'X',c:state.look.accent},
+    {v:{x:0,y:1,z:0},t:'Y',c:state.look.sage},
+    {v:{x:0,y:0,z:1},t:'Z',c:state.look.blue}
+  ].map(a=>({...a,q:rotX(rotY(a.v,cam.yaw),cam.tilt*Math.PI/180)})).sort((a,b)=>b.q.z-a.q.z);
+  ctx.font='9px ui-monospace,monospace'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  for(const a of axes){
+    const L=r*.7, ex=g.x+a.q.x*L, ey=g.y-a.q.y*L;
+    ctx.strokeStyle=a.c; ctx.fillStyle=a.c; ctx.lineWidth=1.3;
+    ctx.globalAlpha=.23; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(g.x,g.y); ctx.lineTo(g.x-a.q.x*L,g.y+a.q.y*L); ctx.stroke(); ctx.setLineDash([]);
+    ctx.globalAlpha=a.q.z<0?.96:.48; ctx.beginPath(); ctx.moveTo(g.x,g.y); ctx.lineTo(ex,ey); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ex,ey,2.7,0,TAU); ctx.fill();
+    ctx.fillText(a.t,ex+4,ey-4);
+  }
+  ctx.restore();
+}
+function drawLinks(screen){
+  if(!state.scene.connect) return;
+  const sorted=[...screen].sort((a,b)=>a.x-b.x), maxD=52, ink=state.look.dark?state.look.paper:state.look.ink;
+  ctx.save(); ctx.strokeStyle=ink; ctx.lineWidth=.7;
+  for(let i=0;i<sorted.length;i+=2){
+    const a=sorted[i];
+    for(let j=i+1;j<Math.min(sorted.length,i+14);j++){
+      const b=sorted[j], dx=a.x-b.x, dy=a.y-b.y, d=Math.hypot(dx,dy);
+      if(d<maxD){ ctx.globalAlpha=(1-d/maxD)*state.scene.linkAlpha*Math.min(a.a,b.a); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+    }
+  }
+  ctx.restore();
+}
+/* staged appearance: particles fade+scale in, staggered by id, shaped by motion-pad ease. Replay (anim.t=0) replays it. */
+function enterFactor(t, id, n, ease){
+  const step = Math.min(0.85, 1.0/Math.max(1,n)), DUR = 0.55;
+  const x = clamp((t - id*step)/DUR, 0, 1);
+  return ease ? ease(x) : x;
+}
+/* data input: each value scales one colour group's particle size (feed your own metrics) */
+function dataWeight(band){ const v=state.data&&state.data.values; if(!v||!v.length) return 1; let a=0; for(const x of v) a+=Math.abs(x); const avg=a/v.length||1; return clamp(0.4+Math.abs(v[band%v.length])/avg*0.7,0.3,2.4); }
+function drawForm(cam, ang, alpha){
+  if(alpha<=0.01) return;
+  const F=FORMS[state.form.shape]||FORMS.cube;
+  if(!F.faces || !(state.form.fill>0)) return;              // line-forms: particles alone define the shape, no bare axis drawn
+  const sc=state.form.size||1.15, pv=(cam.persp==null?1:cam.persp), ink=state.look.dark?state.look.paper:state.look.ink;
+  const view=F.verts.map(v=>{ const q=rotX(rotY({x:v.x*sc,y:v.y*sc,z:v.z*sc}, ang+cam.yaw), cam.tilt*Math.PI/180);
+    const d=4.2,z=q.z*pv+d,k=(cam.scale||1)/Math.max(.25,z);
+    return {vz:q.z, sx:W/2+(cam.offsetX||0)+q.x*k*cam.zoom, sy:H/2+(cam.offsetY||0)+q.y*k*cam.zoom}; });
+  ctx.save(); ctx.lineJoin='round';
+  for(const f of F.faces){ let cvz=0; for(const ix of f) cvz+=view[ix].vz; cvz/=f.length;
+    if(cvz>=0) continue;                                    // far faces occluded — only front faces shown
+    const shade=clamp(0.5-cvz*0.45,0.35,1);                 // nearer front face reads more solid
+    ctx.beginPath(); f.forEach((ix,ii)=>{ const p=view[ix]; ii?ctx.lineTo(p.sx,p.sy):ctx.moveTo(p.sx,p.sy); }); ctx.closePath();
+    ctx.globalAlpha=alpha*clamp(state.form.fill*shade,0,1); ctx.fillStyle=state.form.color||state.look.accent; ctx.fill();
+    ctx.globalAlpha=alpha*0.4; ctx.strokeStyle=ink; ctx.lineWidth=1; ctx.stroke(); }
+  ctx.globalAlpha=1; ctx.restore();
+}
+function frame(now){
+  const rawDt=Math.min(.05,(now-last)/1000||.016); last=now;
+  const mr=motionResolve(state.motion.x,state.motion.y); state.motion.speed=+mr.speed.toFixed(2);
+  const dt=rawDt*mr.speed, bg=state.look.dark?'#10100f':state.look.paper, ink=state.look.dark?state.look.paper:state.look.ink;
+  state.anim.t += dt; if(!state.anim.loop && state.anim.t>state.anim.hold) state.anim.t=state.anim.hold;
+  if(state.look.trails>0.001){ ctx.globalAlpha=lerp(1,.04,clamp(state.look.trails,0,1)); ctx.fillStyle=bg; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
+  else { ctx.fillStyle=bg; ctx.fillRect(0,0,W,H); }
+  state.cam.yaw += state.cam.autoYaw*dt;
+  const cam={...state.cam, tilt:state.cam.tilt, scale:state.cam.scale};
+  drawAxes(cam);
+  let formAngle=0;
+  if(state.pattern==='form'){ const rk=clamp(state.anim.t/1.0,0,1), er=mr.ease(rk);
+    formAngle=state.form.spin*state.anim.t+(1-er)*Math.PI;           // slow self-spin + half-turn on reveal
+    if(state.form.showContour) drawForm(cam, formAngle, er); }
+  const scr=[], opts={...state.scene,count:particles.length,formShape:state.form.shape,formSize:state.form.size,formDrift:state.form.drift,formAngle};
+  if(state.scene.collide){ const R=0.09*state.scene.size, R2=R*R, pf=(state.scene.avoid==null?0.6:state.scene.avoid);
+    for(let a=0;a<live.length;a++){ const la=live[a]; for(let b=a+1;b<live.length;b++){ const lb=live[b];
+      let dx=la.x-lb.x, dy=la.y-lb.y, dz=la.z-lb.z, d2=dx*dx+dy*dy+dz*dz;
+      if(d2<R2 && d2>1e-9){ const d=Math.sqrt(d2), f=(R-d)/d*pf*0.5; la.x+=dx*f; la.y+=dy*f; la.z+=dz*f; lb.x-=dx*f; lb.y-=dy*f; lb.z-=dz*f; } } } }
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i], target=patternPoint(p,state.pattern,state.anim.t,opts), l=live[i], k=1-Math.pow(1-state.scene.follow,dt*60), ent=enterFactor(state.anim.t,p.id,particles.length,mr.ease);
+    const ox=l.x, oy=l.y, oz=l.z;
+    l.x=lerp(l.x,target.x,k)+Math.sin(state.anim.t*4+p.phase)*state.scene.jitter*dt;
+    l.y=lerp(l.y,target.y,k)+Math.cos(state.anim.t*3+p.phase)*state.scene.jitter*dt;
+    l.z=lerp(l.z,target.z,k)+Math.sin(state.anim.t*2+p.phase*2)*state.scene.jitter*dt;
+    const pr=project(l,cam,W,H), dep=1-state.scene.depthFade*clamp((pr.z+1.8)/3.6,0,1), r=(2.2+p.size*2.3)*state.scene.size*clamp(pr.k*3.6,.55,2.3)*(0.45+0.55*ent)*dataWeight(p.band);
+    const color=particleColor(p, ink);
+    const old=project({x:ox,y:oy,z:oz},cam,W,H);
+    const ang=Math.atan2(pr.y-old.y,pr.x-old.x);
+    let rot=p.phase+state.anim.t;
+    if(state.scene.orientMode === 'direction') rot=ang;
+    if(state.scene.orientMode === 'stack') rot=ang + Math.PI/2;
+    scr.push({x:pr.x,y:pr.y,z:pr.z,r,shape:shapeForParticle(p),a:clamp(dep,.18,1)*ent,color,rot,dx:Math.cos(ang),dy:Math.sin(ang)});
+  }
+  scr.sort((a,b)=>a.z-b.z); drawLinks(scr);
+  for(const s of scr){
+    if(s.x<-20||s.x>W+20||s.y<-20||s.y>H+20) continue;
+    const stacks = state.scene.orientMode === 'stack' ? Math.max(1,Math.round(state.scene.stack||1)) : 1;
+    for(let i=stacks-1;i>=0;i--){
+      const off=i*(state.scene.stackDepth||0)*s.r;
+      const alpha=s.a*(1-i/(stacks+1))*.92;
+      drawShape(s.x-s.dx*off,s.y-s.dy*off,s.r,s.shape,s.color,alpha,s.rot);
+    }
+  }
+  drawGizmo(cam);
+  ctx.save(); ctx.globalAlpha=.68; ctx.fillStyle=ink; ctx.textAlign='right'; ctx.font='12px ui-monospace,monospace'; ctx.fillText((state.data&&state.data.label?state.data.label+' · ':'')+String(state.pattern).toUpperCase()+' / '+particles.length+' PARTICLES',W-18,22); ctx.restore();
+  requestAnimationFrame(frame);
+}
+
+function buildPatternButtons(){
+  const el=$('#patterns'); el.innerHTML='';
+  PATTERNS.forEach(([id,name,note])=>{ const b=document.createElement('button'); b.textContent=name; b.dataset.id=id; b.setAttribute('aria-selected',id===state.pattern); b.addEventListener('click',()=>{ state.pattern=id; [...el.children].forEach(x=>x.setAttribute('aria-selected',x.dataset.id===id)); $('#patternNote').textContent=note; syncPanel(); }); el.appendChild(b); });
+  $('#patternNote').textContent=PATTERNS.find(p=>p[0]===state.pattern)[2];
+}
+function initPanel(){
+  buildPatternButtons();
+  buildSelectRows('gForm',[['form.shape','Shape',[['octa','Octahedron'],['cube','Cube'],['tetra','Tetrahedron'],['pyramid','Pyramid'],['icosa','Icosahedron'],['cross','Cross · axes'],['check','Checkmark'],['custom','Custom (loaded)']]]]);
+  buildSliders('gForm',[['form.showContour','Show contour',0,1,1],['form.fill','Fill',0,.5,.02],['form.size','Size',.6,3,.05],['form.drift','Drift',0,.4,.01],['form.spin','Spin',0,.7,.02]]);
+  (function(){ const g=$('#gForm'); if(g && !$('#formCustom')){ const box=document.createElement('div');
+    box.innerHTML='<div class="note" style="margin-top:8px">Custom form: paste JSON {\"verts\":[[x,y,z],…],\"edges\":[[i,j],…]} (edges optional — auto). Symbols build along it.</div>'+
+      '<textarea id="formCustom" class="tin" rows="3" spellcheck="false" placeholder=\'{\"verts\":[[0,1,0],[1,-1,1],[-1,-1,1],[0,-1,-1]]}\' style="width:100%;resize:vertical;margin-top:4px"></textarea>'+
+      '<button class="btn acc" id="formLoad" style="margin-top:6px">Load custom form</button>';
+    g.appendChild(box);
+    $('#formLoad').addEventListener('click',()=>{ const ta=$('#formCustom'); if(loadCustomForm(ta.value)){ ta.style.borderColor=''; syncPanel(); reinit(); } else { ta.style.borderColor='var(--accent)'; } });
+  } })();
+  buildSliders('gScene',[
+    ['scene.count','Count',80,1200,10],['scene.spread','Spread',.4,2.2,.02],['scene.dance','Dance',.1,2.8,.05],['scene.follow','Follow',.02,.45,.01],
+    ['scene.jitter','Jitter',0,.25,.005],['scene.amplitude','Amplitude',.35,2.2,.02],['scene.frequency','Frequency',.25,2.5,.05],['scene.lanes','Lanes',2,16,1],['scene.twist','Twist',.1,2.8,.05],
+    ['scene.axes','Random axes',2,18,1]
+  ]);
+  /* Structure select removed — pattern is chosen in the Pattern group (dedup) */
+  buildSliders('gObjects',[
+    ['scene.size','Size',.35,2.4,.05],['scene.mixed','Mixed glyphs',0,1,1],['scene.paletteMix','Ink mix',0,.65,.01],
+    ['scene.stack','Stack count',1,7,1],['scene.stackDepth','Stack depth',0,.9,.02],['scene.connect','Links',0,1,1],['scene.linkAlpha','Link opacity',0,.45,.01],['scene.depthFade','Depth fade',0,.8,.02],['scene.collide','Collide',0,1,1],['scene.avoid','Avoid strength',0,1,.05]
+  ]);
+  buildSelectRows('gObjects',[
+    ['scene.shapeMode','Object type',[
+      ['mixed','Mixed'],['circle','Circle'],['pill','Pill'],['diamond','Diamond'],['triangle','Triangle'],['char','Symbol']
+    ]],
+    ['scene.orientMode','Direction',[
+      ['free','Free rotation'],['direction','Follow motion'],['stack','Stack trail']
+    ]],
+    ['scene.palette','Palette',[
+      ['grays','Grayscale'],['dance','Orange · Gray'],['studio','Studio'],['mono','Mono'],['warm','Warm'],['cool','Cool'],['signal','Signal']
+    ]]
+  ]);
+  (function(){ const g=$('#gObjects'); if(g && !$('#charInput')){ const row=document.createElement('div'); row.className='row'; row.innerHTML='<label>Symbol</label><input class="tin" id="charInput" spellcheck="false" maxlength="3" style="grid-column:span 2">'; g.appendChild(row); const ci=$('#charInput'); ci.value=state.scene.char||'✳'; ci.addEventListener('input',e=>{ state.scene.char=e.target.value||'✳'; }); } })();
+  buildColorRows();
+  buildDataRows();
+  buildSliders('gMotionSliders',[['motion.speed','Speed',.5,1.9,.05]]);
+  buildSliders('gCamera',[['cam.persp','Perspective',0,1.6,.05],['cam.tilt','Tilt',-180,180,1],['cam.zoom','Zoom',.45,2.2,.02],['cam.scale','Scale',220,760,10],['cam.autoYaw','Auto yaw',-1,1,.01]]);
+  buildSliders('gLook',[['look.dark','Dark canvas',0,1,1],['look.trails','Trails',0,.98,.005],['look.axes','Background axes',0,1,1],['look.axisOpacity','Axis opacity',0,.42,.01],['look.axisCount','Axis count',3,20,1],['look.axisSpin','Axis drift',-.6,.6,.01],['look.gizmo','XYZ gizmo',0,1,1]]);
+  buildSelectRows('gLook',[
+    ['look.axesMode','Axes mode',[
+      ['classic','Classic XYZ'],['random','Random axes'],['radial','Radial fan']
+    ]]
+  ]);
+  $('#seedInput').value=state.scene.seed;
+}
+function buildDataRows(){
+  const box=$('#dataRows'); if(box){ box.innerHTML='';
+    (state.data.values||[]).forEach((v,i)=>{ const row=document.createElement('div'); row.className='row';
+      row.innerHTML='<label>Value '+(i+1)+'</label><input class="tin" type="number" style="grid-column:span 2">';
+      const inp=row.querySelector('input'); inp.value=v;
+      inp.addEventListener('input',e=>{ state.data.values[i]=+e.target.value||0; });
+      box.appendChild(row); }); }
+  const lbl=$('#dataLabel'); if(lbl){ lbl.value=state.data.label||''; lbl.addEventListener('input',e=>{ state.data.label=e.target.value; }); }
+}
+function drawPad(){
+  const w=mpad.clientWidth||1, h=mpad.clientHeight||1, ink='#1a1a1a';
+  if(mpad.width!==Math.round(w*DPR) || mpad.height!==Math.round(h*DPR)){ mpad.width=Math.round(w*DPR); mpad.height=Math.round(h*DPR); }
+  mctx.setTransform(DPR,0,0,DPR,0,0);
+  mctx.clearRect(0,0,w,h);
+  mctx.strokeStyle='#ececea'; mctx.lineWidth=1; mctx.beginPath();
+  for(let i=1;i<4;i++){ const gx=(i*w/4|0)+0.5, gy=(i*h/4|0)+0.5; mctx.moveTo(gx,0); mctx.lineTo(gx,h); mctx.moveTo(0,gy); mctx.lineTo(w,gy); }
+  mctx.stroke();
+  mctx.globalAlpha=.7; mctx.strokeStyle=state.look.accent; mctx.lineWidth=1.5; mctx.lineJoin='round'; mctx.beginPath();
+  const mr=motionResolve(state.motion.x,state.motion.y);
+  for(let i=0;i<=80;i++){ const t=i/80, x=t*w, y=h-(mr.ease(t)*h); if(i)mctx.lineTo(x,y); else mctx.moveTo(x,y); } mctx.stroke(); mctx.globalAlpha=1; mctx.lineWidth=1;
+  const px=state.motion.x*w, py=(1-state.motion.y)*h; mctx.fillStyle=ink; mctx.beginPath(); mctx.arc(px,py,6,0,TAU); mctx.fill();
+}
+function commitMotion(){ const mr=motionResolve(state.motion.x,state.motion.y); state.motion.speed=+mr.speed.toFixed(2); syncPanel(); drawPad(); }
+function initMotionPad(){
+  let drag=false; const from=e=>{const r=mpad.getBoundingClientRect(); return {x:clamp((e.clientX-r.left)/r.width,0,1), y:clamp(1-(e.clientY-r.top)/r.height,0,1)};};
+  mpad.addEventListener('pointerdown',e=>{drag=true; mpad.setPointerCapture(e.pointerId); const p=from(e); state.motion.x=p.x; state.motion.y=p.y; commitMotion();});
+  mpad.addEventListener('pointermove',e=>{if(!drag)return; const p=from(e); state.motion.x=p.x; state.motion.y=p.y; commitMotion();});
+  mpad.addEventListener('pointerup',()=>drag=false);
+  $('#easePreset').addEventListener('change',e=>{ const p=MOTION_PRESETS[e.target.value]||MOTION_PRESETS.balanced; state.motion.x=p[0]; state.motion.y=p[1]; commitMotion(); });
+}
+function bindUi(){
+  $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-selected',String(x===b))); document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===b.dataset.tab)); });
+  document.querySelectorAll('legend').forEach(l=>l.addEventListener('click',()=>l.parentElement.classList.toggle('closed')));
+  $('#reseed').addEventListener('click',()=>{ state.scene.seed=Math.floor(Math.random()*99999); reinit(); });
+  $('#seedInput').addEventListener('change',e=>{ state.scene.seed=+e.target.value||1; reinit(); });
+  $('#replay').addEventListener('click',()=>{ state.anim.t=0; reinit(); });
+  $('#loop').addEventListener('click',()=>{ state.anim.loop=state.anim.loop?0:1; $('#loop').setAttribute('aria-pressed',String(!!state.anim.loop)); });
+  $('#holdRange').addEventListener('input',e=>{ state.anim.hold=+e.target.value; });
+  $('#hideBtn').addEventListener('click',()=>document.body.classList.toggle('noui'));
+  $('#uitoggle').addEventListener('click',()=>document.body.classList.toggle('noui'));
+  $('#savePng').addEventListener('click',()=>{ const a=document.createElement('a'); a.download='particle-dance.png'; a.href=cv.toDataURL('image/png'); a.click(); });
+  const embedState=()=>{ const s=JSON.parse(JSON.stringify(state)); s.anim=Object.assign({},s.anim,{t:0}); return s; };
+  const b64cfg=()=>btoa(unescape(encodeURIComponent(JSON.stringify(embedState()))));
+  $('#embedCode').addEventListener('click',()=>{ const base=location.origin+location.pathname;
+    const code='<iframe src="'+base+'?cfg='+b64cfg()+'&noui" style="width:100%;aspect-ratio:16/9;border:0;border-radius:12px" loading="lazy" title="Particle Dance"></iframe>';
+    const ta=$('#embedOut'); ta.style.display='block'; ta.value=code; ta.focus(); ta.select(); if(navigator.clipboard) navigator.clipboard.writeText(code).catch(()=>{}); });
+  $('#embedHtml').addEventListener('click',()=>{ fetch(location.pathname).then(r=>r.text()).then(html=>{
+    const inject='<scr'+'ipt>window.__EMBED_CFG__='+JSON.stringify(embedState())+';window.__EMBED_NOUI__=true;</scr'+'ipt>';
+    const out=html.replace('</head>', inject+'</head>');
+    const a=document.createElement('a'); a.download='particle-dance-embed.html'; a.href=URL.createObjectURL(new Blob([out],{type:'text/html'})); a.click(); }).catch(()=>{}); });
+  $('#saveCfg').addEventListener('click',()=>{ const a=document.createElement('a'); a.download='particle-dance-config.json'; a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'})); a.click(); });
+  $('#loadFile').addEventListener('change',e=>{ const f=e.target.files[0]; if(!f)return; f.text().then(txt=>{ deepMerge(state,JSON.parse(txt)); applyLook(); buildPatternButtons(); syncPanel(); reinit(); }); });
+  addEventListener('keydown',e=>{ if(e.key.toLowerCase()==='h') document.body.classList.toggle('noui'); });
+  let drag=false,lx=0,ly=0; cv.addEventListener('pointerdown',e=>{drag=true; lx=e.clientX; ly=e.clientY; cv.setPointerCapture(e.pointerId);});
+  cv.addEventListener('pointermove',e=>{if(!drag)return; const dx=e.clientX-lx, dy=e.clientY-ly; lx=e.clientX; ly=e.clientY; state.cam.yaw+=dx*.006; state.cam.tilt=((state.cam.tilt-dy*.18+180)%360+360)%360-180; syncPanel();});
+  cv.addEventListener('pointerup',()=>drag=false);
+  cv.addEventListener('wheel',e=>{ e.preventDefault(); state.cam.zoom=clamp(state.cam.zoom*(e.deltaY>0?.94:1.06),.35,3); syncPanel(); },{passive:false});
+}
+function runSelfTest(){
+  try{ assertCore(); if(!particles.length) throw new Error('empty particles'); console.log('SELFTEST_OK'); $('#selftest').style.display='block'; }
+  catch(e){ console.error('SELFTEST_FAIL', e); $('#selftest').textContent='SELFTEST_FAIL'; $('#selftest').style.display='block'; throw e; }
+}
+function applyEmbedConfig(){
+  let cfg=null, noui=false;
+  try{ const p=new URLSearchParams(location.search);
+    if(p.get('cfg')) cfg=JSON.parse(decodeURIComponent(escape(atob(p.get('cfg')))));
+    if(p.has('noui')) noui=true;
+  }catch(e){}
+  if(window.__EMBED_CFG__) cfg=window.__EMBED_CFG__;
+  if(window.__EMBED_NOUI__) noui=true;
+  if(cfg) deepMerge(state,cfg);
+  if(noui) document.body.classList.add('noui');
+}
+applyEmbedConfig(); resize(); initPanel(); initMotionPad(); bindUi(); applyLook(); reinit(); commitMotion(); requestAnimationFrame(frame);
+if (new URLSearchParams(location.search).get('selftest') === '1') setTimeout(runSelfTest, 80);
+window.__particleDance = {state, rng, makeParticles, patternPoint, assertCore};
+</script>
+</body>
+</html>

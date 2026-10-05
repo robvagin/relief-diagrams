@@ -1,0 +1,551 @@
+<!doctype html>
+<!--
+  CCC Pipeline. Staged flow graph: INPUT -> CONCEPT -> MEDIUMS -> OUTPUTS.
+  Клик по узлу подсвечивает ВЕСЬ его путь через пайплайн (вверх и вниз
+  по течению) + бабл с пояснением.
+  Приёмы: mono-коды узлов, chevron-стрелки на связях,
+  линейка-тики, живой поток (бегущий пунктир).
+  Грамматика конструкторов: state+пути, тумблеры, конфиг-merge, PNG, H.
+  Данные по умолчанию — обобщённый демонстрационный набор.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage Flow</title>
+<style>
+  :root{
+    --paper:#f6f5f2; --ink:#1a1a1a; --muted:#6f6d67; --line:#dcdad4;
+    --accent:#0b0b0c; --panel:#fdfdfc;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);
+    font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
+  canvas{display:block}
+
+  #panel{position:fixed;top:16px;left:16px;width:272px;max-height:calc(100vh - 32px);
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    display:flex;flex-direction:column;overflow:hidden;z-index:10}
+  #tabs{display:flex;border-bottom:1px solid var(--line)}
+  #tabs button{flex:1;padding:10px 0;background:none;border:0;font:inherit;color:var(--muted);
+    cursor:pointer;text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+  #tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 -2px var(--ink)}
+  #body{overflow-y:auto;padding:12px 14px 16px}
+  .tab{display:none}.tab.on{display:block}
+  fieldset{border:0;margin:0 0 14px;padding:0}
+  legend{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    margin-bottom:8px;cursor:pointer;user-select:none}
+  legend::before{content:'▾ ';font-size:8px;color:var(--muted)}
+  fieldset.closed>legend::before{content:'▸ '}
+  fieldset.closed>*:not(legend){display:none}
+  .row{display:grid;grid-template-columns:1fr 64px 48px;gap:8px;align-items:center;margin:5px 0}
+  .row label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row input[type=range]{width:100%;accent-color:var(--ink);height:2px}
+  .row input[type=number]{width:100%;font:10px ui-monospace,monospace;color:var(--muted);
+    background:var(--paper);border:1px solid var(--line);border-radius:4px;
+    text-align:right;padding:3px 4px}
+  .row input[type=number]:focus{color:var(--ink);outline:none;border-color:var(--ink)}
+  .row input[type=number]::-webkit-inner-spin-button{display:none}
+  .row.toggle{grid-template-columns:1fr auto}
+  .sw{appearance:none;-webkit-appearance:none;width:30px;height:16px;margin:0;cursor:pointer;
+    border:1px solid var(--line);border-radius:99px;background:var(--paper);position:relative}
+  .sw::before{content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;
+    border-radius:50%;background:var(--muted);transition:left .15s,background .15s}
+  .sw:checked{border-color:var(--ink);background:var(--ink)}
+  .sw:checked::before{left:16px;background:var(--paper)}
+  .btn{padding:7px 10px;font:inherit;font-size:11px;background:none;
+    border:1px solid var(--line);border-radius:6px;cursor:pointer;color:var(--ink);margin:3px 4px 3px 0}
+  .btn:hover{border-color:var(--ink)}
+  .btn.acc{border-color:var(--accent);color:var(--accent)}
+  .note{color:var(--muted);font-size:10px;margin:6px 0}
+  .tin{font:10px ui-monospace,monospace;border:1px solid var(--line);border-radius:4px;
+    background:var(--paper);color:var(--ink);padding:4px 6px;width:100%}
+  .tin:focus{outline:none;border-color:var(--ink)}
+  textarea.tin{height:110px;resize:vertical;font-size:9px;line-height:1.5}
+  .stage{border:1px solid var(--line);border-radius:6px;margin:6px 0;padding:4px 6px}
+  .stage h4{margin:2px 0 4px;font-size:10px;letter-spacing:.08em;color:var(--muted);font-weight:400}
+  .arow{display:grid;grid-template-columns:1fr 38px 18px;gap:4px;align-items:center;margin:3px 0}
+  .arow input[type=number]{font:10px ui-monospace,monospace;border:1px solid var(--line);
+    border-radius:4px;background:var(--paper);color:var(--ink);padding:3px 2px;width:100%;text-align:right}
+  .arow input[type=number]::-webkit-inner-spin-button{display:none}
+  .idel{background:none;border:0;color:var(--muted);cursor:pointer;font-size:13px;padding:0}
+  .idel:hover{color:var(--accent)}
+  .nrow{display:grid;grid-template-columns:40px 1fr;gap:6px;align-items:center;margin:4px 0}
+  #err{color:var(--accent);font-size:10px;white-space:pre-wrap}
+
+  #hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);color:var(--muted);
+    font-size:10px;letter-spacing:.04em;z-index:5;pointer-events:none}
+  body.noui #panel,body.noui #hint{display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="panel">
+  <div id="tabs">
+    <button data-tab="scene" aria-selected="true">Scene</button>
+    <button data-tab="data">Data</button>
+    <button data-tab="io">Export</button>
+  </div>
+  <div id="body">
+    <div class="tab on" data-tab="scene">
+      <fieldset id="gFlow"><legend>Pipeline</legend></fieldset>
+      <fieldset id="gLabels" class="closed"><legend>Labels</legend></fieldset>
+    </div>
+    <div class="tab" data-tab="data">
+      <fieldset><legend>Title</legend>
+        <div class="nrow"><label>Title</label><input class="tin" id="nTitle"></div>
+      </fieldset>
+      <fieldset><legend>Stages · узлы</legend>
+        <div id="stagesList"></div>
+        <p class="note">Node weight sets its size and the thickness of its links. The note shows as a bubble on click. Clicking a node on the canvas highlights its whole path.</p>
+      </fieldset>
+      <fieldset class="closed"><legend>Links (JSON raw)</legend>
+        <textarea class="tin" id="linksTa" spellcheck="false"></textarea>
+        <div><button class="btn" id="applyLinks">Apply</button>
+        <button class="btn" id="defLinks">Default flow</button><span id="err"></span></div>
+        <p class="note">Pairs [from, to] by label. Default flow: all INPUT → CONCEPT → all MEDIUMS → OUTPUTS in a cycle.</p>
+      </fieldset>
+    </div>
+    <div class="tab" data-tab="io">
+      <fieldset><legend>Config</legend>
+        <button class="btn" id="saveCfg">Save JSON</button>
+        <button class="btn" id="loadCfg">Load JSON</button>
+        <input type="file" id="loadFile" accept=".json" hidden>
+      </fieldset>
+      <fieldset><legend>Image</legend>
+        <button class="btn acc" id="pngBtn">Export PNG</button>
+      </fieldset>
+      <fieldset><legend>UI</legend>
+        <button class="btn" id="hideBtn">Hide UI (H)</button>
+      </fieldset>
+    </div>
+  </div>
+</div>
+<div id="hint">click a node — path through the pipeline and a note · click empty space — reset · H — hide UI</div>
+
+<script>
+/* ================= @core-begin — чистая математика, без DOM ================= */
+const TAU = Math.PI * 2;
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// дефолтный поток: stage0→stage1 (все), stage1→stage2 (все), stage2→stage3 (i, i+1 по кругу)
+function defaultLinks(stages){
+  const L = [];
+  const by = i => stages[i] ? stages[i].nodes.map(n => n.label) : [];
+  const [inp, ccc, med, tp] = [by(0), by(1), by(2), by(3)];
+  for (const a of inp) for (const c of ccc) L.push([a, c]);
+  for (const c of ccc) for (const m of med) L.push([c, m]);
+  med.forEach((m, i) => {
+    if (!tp.length) return;
+    L.push([m, tp[i % tp.length]]);
+    L.push([m, tp[(i + 1) % tp.length]]);
+  });
+  return L;
+}
+
+// путь узла через пайплайн: BFS вверх и вниз по связям → множества узлов и связей
+function tracePath(links, label){
+  const nodes = new Set([label]), used = new Set();
+  let grew = true;
+  while (grew){
+    grew = false;
+    links.forEach(([a, b], i) => {
+      if (used.has(i)) return;
+      if (nodes.has(a) || nodes.has(b)){
+        // вниз по течению от a, вверх — к a
+        if (nodes.has(a) && !nodes.has(b)){ nodes.add(b); grew = true; }
+        if (nodes.has(b) && !nodes.has(a)){ nodes.add(a); grew = true; }
+        used.add(i);
+      }
+    });
+  }
+  return { nodes, links: used };
+}
+/* ================= @core-end ================= */
+
+/* Sample dataset: a generic four-stage pipeline. Demo data only. */
+const state = {
+  flow: { curve: 0.5, flowSpeed: 0.5, linkAlpha: 0.3, nodeSize: 1,
+          arrows: 1, codes: 0, ruler: 1 },
+  labels: { size: 11, pillAlpha: 0.85 },
+  data: {
+    title: "Sample Pipeline",
+    stages: [
+      { name: "INPUT", nodes: [
+        { label: "Audience", weight: 2.4, note: "Who the work speaks to." },
+        { label: "Product", weight: 2.2, note: "What is being made." },
+        { label: "Market", weight: 1.8, note: "Where it competes." },
+        { label: "Category", weight: 1.6 },
+        { label: "Context", weight: 1.6 },
+        { label: "Benchmarks", weight: 1.2 },
+        { label: "Constraints", weight: 1.2 },
+        { label: "References", weight: 1.4 },
+        { label: "Goals", weight: 1.4 }
+      ]},
+      { name: "CONCEPT", nodes: [
+        { label: "Core Concept", weight: 3.6,
+          note: "One idea the rest of the graph grows from." }
+      ]},
+      { name: "MEDIUMS", nodes: [
+        { label: "Form", weight: 2, note: "Mark, logo, graphics." },
+        { label: "Color", weight: 1.8 },
+        { label: "Type", weight: 1.8 },
+        { label: "Word", weight: 1.6, note: "Voice, naming, messaging." },
+        { label: "Motion", weight: 1.6 },
+        { label: "Space", weight: 1.4 }
+      ]},
+      { name: "OUTPUTS", nodes: [
+        { label: "Site", weight: 2 },
+        { label: "Deck", weight: 1.8 },
+        { label: "Social", weight: 1.6 },
+        { label: "Packaging", weight: 1.4 },
+        { label: "Merch", weight: 1.2 },
+        { label: "Campaign", weight: 1.6 }
+      ]}
+    ],
+    links: []
+  },
+  sel: null // label выбранного узла
+};
+state.data.links = defaultLinks(state.data.stages);
+
+/* ===== канвас ===== */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, clock = 0, lastT = performance.now();
+function resize(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', resize); resize();
+const css = v => getComputedStyle(document.body).getPropertyValue(v).trim();
+const INK = css('--ink'), MUTED = css('--muted'), ACC = css('--accent'), PAPER = css('--paper');
+
+/* раскладка: колонки этапов, узлы по вертикали */
+function layout(){
+  const st = state.data.stages, n = st.length;
+  const x0 = 340, x1 = W - 120;
+  const pos = new Map(); // label -> {x, y, w(eight), stage}
+  st.forEach((s, si) => {
+    const x = n === 1 ? (x0 + x1) / 2 : x0 + (x1 - x0) * si / (n - 1);
+    const m = s.nodes.length;
+    s.nodes.forEach((nd, ni) => {
+      const y = H / 2 + (m === 1 ? 0 : (ni - (m - 1) / 2) * Math.min(64, (H - 220) / m));
+      pos.set(nd.label, { x, y, w: nd.weight || 1, stage: si, node: nd });
+    });
+  });
+  return pos;
+}
+/* seed-код узла (приём из референсов) */
+function nodeCode(label){
+  let h = 0;
+  for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) >>> 0;
+  return 'N' + (h % 890 + 10);
+}
+
+let lastHit = []; // для кликов: [{x,y,r,label}]
+function frame(now){
+  const dt = Math.min((now - lastT) / 1000, 0.05); lastT = now;
+  clock += dt;
+  ctx.clearRect(0, 0, W, H);
+  const f = state.flow, pos = layout();
+  const trace = state.sel ? tracePath(state.data.links, state.sel) : null;
+
+  // связи: кубические кривые; выбранный путь — акцент + бегущий пунктир
+  state.data.links.forEach(([a, b], li) => {
+    const A = pos.get(a), B = pos.get(b);
+    if (!A || !B) return;
+    const on = trace && trace.links.has(li);
+    const wgt = Math.min(A.w, B.w);
+    const dx = (B.x - A.x) * f.curve;
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y);
+    ctx.bezierCurveTo(A.x + dx, A.y, B.x - dx, B.y, B.x, B.y);
+    ctx.strokeStyle = on ? ACC : INK;
+    ctx.globalAlpha = on ? 0.9 : (trace ? f.linkAlpha * 0.35 : f.linkAlpha);
+    ctx.lineWidth = on ? 1.6 : Math.max(0.7, wgt * 0.45);
+    if (on && f.flowSpeed > 0.01){
+      ctx.setLineDash([6, 6]);
+      ctx.lineDashOffset = -clock * f.flowSpeed * 60;
+    }
+    ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    ctx.globalAlpha = 1; ctx.lineWidth = 1;
+    // chevron-стрелка у конца (приём из жёлтого референса)
+    if (f.arrows && (!trace || on)){
+      const t = 0.86;
+      const px2 = bez(A.x, A.x + dx, B.x - dx, B.x, t), py2 = bez(A.y, A.y, B.y, B.y, t);
+      const px3 = bez(A.x, A.x + dx, B.x - dx, B.x, t + 0.02), py3 = bez(A.y, A.y, B.y, B.y, t + 0.02);
+      const ang = Math.atan2(py3 - py2, px3 - px2);
+      ctx.beginPath();
+      ctx.moveTo(px2 - 5 * Math.cos(ang - 0.5), py2 - 5 * Math.sin(ang - 0.5));
+      ctx.lineTo(px2, py2);
+      ctx.lineTo(px2 - 5 * Math.cos(ang + 0.5), py2 - 5 * Math.sin(ang + 0.5));
+      ctx.strokeStyle = on ? ACC : INK;
+      ctx.globalAlpha = on ? 0.9 : f.linkAlpha * 1.4;
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  });
+
+  // названия этапов + линейка-тики под колонками
+  ctx.font = '10px ui-monospace, monospace';
+  state.data.stages.forEach((s, si) => {
+    const first = s.nodes[0] && pos.get(s.nodes[0].label);
+    if (!first) return;
+    ctx.fillStyle = MUTED; ctx.globalAlpha = 0.9; ctx.textAlign = 'center';
+    ctx.fillText(s.name, first.x, 64);
+    ctx.globalAlpha = 1; ctx.textAlign = 'left';
+    if (f.ruler){
+      ctx.strokeStyle = INK; ctx.globalAlpha = 0.35;
+      for (let i = 0; i < 13; i++){
+        const x = first.x - 36 + i * 6;
+        ctx.beginPath(); ctx.moveTo(x, 72); ctx.lineTo(x, 72 + (i % 4 === 0 ? 7 : 4)); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+  });
+
+  // узлы + пилюли
+  lastHit = [];
+  ctx.font = state.labels.size + 'px ui-monospace, monospace';
+  pos.forEach((P, label) => {
+    const on = !trace || trace.nodes.has(label);
+    const isSel = state.sel === label;
+    const r = (3 + P.w * 2.2) * f.nodeSize;
+    const isCCC = P.stage === 1;
+    ctx.beginPath(); ctx.arc(P.x, P.y, isCCC ? r * 1.25 : r, 0, TAU);
+    ctx.fillStyle = isSel || isCCC ? ACC : INK;
+    ctx.globalAlpha = on ? 1 : 0.2;
+    ctx.fill();
+    if (isCCC){ // ядро с орбитой — фирменный узел
+      ctx.beginPath(); ctx.arc(P.x, P.y, r * 2, 0, TAU);
+      ctx.strokeStyle = ACC; ctx.globalAlpha = on ? 0.4 : 0.1; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    lastHit.push({ x: P.x, y: P.y, r: Math.max(14, r + 6), label });
+    // пилюля: слева для входов, справа для выходов, снизу для CCC
+    const txt = f.codes ? label + ' · ' + nodeCode(label) : label;
+    const tw = ctx.measureText(txt).width, w2 = tw + 14, h2 = state.labels.size + 8;
+    let bx = P.stage === 0 ? P.x - w2 - 14 : P.x + 14;
+    let by2 = P.y - h2 / 2;
+    if (isCCC){ bx = P.x - w2 / 2; by2 = P.y + r * 2 + 8; }
+    bx = Math.max(6, Math.min(W - w2 - 6, bx));
+    ctx.beginPath(); ctx.roundRect(bx, by2, w2, h2, h2 / 2);
+    ctx.fillStyle = PAPER; ctx.globalAlpha = state.labels.pillAlpha * (on ? 1 : 0.4); ctx.fill();
+    ctx.globalAlpha = (on ? 0.55 : 0.15);
+    ctx.strokeStyle = isSel ? ACC : INK; ctx.stroke();
+    ctx.globalAlpha = on ? 0.9 : 0.25;
+    ctx.fillStyle = isSel ? ACC : INK;
+    ctx.fillText(txt, bx + 7, by2 + h2 - 6);
+    ctx.globalAlpha = 1;
+    lastHit.push({ x: bx + w2 / 2, y: by2 + h2 / 2, r: Math.max(w2, h2) / 2 + 4, label });
+  });
+
+  // бабл выбранного узла
+  if (state.sel){
+    const P = pos.get(state.sel);
+    if (P && P.node.note) drawBubble(P, P.node);
+  }
+
+  if (state.data.title){
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.fillStyle = INK; ctx.globalAlpha = 0.65; ctx.textAlign = 'right';
+    ctx.fillText(String(state.data.title).toUpperCase(), W - 16, 26);
+    ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+  }
+  requestAnimationFrame(frame);
+}
+const bez = (p0, p1, p2, p3, t) =>
+  (1-t)**3*p0 + 3*(1-t)**2*t*p1 + 3*(1-t)*t*t*p2 + t**3*p3;
+
+function drawBubble(P, nd){
+  ctx.font = '11px ui-monospace, monospace';
+  const maxW = 210, words = String(nd.note || '').split(/\s+/).filter(Boolean), lines = [];
+  let cur = '';
+  for (const w2 of words){
+    const t = cur ? cur + ' ' + w2 : w2;
+    if (ctx.measureText(t).width > maxW && cur){ lines.push(cur); cur = w2; } else cur = t;
+  }
+  if (cur) lines.push(cur);
+  const wPx = Math.min(maxW, Math.max(ctx.measureText(nd.label).width,
+    ...(lines.length ? lines.map(l => ctx.measureText(l).width) : [0]), 60)) + 20;
+  const hPx = 24 + lines.length * 15 + 8;
+  let bx = P.x + 24, by = P.y - hPx - 18;
+  bx = Math.max(8, Math.min(W - wPx - 8, bx));
+  by = Math.max(8, Math.min(H - hPx - 8, by));
+  ctx.beginPath(); ctx.moveTo(bx + 10, by + hPx); ctx.lineTo(P.x, P.y - 6);
+  ctx.strokeStyle = ACC; ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.roundRect(bx, by, wPx, hPx, 8);
+  ctx.fillStyle = PAPER; ctx.globalAlpha = 0.96; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = ACC; ctx.stroke();
+  ctx.fillStyle = ACC; ctx.fillText(nd.label, bx + 10, by + 16);
+  ctx.fillStyle = INK; ctx.globalAlpha = 0.85;
+  lines.forEach((l, i) => ctx.fillText(l, bx + 10, by + 33 + i * 15));
+  ctx.globalAlpha = 1;
+}
+requestAnimationFrame(frame);
+
+/* клики: выбор узла = подсветка пути */
+cv.addEventListener('pointerup', e => {
+  let best = null, bd = 1e9;
+  for (const h of lastHit){
+    const d = Math.hypot(h.x - e.clientX, h.y - e.clientY);
+    if (d < h.r && d < bd){ bd = d; best = h.label; }
+  }
+  state.sel = best === state.sel ? null : best;
+});
+
+/* ===== панель ===== */
+const $ = s => document.querySelector(s);
+const getPath = k => k.split('.').reduce((o, p) => o[p], state);
+const setPath = (k, v) => { const ps = k.split('.'), last = ps.pop();
+  ps.reduce((o, p) => o[p], state)[last] = v; };
+
+const sliderDefs = {
+  gFlow: [
+    ['flow.curve',    'Curve',      0, 1, 0.05],
+    ['flow.flowSpeed','Flow',       0, 2, 0.05],
+    ['flow.linkAlpha','Link ink',   0.05, 0.8, 0.05],
+    ['flow.nodeSize', 'Node size',  0.5, 2, 0.05],
+    ['flow.arrows',   'Arrows',     0, 1, 1],
+    ['flow.codes',    'Node codes', 0, 1, 1],
+    ['flow.ruler',    'Ruler',      0, 1, 1]
+  ],
+  gLabels: [
+    ['labels.size',     'Size',      9, 15, 1],
+    ['labels.pillAlpha','Pill fill', 0, 1, 0.05]
+  ]
+};
+function buildSliders(elId, defs){
+  const el = typeof elId === 'string' ? $('#' + elId) : elId;
+  [...el.querySelectorAll('.row')].forEach(r => r.remove());
+  for (const [key, name, min, max, step] of defs){
+    const row = document.createElement('div'); row.className = 'row';
+    if (min === 0 && max === 1 && step === 1){
+      row.classList.add('toggle');
+      row.innerHTML = `<label>${name}</label><input type="checkbox" class="sw">`;
+      const cb = row.querySelector('input');
+      cb.checked = !!getPath(key); cb.dataset.key = key;
+      cb.addEventListener('change', () => setPath(key, cb.checked ? 1 : 0));
+      el.appendChild(row); continue;
+    }
+    row.innerHTML = `<label>${name}</label><input type="range" min="${min}" max="${max}" step="${step}"><input type="number" class="val" min="${min}" max="${max}" step="${step}">`;
+    const inp = row.querySelector('input[type=range]'), val = row.querySelector('input[type=number]');
+    const fmt = x => +(+x).toFixed(step < 1 ? 2 : 0);
+    inp.value = getPath(key); val.value = fmt(getPath(key)); inp.dataset.key = key;
+    inp.addEventListener('input', () => { setPath(key, +inp.value); val.value = fmt(inp.value); });
+    val.addEventListener('change', () => { const x = parseFloat(val.value);
+      if (isFinite(x)){ setPath(key, x); inp.value = x; } });
+    el.appendChild(row);
+  }
+}
+buildSliders('gFlow', sliderDefs.gFlow);
+buildSliders('gLabels', sliderDefs.gLabels);
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === b.dataset.tab));
+});
+document.querySelectorAll('#panel legend').forEach(lg =>
+  lg.addEventListener('click', () => lg.parentElement.classList.toggle('closed')));
+
+/* редактор этапов и узлов */
+function buildStages(){
+  const box = $('#stagesList'); box.innerHTML = '';
+  state.data.stages.forEach((s, si) => {
+    const stg = document.createElement('div'); stg.className = 'stage';
+    const h = document.createElement('h4'); h.textContent = s.name; stg.appendChild(h);
+    s.nodes.forEach((nd, ni) => {
+      const row = document.createElement('div'); row.className = 'arow';
+      const lab = document.createElement('input'); lab.className = 'tin'; lab.value = nd.label;
+      lab.title = nd.note || '';
+      lab.addEventListener('change', () => { // rename → обновить связи
+        const old = nd.label; nd.label = lab.value;
+        state.data.links = state.data.links.map(([a, b]) =>
+          [a === old ? nd.label : a, b === old ? nd.label : b]);
+        if (state.sel === old) state.sel = nd.label;
+        syncLinksTa();
+      });
+      const w2 = document.createElement('input');
+      w2.type = 'number'; w2.min = 0.5; w2.max = 4; w2.step = 0.1; w2.value = nd.weight || 1;
+      w2.addEventListener('change', () => { const v = parseFloat(w2.value);
+        if (isFinite(v)) nd.weight = v; });
+      const del = document.createElement('button'); del.className = 'idel'; del.textContent = '×';
+      del.addEventListener('click', () => {
+        state.data.links = state.data.links.filter(([a, b]) => a !== nd.label && b !== nd.label);
+        s.nodes.splice(ni, 1); buildStages(); syncLinksTa();
+      });
+      row.append(lab, w2, del);
+      stg.appendChild(row);
+    });
+    const add = document.createElement('button'); add.className = 'btn'; add.textContent = '+';
+    add.addEventListener('click', () => {
+      s.nodes.push({ label: s.name + ' ' + (s.nodes.length + 1), weight: 1 });
+      buildStages();
+    });
+    stg.appendChild(add);
+    box.appendChild(stg);
+  });
+}
+buildStages();
+
+/* links raw */
+const ta = $('#linksTa');
+function syncLinksTa(){ ta.value = JSON.stringify(state.data.links); }
+syncLinksTa();
+$('#applyLinks').addEventListener('click', () => {
+  try { state.data.links = JSON.parse(ta.value); $('#err').textContent = ''; }
+  catch (err){ $('#err').textContent = ' ' + err.message; }
+});
+$('#defLinks').addEventListener('click', () => {
+  state.data.links = defaultLinks(state.data.stages); syncLinksTa();
+});
+
+/* имена / конфиг / png / ui */
+$('#nTitle').value = state.data.title;
+$('#nTitle').addEventListener('input', e => state.data.title = e.target.value);
+$('#saveCfg').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = 'ccc-pipeline.json';
+  a.href = URL.createObjectURL(new Blob(
+    [JSON.stringify({ version: 1, flow: state.flow, labels: state.labels, data: state.data }, null, 1)],
+    { type: 'application/json' }));
+  a.click();
+});
+$('#loadCfg').addEventListener('click', () => $('#loadFile').click());
+$('#loadFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => {
+    const cfg = JSON.parse(t);
+    for (const k of ['flow','labels'])
+      if (cfg[k]) state[k] = { ...state[k], ...cfg[k] }; // merge, не замена
+    if (cfg.data) state.data = cfg.data;
+    state.sel = null;
+    $('#nTitle').value = state.data.title || '';
+    buildStages(); syncLinksTa(); syncPanel();
+  });
+});
+function syncPanel(){
+  document.querySelectorAll('#panel input[type=range]').forEach(inp => {
+    const key = inp.dataset.key; if (!key) return;
+    const x = getPath(key), step = +inp.step;
+    inp.value = x; inp.nextElementSibling.value = +(+x).toFixed(step < 1 ? 2 : 0);
+  });
+  document.querySelectorAll('#panel input.sw').forEach(cb => {
+    if (cb.dataset.key) cb.checked = !!getPath(cb.dataset.key);
+  });
+}
+$('#pngBtn').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = 'ccc-pipeline.png'; a.href = cv.toDataURL('image/png'); a.click();
+});
+function toggleUI(){ document.body.classList.toggle('noui'); }
+$('#hideBtn').addEventListener('click', toggleUI);
+addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'h' && !['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) toggleUI();
+});
+</script>
+</body>
+</html>

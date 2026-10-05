@@ -1,0 +1,443 @@
+<!doctype html>
+<!--
+  Magnitude — Skeleton. Дешборд-тип: ГЛИФ ВЕЛИЧИНЫ (K9) — proportional area + scaled number.
+  Один ряд фигур: площадь ∝ значению (r = k·√v), НЕ радиус ∝ значению — так меньшая доля не тонет.
+  Mode: Circle · Square · Half-circle · Scaled number (само число — глиф, + чип дельты).
+  Читает общий датасет (story-data.json) через DataCore — не имеет своего примера.
+    Motion pad · Reveal · transport ⟲ Replay/Loop/Hold · Config save/load (merge) · PNG+SVG · H — UI
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magnitude</title>
+<style>
+  :root{ --paper:#f6f5f2; --ink:#1a1a1a; --muted:#6f6d67; --line:#dcdad4; --accent:#0b0b0c; --panel:#fdfdfc; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
+  canvas{display:block;cursor:default}
+  #panel{position:fixed;top:16px;left:16px;width:272px;max-height:calc(100vh - 32px);background:var(--panel);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;z-index:10}
+  #tabs{display:flex;border-bottom:1px solid var(--line)}
+  #tabs button{flex:1;padding:10px 0;background:none;border:0;font:inherit;color:var(--muted);cursor:pointer;text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+  #tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 -2px var(--ink)}
+  #body{overflow-y:auto;padding:12px 14px 16px}
+  .tab{display:none}.tab.on{display:block}
+  fieldset{border:0;margin:0 0 14px;padding:0}
+  legend{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;cursor:pointer;user-select:none}
+  legend::before{content:'▾ ';font-size:8px;color:var(--muted)}fieldset.closed>legend::before{content:'▸ '}fieldset.closed>*:not(legend){display:none}
+  .row{display:grid;grid-template-columns:1fr 64px 48px;gap:8px;align-items:center;margin:5px 0}
+  .row label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row input[type=range]{width:100%;accent-color:var(--ink);height:2px}
+  .row input[type=number]{width:100%;font:10px ui-monospace,monospace;color:var(--muted);background:var(--paper);border:1px solid var(--line);border-radius:4px;text-align:right;padding:3px 4px}
+  .row input[type=number]:focus{color:var(--ink);outline:none;border-color:var(--ink)}.row input[type=number]::-webkit-inner-spin-button{display:none}
+  .row.toggle{grid-template-columns:1fr auto}
+  .seg{display:flex;gap:4px;margin:2px 0 12px;flex-wrap:wrap}
+  .seg button{flex:1 0 auto;min-width:52px;font:inherit;font-size:10px;padding:6px 6px;background:var(--paper);border:1px solid var(--line);border-radius:6px;cursor:pointer;color:var(--ink);text-transform:uppercase;letter-spacing:.03em}
+  .seg button[aria-pressed="true"]{border-color:var(--ink);background:var(--panel)}
+  .sw{appearance:none;-webkit-appearance:none;width:30px;height:16px;margin:0;cursor:pointer;border:1px solid var(--line);border-radius:99px;background:var(--paper);position:relative}
+  .sw::before{content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:var(--muted);transition:left .15s,background .15s}
+  .sw:checked{border-color:var(--ink);background:var(--ink)}.sw:checked::before{left:16px;background:var(--paper)}
+  .btn{padding:7px 10px;font:inherit;font-size:11px;background:none;border:1px solid var(--line);border-radius:6px;cursor:pointer;color:var(--ink);margin:3px 4px 3px 0}
+  .btn:hover{border-color:var(--ink)}.btn.acc{border-color:var(--accent);color:var(--accent)}
+  .note{color:var(--muted);font-size:10px;margin:6px 0}
+  .tin{font:10px ui-monospace,monospace;border:1px solid var(--line);border-radius:4px;background:var(--paper);color:var(--ink);padding:5px 6px;width:100%}
+  .mpad{position:relative;width:100%;aspect-ratio:1;touch-action:none;cursor:crosshair;margin:2px 0 4px}
+  .mpad canvas{position:absolute;inset:0;width:100%;height:100%;border:1px solid var(--line);border-radius:6px;background:#fff}
+  .mcn{position:absolute;font-size:9px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;pointer-events:none;user-select:none}
+  .mcn.nw{left:7px;top:6px}.mcn.ne{right:7px;top:6px}.mcn.sw{left:7px;bottom:6px}.mcn.se{right:7px;bottom:6px}
+  .mprev{position:relative;height:40px;background:var(--paper);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:6px}
+  .mprev canvas{position:absolute;inset:0;width:100%;height:100%}
+  #mtrans{position:fixed;bottom:34px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:11}
+  #mtrans button{font:inherit;font-size:10px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:6px 12px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
+  #mtrans button[aria-pressed="true"]{border-color:var(--ink)}
+  #mtrans .msp{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:4px 12px}
+  #mtrans .msp label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  #mtrans .msp input[type=range]{width:74px;accent-color:var(--ink);height:2px}
+  #hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);color:var(--muted);font-size:10px;z-index:5;pointer-events:none}
+  body.noui #panel,body.noui #hint,body.noui #mtrans{display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="panel">
+  <div id="tabs"><button data-tab="scene" aria-selected="true">Scene</button><button data-tab="data">Data</button><button data-tab="io">Export</button></div>
+  <div id="body">
+    <div class="tab on" data-tab="scene">
+      <div class="seg" id="modeSeg">
+        <button data-m="circle" aria-pressed="true">Circle</button>
+        <button data-m="square">Square</button>
+        <button data-m="half">Half-circle</button>
+        <button data-m="number">Number</button>
+      </div>
+      <fieldset id="gMag"><legend>Magnitude</legend></fieldset>
+      <fieldset id="gMotion"><legend>Motion pad</legend>
+        <div class="mpad" id="mpad"><canvas id="mpadc"></canvas>
+          <span class="mcn nw">soft</span><span class="mcn ne">raw</span><span class="mcn sw">slow</span><span class="mcn se">fast</span></div>
+        <div id="gMotionSliders"></div>
+        <div style="margin-top:7px"><select class="tin" id="mEase">
+          <option value="balanced">Balanced — center</option><option value="slow">Slow — smooth start/stop</option>
+          <option value="fast">Fast — quick settle</option><option value="soft">Soft — deep cushion</option>
+          <option value="raw">Raw — linear</option><option value="gentle">Gentle — soft</option><option value="snappy">Snappy — sharp and lively</option></select></div>
+        <div class="mprev"><canvas id="mprevc"></canvas></div>
+      </fieldset>
+    </div>
+    <div class="tab" data-tab="data">
+      <fieldset><legend>Title</legend><input class="tin" id="nTitle"></fieldset>
+      <p class="note">One shared dataset (story-data.json). 2026 magnitude (v1), chip — delta vs 2024.</p>
+    </div>
+    <div class="tab" data-tab="io">
+      <fieldset><legend>Config</legend><button class="btn" id="saveCfg">Save JSON</button><button class="btn" id="loadCfg">Load JSON</button><input type="file" id="loadFile" accept=".json" hidden></fieldset>
+      <fieldset><legend>Shared dataset</legend>
+        <button class="btn" id="loadStoryBtn">Load story data</button>
+        <p class="note" id="storyNote">story-data.json (embedded by default; button re-fetches the sibling file).</p>
+      </fieldset>
+      <fieldset><legend>Image</legend><button class="btn acc" id="svgBtn">Export SVG</button><button class="btn" id="pngBtn">Export PNG</button></fieldset>
+      <fieldset><legend>UI</legend><button class="btn" id="hideBtn">Hide UI (H)</button></fieldset>
+    </div>
+  </div>
+</div>
+<div id="hint">Mode: Circle/Square/Half/Number · click a shape — category · H — UI</div>
+<div id="mtrans"><button id="mReplay">⟲ Replay</button><button id="mLoop" aria-pressed="false">Loop</button><span class="msp"><label>Hold</label><input type="range" id="mHold" min="0.3" max="12" step="0.1" value="1.6"></span></div>
+
+<script>
+/* ================= @data-core-begin — shared dataset rail (story-data.json) ================= */
+const STORY_DATA_INLINE = {
+  "meta": { "title": "Streaming library 2024 → 2026", "t0": "2024", "t1": "2026", "unit": "titles" },
+  "categories": [
+    { "id":"drama",  "name":"Drama",  "v0":120, "v1":168,
+      "children":[{"name":"Crime","v0":50,"v1":70},{"name":"Period","v0":40,"v1":55},{"name":"Teen","v0":30,"v1":43}] },
+    { "id":"comedy", "name":"Comedy", "v0":90,  "v1":110,
+      "children":[{"name":"Sitcom","v0":45,"v1":52},{"name":"Standup","v0":25,"v1":33},{"name":"Rom","v0":20,"v1":25}] },
+    { "id":"docs",   "name":"Docs",   "v0":60,  "v1":102,
+      "children":[{"name":"Nature","v0":22,"v1":40},{"name":"True-crime","v0":20,"v1":38},{"name":"Bio","v0":18,"v1":24}] },
+    { "id":"kids",   "name":"Kids",   "v0":45,  "v1":58,
+      "children":[{"name":"Animated","v0":30,"v1":38},{"name":"Learning","v0":15,"v1":20}] }
+  ],
+  "flow": { "nodes": ["Drama","Comedy","Docs","Kids"],
+    "matrix": [[70,12,8,5],[10,62,9,4],[9,8,55,3],[6,5,4,40]] },
+  "series_seed": 20260707, "points_seed": 424242, "points_n": 140
+};
+const TAU_DC = Math.PI * 2;
+let _storyData = STORY_DATA_INLINE, _dcCache = {}, _dcListeners = [];
+function _dcInvalidate(){ _dcCache = {}; _dcListeners.forEach(fn => fn()); }
+function _dcRng(seed){ let s = (seed >>> 0) || 1; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+function _dcHash(str){ let h = 2166136261; for (let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = (h * 16777619) >>> 0; } return h >>> 0; }
+const DataCore = {
+  onChange(fn){ _dcListeners.push(fn); },
+  raw(){ return _storyData; },
+  setRaw(d){ _storyData = d; _dcInvalidate(); },
+  async load(url){
+    try { const r = await fetch(url || 'story-data.json'); if (!r.ok) throw 0; const d = await r.json(); this.setRaw(d); return true; }
+    catch (e) { return false; }
+  },
+  table(){
+    if (_dcCache.table) return _dcCache.table;
+    const cats = _storyData.categories;
+    const sum0 = cats.reduce((s,c) => s + c.v0, 0) || 1, sum1 = cats.reduce((s,c) => s + c.v1, 0) || 1;
+    return _dcCache.table = cats.map(c => ({ id:c.id, name:c.name, v0:c.v0, v1:c.v1,
+      delta:c.v1 - c.v0, share0:c.v0 / sum0, share1:c.v1 / sum1 }));
+  },
+  hierarchy(){
+    if (_dcCache.hier) return _dcCache.hier;
+    const cats = _storyData.categories;
+    return _dcCache.hier = { name:_storyData.meta.title, children: cats.map(c => ({
+      name:c.name, children:(c.children || []).map(ch => ({ name:ch.name, value: ch.v1 })) })) };
+  },
+  series(){
+    if (_dcCache.series) return _dcCache.series;
+    const cats = _storyData.categories, N = 24;
+    const labels = Array.from({ length:N }, (_,i) => 'M' + (i + 1));
+    const series = cats.map(c => {
+      const r = _dcRng((_storyData.series_seed || 1) ^ _dcHash(c.id));
+      const v0 = c.v0 / 12, v1 = c.v1 / 12, vals = []; let cur = v0;
+      for (let i = 0; i < N; i++){ const target = v0 + (v1 - v0) * i / (N - 1);
+        cur += (target - cur) * 0.35 + (r() - 0.5) * (Math.abs(v1 - v0) * 0.25 + 0.35);
+        vals.push(Math.max(0, cur)); }
+      vals[0] = v0; vals[N - 1] = v1;
+      return { id:c.id, name:c.name, values:vals };
+    });
+    return _dcCache.series = { labels, series };
+  },
+  flow(){
+    if (_dcCache.flow) return _dcCache.flow;
+    return _dcCache.flow = { nodes:_storyData.flow.nodes.slice(), matrix:_storyData.flow.matrix.map(r => r.slice()) };
+  },
+  points(){
+    if (_dcCache.points) return _dcCache.points;
+    const cats = _storyData.categories, n = _storyData.points_n || 140;
+    const r = _dcRng(_storyData.points_seed || 1);
+    const gauss = () => { const u = Math.max(1e-9, r()), v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU_DC * v); };
+    const sum1 = cats.reduce((s,c) => s + c.v1, 0) || 1;
+    const meta = cats.map((c,i) => ({
+      id:c.id, share:c.v1 / sum1, growth:(c.v1 - c.v0) / Math.max(1, c.v0),
+      mx: Math.min(95, Math.max(5, 30 + (c.v1 / sum1) * 140)),
+      my: Math.min(95, Math.max(5, 40 + ((c.v1 - c.v0) / Math.max(1, c.v0)) * 120)),
+      mw: 0.6 + i * 0.35
+    }));
+    const cum = []; meta.reduce((acc,m) => { acc += m.share; cum.push(acc); return acc; }, 0);
+    const pts = [];
+    for (let i = 0; i < n; i++){
+      const w = r(); let idx = cum.findIndex(c => w <= c); if (idx < 0) idx = meta.length - 1;
+      const m = meta[idx];
+      pts.push({ cat:m.id, x: Math.min(100, Math.max(0, m.mx + gauss() * 12)),
+                  y: Math.min(100, Math.max(0, m.my + gauss() * 14)),
+                  w: Math.max(0.2, m.mw + gauss() * 0.4) });
+    }
+    return _dcCache.points = pts;
+  },
+  palette(){
+    const cats = _storyData.categories, ids = ['#0b0b0c','#e0a93e','#5b8fb0','#6f9d7c','#7d8a9e','#b0685b'];
+    const catCols = {}; cats.forEach((c,i) => catCols[c.id] = ids[i % ids.length]);
+    return { paper:'#f6f5f2', ink:'#1a1a1a', muted:'#a9b3a1', accent:'#0b0b0c', gold:'#e0a93e', cats:catCols };
+  }
+};
+addEventListener('message', e => { if (e.data && e.data.type === 'story-data' && e.data.payload){ DataCore.setRaw(e.data.payload); } });
+/* ================= @data-core-end ================= */
+
+/* ================= @core-begin — чистая математика, без DOM ================= */
+const TAU = Math.PI * 2;
+const lerp = (a,b,t) => a + (b - a) * t;
+const clamp01 = v => Math.max(0, Math.min(1, v));
+
+// proportional-area layout: r_i = K·√v_i (AREA ∝ value, not radius) — one shared K across all items,
+// so (r_i/r_j)^2 === v_i/v_j exactly, regardless of shape mode drawn on top of it.
+function magnitudeLayout(table, o){
+  const maxV = Math.max(...table.map(r => r.v1), 1e-9);
+  const K = o.rMax / Math.sqrt(maxV);
+  const marks = table.map(r => ({ ...r, r: K * Math.sqrt(r.v1) }));
+  const gapAbs = o.gap * o.rMax;
+  const totalW = marks.reduce((s,m) => s + 2 * m.r, 0) + gapAbs * (marks.length - 1);
+  let x = -totalW / 2;
+  return marks.map(m => { const cx = x + m.r; x += 2 * m.r + gapAbs; return { ...m, cx, cy:0 }; });
+}
+
+/* ===== @motion-core — единый регулятор движения (Motion Pad) ===== */
+const _mClamp = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const ARCHETYPES = {
+  slow: { speed: 0.55, ease: t => 0.5 * (1 - Math.cos(Math.PI * t)) },
+  fast: { speed: 1.90, ease: t => 1 - Math.pow(1 - t, 3) },
+  soft: { speed: 0.85, ease: t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 },
+  raw:  { speed: 1.30, ease: t => t }
+};
+function motionResolve(x, y){
+  x = _mClamp(x); y = _mClamp(y);
+  const w = { slow:(1-x)*(1-y), fast:x*(1-y), soft:(1-x)*y, raw:x*y }, A = ARCHETYPES;
+  const speed = w.slow*A.slow.speed + w.fast*A.fast.speed + w.soft*A.soft.speed + w.raw*A.raw.speed;
+  const ease = t => { t=_mClamp(t); return w.slow*A.slow.ease(t)+w.fast*A.fast.ease(t)+w.soft*A.soft.ease(t)+w.raw*A.raw.ease(t); };
+  return { speed, ease };
+}
+function speedToX(target, y){
+  const A = ARCHETYPES, left=(1-y)*A.slow.speed+y*A.soft.speed, right=(1-y)*A.fast.speed+y*A.raw.speed;
+  return Math.abs(right-left)<1e-6 ? 0.5 : _mClamp((target-left)/(right-left));
+}
+
+/* ===== reveal-engine — staged appearance gated by ONE globalAlpha multiplier ===== */
+function revealFactors(t, easeFn, n){
+  const c01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+  const E = x => easeFn ? easeFn(c01(x)) : c01(x);
+  const S1 = 0.45, S2 = 0.2;
+  const step = Math.min(0.09, 1.4 / Math.max(1, n)), PDUR = 0.45;
+  const pStart = S1 + S2, pEnd = pStart + n * step + PDUR;
+  const labStart = pEnd - 0.06, labDur = 0.42;
+  const holdEnd = labStart + labDur + (state.anim.hold != null ? state.anim.hold : 1.6), EXIT = 0.65, GAP = 0.5;
+  const cycle = holdEnd + EXIT + GAP;
+  let exitK = 0;
+  if (state.anim.loop) t = ((t % cycle) + cycle) % cycle;
+  else if (t > holdEnd) t = holdEnd;
+  if (state.anim.loop && t > holdEnd) exitK = c01((t - holdEnd) / EXIT);
+  const keep = 1 - E(exitK);
+  return { structK: E(t / S1) * keep, axK: E((t - S1) / S2) * keep,
+           ptsK: E((t - pStart) / (pEnd - pStart)) * keep, labK: E((t - labStart) / labDur) * keep,
+           point: i => E((t - pStart - i * step) / PDUR) * keep };
+}
+/* ================= @core-end ================= */
+
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, lastT = performance.now();
+function resize(){ const dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); if (table.length) rebuild(); }
+addEventListener('resize', resize);
+const css = v => getComputedStyle(document.body).getPropertyValue(v).trim();
+const INK = css('--ink'), MUTED = css('--muted'), ACC = css('--accent'), PAPER = css('--paper');
+
+let REVEAL_A = 1;
+(function(){ const pr = Object.getPrototypeOf(ctx), d = Object.getOwnPropertyDescriptor(pr, 'globalAlpha');
+  if (d && d.set) Object.defineProperty(ctx, 'globalAlpha', { configurable:true,
+    get(){ return d.get.call(ctx); }, set(v){ d.set.call(ctx, v * REVEAL_A); } }); })();
+
+const state = {
+  mag: { mode:'circle', gap:0.5 },
+  data: { title: 'Streaming library 2026' },
+  motion: { x:0.14, y:0.55, speed:1 }, anim: { t:0, loop:0, hold:1.6 }, sel:-1
+};
+let table = [], pal = null, marks = [];
+function rebuild(){ table = DataCore.table(); pal = DataCore.palette();
+  const rMax = Math.min(W, H) * 0.16 || 90;
+  marks = magnitudeLayout(table, { rMax, gap:state.mag.gap }); }
+function applyStoryData(){ state.data.title = DataCore.raw().meta.title + ' ' + DataCore.raw().meta.t1;
+  rebuild(); state.anim.t = 0; state.sel = -1; $('#nTitle').value = state.data.title; }
+DataCore.onChange(applyStoryData);
+
+function drawMark(m, a, cy, mode, col){
+  ctx.fillStyle = col;
+  if (mode === 'square'){ const side = m.r * 1.35;
+    ctx.beginPath(); ctx.roundRect(m.cx - side/2, cy - side/2, side, side, side*0.08); ctx.fill(); }
+  else if (mode === 'half'){
+    ctx.beginPath(); ctx.arc(m.cx, cy + m.r*0.5, m.r, Math.PI, 0); ctx.closePath(); ctx.fill(); }
+  else { ctx.beginPath(); ctx.arc(m.cx, cy, m.r, 0, TAU); ctx.fill(); }
+}
+
+function frame(now){
+  const rawDt = Math.min((now - lastT) / 1000, 0.05); lastT = now;
+  const dt = rawDt * (state.motion.speed || 1); state.anim.t += dt;
+  if (!table.length) rebuild();
+  ctx.fillStyle = PAPER; ctx.fillRect(0, 0, W, H);
+  const mo = motionResolve(state.motion.x, state.motion.y);
+  const R = revealFactors(state.anim.t, mo.ease, marks.length);
+  const cy = H / 2;
+
+  ctx.save(); ctx.translate(W / 2, 0);
+  if (state.mag.mode === 'number'){
+    marks.forEach((m, i) => {
+      const a = R.point(i); if (a <= 0.001) return;
+      REVEAL_A = a;
+      const fs = Math.max(22, m.r * 1.9);
+      ctx.font = '600 ' + fs.toFixed(0) + 'px ui-monospace,monospace';
+      ctx.textAlign = 'center'; ctx.fillStyle = state.sel === i ? ACC : INK;
+      ctx.fillText(Math.round(m.v1), m.cx, cy);
+      ctx.font = '11px ui-monospace,monospace'; ctx.fillStyle = MUTED;
+      ctx.fillText(m.name, m.cx, cy + fs * 0.42);
+      const up = m.delta >= 0; ctx.fillStyle = up ? '#21D184' : ACC;
+      ctx.fillText((up ? '▲ +' : '▼ ') + m.delta, m.cx, cy + fs * 0.42 + 16);
+      ctx.textAlign = 'left';
+    });
+  } else {
+    marks.forEach((m, i) => {
+      const a = R.point(i); if (a <= 0.001) return;
+      REVEAL_A = a;
+      drawMark({ ...m, r:m.r * (0.35 + 0.65 * a) }, a, cy, state.mag.mode, state.sel === i ? ACC : pal.cats[table[i].id]);
+    });
+    REVEAL_A = R.labK; ctx.font = '11px ui-monospace,monospace'; ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.globalAlpha = 0.85 * R.labK;
+    marks.forEach(m => { ctx.fillText(m.name + '  ' + m.v1, m.cx, cy + (state.mag.mode === 'half' ? m.r * 0.6 : m.r) + 24); });
+    ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  }
+  ctx.restore();
+
+  REVEAL_A = 1; ctx.font = '11px ui-monospace,monospace'; ctx.fillStyle = INK; ctx.globalAlpha = 0.65; ctx.textAlign = 'right';
+  ctx.fillText(String(state.data.title).toUpperCase() + ' · ' + state.mag.mode, W - 16, 26);
+  ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+  requestAnimationFrame(frame);
+}
+
+cv.addEventListener('pointerdown', e => {
+  const x = e.clientX - W / 2, y = e.clientY;
+  const hit = marks.findIndex(m => Math.hypot(x - m.cx, y - H / 2) <= m.r * 1.3);
+  state.sel = hit;
+});
+
+/* панель */
+const $ = s => document.querySelector(s);
+const getPath = k => k.split('.').reduce((o,p) => o[p], state);
+const setPath = (k,v) => { const ps = k.split('.'), last = ps.pop(); ps.reduce((o,p) => o[p], state)[last] = v; if (k.startsWith('mag.')) rebuild(); };
+function buildSliders(elId, defs){
+  const el = $('#' + elId); [...el.querySelectorAll('.row')].forEach(r => r.remove());
+  for (const [key, name, min, max, step] of defs){
+    const row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = `<label>${name}</label><input type="range" min="${min}" max="${max}" step="${step}"><input type="number" min="${min}" max="${max}" step="${step}">`;
+    const inp = row.querySelector('input[type=range]'), val = row.querySelector('input[type=number]');
+    const fmt = v => +(+v).toFixed(step < 1 ? 2 : 0);
+    inp.value = getPath(key); val.value = fmt(getPath(key)); inp.dataset.key = key;
+    inp.addEventListener('input', () => { setPath(key, +inp.value); val.value = fmt(inp.value); });
+    val.addEventListener('change', () => { const x = parseFloat(val.value); if (isFinite(x)){ setPath(key, x); inp.value = x; } });
+    el.appendChild(row);
+  }
+}
+function syncPanel(){
+  document.querySelectorAll('#panel input[type=range]').forEach(inp => { const k = inp.dataset.key; if (!k) return;
+    const v = getPath(k), step = +inp.step; inp.value = v; inp.nextElementSibling.value = +(+v).toFixed(step < 1 ? 2 : 0); });
+}
+buildSliders('gMag', [['mag.gap', 'Gap', 0.1, 1.2, 0.02]]);
+buildSliders('gMotionSliders', [['motion.speed', 'Speed', 0.4, 2, 0.01]]);
+$('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+  state.mag.mode = b.dataset.m; [...$('#modeSeg').children].forEach(x => x.setAttribute('aria-pressed', x === b)); state.anim.t = 0; });
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === b.dataset.tab)); });
+document.querySelectorAll('#panel legend').forEach(lg => lg.addEventListener('click', () => lg.parentElement.classList.toggle('closed')));
+$('#nTitle').addEventListener('input', e => state.data.title = e.target.value);
+
+$('#saveCfg').addEventListener('click', () => { const a = document.createElement('a'); a.download = 'magnitude-config.json';
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ version:1, mag:state.mag, motion:state.motion, anim:{ loop:state.anim.loop, hold:state.anim.hold }, data:state.data }, null, 1)], { type:'application/json' })); a.click(); });
+$('#loadCfg').addEventListener('click', () => $('#loadFile').click());
+$('#loadFile').addEventListener('change', e => { const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => { const c = JSON.parse(t);
+    if (c.mag) state.mag = { ...state.mag, ...c.mag }; if (c.motion) state.motion = { ...state.motion, ...c.motion };
+    if (c.anim) state.anim = { ...state.anim, ...c.anim }; if (c.data) state.data = { ...state.data, ...c.data };
+    $('#nTitle').value = state.data.title; syncPanel(); rebuild();
+    document.querySelectorAll('#modeSeg button').forEach(x => x.setAttribute('aria-pressed', x.dataset.m === state.mag.mode)); }); });
+$('#loadStoryBtn').addEventListener('click', () => { const n = $('#storyNote');
+  DataCore.load().then(ok => { n.textContent = ok ? 'loaded story-data.json ✓' : 'fetch blocked (file://) — using embedded copy'; }); });
+
+function svgOut(){
+  const cy = H / 2;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="${PAPER}"/><g transform="translate(${W/2},0)">`;
+  marks.forEach((m,i) => { const col = pal.cats[table[i].id];
+    if (state.mag.mode === 'number'){ s += `<text x="${m.cx.toFixed(1)}" y="${(cy+8).toFixed(1)}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="${Math.max(22,m.r*1.9).toFixed(0)}" font-weight="600" fill="${INK}">${Math.round(m.v1)}</text>`; }
+    else if (state.mag.mode === 'square'){ const side = m.r*1.35; s += `<rect x="${(m.cx-side/2).toFixed(1)}" y="${(cy-side/2).toFixed(1)}" width="${side.toFixed(1)}" height="${side.toFixed(1)}" fill="${col}"/>`; }
+    else if (state.mag.mode === 'half'){ s += `<path d="M${(m.cx-m.r).toFixed(1)} ${(cy+m.r*0.5).toFixed(1)} A${m.r.toFixed(1)} ${m.r.toFixed(1)} 0 0 1 ${(m.cx+m.r).toFixed(1)} ${(cy+m.r*0.5).toFixed(1)} Z" fill="${col}"/>`; }
+    else { s += `<circle cx="${m.cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${m.r.toFixed(1)}" fill="${col}"/>`; }
+  });
+  s += '</g></svg>';
+  const a = document.createElement('a'); a.download = 'magnitude.svg';
+  a.href = URL.createObjectURL(new Blob([s], { type:'image/svg+xml' })); a.click();
+}
+$('#svgBtn').addEventListener('click', svgOut);
+$('#pngBtn').addEventListener('click', () => { const a = document.createElement('a'); a.download = 'magnitude.png'; a.href = cv.toDataURL('image/png'); a.click(); });
+function toggleUI(){ document.body.classList.toggle('noui'); }
+$('#hideBtn').addEventListener('click', toggleUI);
+addEventListener('keydown', e => { if (e.key.toLowerCase() === 'h' && !['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) toggleUI(); });
+
+(function(){ const rp = $('#mReplay'), lp = $('#mLoop'), hd = $('#mHold');
+  rp.addEventListener('click', () => { state.anim.t = 0; }); hd.addEventListener('input', () => { state.anim.hold = +hd.value; });
+  lp.addEventListener('click', () => { state.anim.loop = state.anim.loop ? 0 : 1; lp.setAttribute('aria-pressed', state.anim.loop ? 'true' : 'false'); if (!state.anim.loop) state.anim.t = 0; }); })();
+
+(function initMotionPad(){
+  const cINK = INK, cMUT = MUTED, cACC = ACC, cLINE = css('--line');
+  const padEl = $('#mpad'), padC = $('#mpadc'), prevC = $('#mprevc'), easeSel = $('#mEase'), pc = padC.getContext('2d'), rc = prevC.getContext('2d');
+  const PRESETS_XY = { balanced:[.5,.5], slow:[.12,.12], fast:[.88,.12], soft:[.12,.88], raw:[.88,.88], gentle:[.3,.7], snappy:[.72,.28] };
+  const cl = v => v < 0 ? 0 : v > 1 ? 1 : v;
+  function nearest(){ let b = 'balanced', bd = 1e9; for (const k in PRESETS_XY){ const dx = PRESETS_XY[k][0]-state.motion.x, dy = PRESETS_XY[k][1]-state.motion.y, d = dx*dx+dy*dy; if (d < bd){ bd = d; b = k; } } return b; }
+  function fit(c){ const dpr = Math.min(devicePixelRatio||1,2), r = c.getBoundingClientRect(); c.width = Math.max(1,r.width*dpr); c.height = Math.max(1,r.height*dpr); c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); return { w:r.width, h:r.height }; }
+  let PD = fit(padC), RD = fit(prevC), phase = 0, lastM = performance.now();
+  addEventListener('resize', () => { PD = fit(padC); RD = fit(prevC); }); setTimeout(() => { PD = fit(padC); RD = fit(prevC); }, 90);
+  const cur = () => motionResolve(state.motion.x, state.motion.y);
+  function drawPad(){ const { w,h } = PD, c = cur(); pc.clearRect(0,0,w,h); pc.strokeStyle = cLINE; pc.lineWidth = 1;
+    for (let i=1;i<4;i++){ const g=i/4; pc.globalAlpha=.6; pc.beginPath(); pc.moveTo(g*w,0); pc.lineTo(g*w,h); pc.stroke(); pc.beginPath(); pc.moveTo(0,g*h); pc.lineTo(w,g*h); pc.stroke(); }
+    pc.globalAlpha=1; const p0=13; pc.strokeStyle=cACC; pc.globalAlpha=.28; pc.lineWidth=2; pc.beginPath();
+    for (let i=0;i<=60;i++){ const t=i/60, xx=p0+t*(w-2*p0), yy=(h-p0)-c.ease(t)*(h-2*p0); i?pc.lineTo(xx,yy):pc.moveTo(xx,yy); } pc.stroke();
+    pc.globalAlpha=.1; pc.setLineDash([3,4]); pc.beginPath(); pc.moveTo(p0,h-p0); pc.lineTo(w-p0,p0); pc.stroke(); pc.setLineDash([]); pc.globalAlpha=1;
+    const px=state.motion.x*w, py=(1-state.motion.y)*h; pc.strokeStyle=cINK; pc.globalAlpha=.22; pc.beginPath(); pc.moveTo(px,0); pc.lineTo(px,h); pc.moveTo(0,py); pc.lineTo(w,py); pc.stroke(); pc.globalAlpha=1;
+    pc.fillStyle=cINK; pc.beginPath(); pc.arc(px,py,6,0,TAU); pc.fill(); pc.fillStyle='#fff'; pc.beginPath(); pc.arc(px,py,2.2,0,TAU); pc.fill(); }
+  function drawPrev(dt){ const { w,h } = RD, c = cur(); rc.clearRect(0,0,w,h); const y0=h/2, x0=13, x1=w-13;
+    rc.strokeStyle=cLINE; rc.lineWidth=1; rc.beginPath(); rc.moveTo(x0,y0); rc.lineTo(x1,y0); rc.stroke();
+    phase += dt*state.motion.speed*0.6; if (phase>1.35) phase-=1.35; const p=cl(phase);
+    rc.fillStyle=cMUT; rc.globalAlpha=.45; rc.beginPath(); rc.arc(x0+p*(x1-x0),y0+8,3,0,TAU); rc.fill(); rc.globalAlpha=1;
+    rc.fillStyle=cINK; rc.beginPath(); rc.arc(x0+c.ease(p)*(x1-x0),y0-8,4.6,0,TAU); rc.fill(); }
+  function commit(){ state.motion.speed = +cur().speed.toFixed(2); syncPanel(); easeSel.value = nearest(); drawPad(); }
+  function fromEvt(e){ const r = padEl.getBoundingClientRect(); return { x:(e.clientX-r.left)/r.width, y:1-(e.clientY-r.top)/r.height }; }
+  let drag = false;
+  padEl.addEventListener('pointerdown', e => { drag = true; padEl.setPointerCapture(e.pointerId); const p = fromEvt(e); state.motion.x = cl(p.x); state.motion.y = cl(p.y); commit(); });
+  padEl.addEventListener('pointermove', e => { if (drag){ const p = fromEvt(e); state.motion.x = cl(p.x); state.motion.y = cl(p.y); commit(); } });
+  padEl.addEventListener('pointerup', () => drag = false); padEl.addEventListener('pointercancel', () => drag = false);
+  const spInp = $('#gMotionSliders input[type=range]');
+  spInp.addEventListener('input', () => { state.motion.x = speedToX(+spInp.value, state.motion.y); easeSel.value = nearest(); drawPad(); });
+  easeSel.addEventListener('change', () => { const q = PRESETS_XY[easeSel.value] || [.5,.5]; state.motion.x = q[0]; state.motion.y = q[1]; commit(); });
+  (function ml(now){ const dt = Math.min((now-lastM)/1000,0.05); lastM = now; drawPad(); drawPrev(dt); requestAnimationFrame(ml); })(performance.now());
+  commit();
+})();
+
+resize(); rebuild(); $('#nTitle').value = state.data.title;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
