@@ -19,7 +19,7 @@ CORE = os.path.join(HERE, '_core')
 
 TARGETS = [
     ('desk', 'v1', 'Desk · mobile'), ('desk', 'v2', 'Desk · plant'), ('desk', 'v3', 'Desk · octopus'), ('desk', 'v4', 'Desk · Letter ensemble'),
-    ('desk', 'v5', 'Desk · Deep orbit'), ('desk', 'v6', 'Desk · Helix'), ('desk', 'v7', 'Desk · Living archive'),
+    ('desk', 'v5', 'Desk · Deep orbit'), ('desk', 'v6', 'Desk · Helix'), ('desk', 'v7', 'Desk · Living archive'), ('desk', 'v8', 'Desk · Renewal'), ('desk', 'v9', 'Desk · Inward archive'),
     ('ledger', 'v1', 'Ledger · flower'), ('ledger', 'v2', 'Ledger · vine'), ('ledger', 'v3', 'Ledger · chandelier'),
 ]
 # рельс src/ (свет, тени по приёмникам, материал, движение — принято владельцем), verbatim из main
@@ -149,11 +149,11 @@ def build(scene, ver, title):
         parts.append(script(rd('src', *fn.split('/')), 'инлайн verbatim рельса: src/' + fn))
     for fn in CORE_JS[scene]:
         parts.append(script(rd('lab', 'desk', '_core', fn), 'lab/desk/_core/' + fn))
-    if scene == 'desk' and ver in ('v5', 'v6', 'v7'):
-        parts.append(script(rd('lab', 'desk', 'explore-widgets.js'), 'cached exploratory widgets'))
+    if scene == 'desk' and ver in ('v5', 'v6', 'v7', 'v8', 'v9'):
+        parts.append(script(rd('lab', 'desk', 'explore-next-widgets.js' if ver in ('v8', 'v9') else 'explore-widgets.js'), 'cached exploratory widgets'))
     parts.append(script(rd('lab', scene, ver + '.scene.js'), 'lab/%s/%s.scene.js' % (scene, ver)))
-    if scene == 'desk' and ver in ('v5', 'v6', 'v7'):
-        parts.append(script(rd('lab', 'desk', 'explore.scene.js'), 'shared exploration renderer'))
+    if scene == 'desk' and ver in ('v5', 'v6', 'v7', 'v8', 'v9'):
+        parts.append(script(rd('lab', 'desk', 'explore-next.scene.js' if ver in ('v8', 'v9') else 'explore.scene.js'), 'shared exploration renderer'))
     out = (page.replace('{{TITLE}}', 'RELIEF · ' + title)
                .replace('{{FONTS}}', fonts_css())
                .replace('{{PANEL_CSS}}', panel_css())
@@ -197,8 +197,8 @@ def param_of(d):
 
 def passport(scene, ver, title, html, score):
     rows = decls(('lab', 'desk', '_core', 'app.js'), ('lab', scene, ver + '.scene.js'), ('lab', 'desk', '_core', CORE_JS[scene][-1]))
-    if scene == 'desk' and ver in ('v5', 'v6', 'v7'):
-        rows += decls(('lab', 'desk', 'explore.scene.js'))
+    if scene == 'desk' and ver in ('v5', 'v6', 'v7', 'v8', 'v9'):
+        rows += decls(('lab', 'desk', 'explore-next.scene.js' if ver in ('v8', 'v9') else 'explore.scene.js'))
     seen, params = set(), []
     for d in rows:
         if d[0] not in seen:
