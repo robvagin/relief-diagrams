@@ -3,7 +3,7 @@
   "title": "Desk · Letter ensemble",
   "blurb": "RELIEF lab variant: desk, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "09b159659a212b455f6aacc38d03bfbf9ecf3afcf35dfdf7a739ac5ee8a53c3c",
+  "engineHash": "47b2e541568b7b1fd21400c4acfeedb4f6b1155b1872daa361a1d1b160cb9733",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -352,9 +352,9 @@
       "id": "orbitPeriod",
       "label": "Orbit period, s",
       "type": "number",
-      "default": 72,
-      "min": 24,
-      "max": 180,
+      "default": 144,
+      "min": 48,
+      "max": 240,
       "step": 1
     },
     {
@@ -370,7 +370,34 @@
       "id": "depthView",
       "label": "Depth",
       "type": "number",
-      "default": 0.55,
+      "default": 0.65,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "air",
+      "label": "Float",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01
+    },
+    {
+      "id": "flex",
+      "label": "Paper flex",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01
+    },
+    {
+      "id": "backdrop",
+      "label": "Backdrop shadow",
+      "type": "number",
+      "default": 0.35,
       "min": 0,
       "max": 1,
       "step": 0.01

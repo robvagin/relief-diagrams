@@ -670,3 +670,10 @@ Skills applied: canvas-frame-budget, adaptive-typography, ui-state-completeness,
 - Исходная ревизия: `c9aeb6f`. Последняя строка runtime gate: `приёмка закрыта.`
 
 - 2026-10-05T16:01:34Z - Реализация: `db58816`; сборка, типографика, взаимодействия и Letter-орбита проверены.
+
+### 2026-10-05 - Floating Letter graph
+
+- Desk v4: five US Letter papers linked to a central model-of-record node. One 144-second shared orbit, small depth scaling and gentle harmonic flutter; ink follows the paper deformation.
+- No close support-plane shadow. A faint diffuse backdrop trace and depth-clipped paper-to-paper shadows preserve air between sheets. Connectors are depth sorted with a subtle matte light edge.
+- Small sheets use concise summaries; tap/keyboard focus retains full details. Other scene outputs are unchanged.
+- Verified four orbit views, mobile day/night, 88 typography cases, 360/720-sample motion continuity and reduced-motion stability. Rendered loop closes pixel-identically; quarter-turn negative control changes 21.9% of pixels. Runtime gate: 19/19.
