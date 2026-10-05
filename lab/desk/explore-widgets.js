@@ -54,23 +54,41 @@ function backdrop(g,plates,F){
  });g.restore();
 }
 function route(nodes,ctx,yaw){
- var small=nodes.filter(function(n){return n.shape==='disc'&&n.id!=='hub'&&n.id!=='st0';});
- small.forEach(function(n){n.w=Math.max(28,n.w);n.h=n.w;});
- var cards=nodes.filter(function(n){return small.indexOf(n)<0;}),W=ctx.W,H=ctx.H,cx=W/2,cy=H*.52;
- var rx=W*.43,ry=H*.40,maxRadius=Math.max.apply(null,small.map(function(n){return n.w/2;}));
- // Reserve a continuous outer lane. The bodies keep their size and only their centre is compressed.
- cards.forEach(function(n){var ex=(Math.abs(Math.cos(n.rot))*n.w+Math.abs(Math.sin(n.rot))*n.h)/2,
- ey=(Math.abs(Math.sin(n.rot))*n.w+Math.abs(Math.cos(n.rot))*n.h)/2;
- var body=Math.hypot(ex/rx,ey/ry),limit=Math.max(.08,1-body-(maxRadius+12)/Math.min(rx,ry));
- var dx=(n.x-cx)/rx,dy=(n.y-cy)/ry,d=Math.hypot(dx,dy),k=d>0?limit*Math.tanh(d/limit)/d:1;
- n.x=cx+dx*rx*k;n.y=cy+dy*ry*k;
+ var W=ctx.W,H=ctx.H,unit=Math.min(W,H),by={};nodes.forEach(function(n){by[n.id]=n;});
+ var sheets=nodes.filter(function(n){return n.shape==='sheet';});
+ function limit(v,max){var d=Math.hypot(v[0],v[1]);return d>max?[v[0]*max/d,v[1]*max/d]:v;}
+ function push(n,x,y,budget){
+  var dx=0,dy=0;
+  sheets.forEach(function(o){
+   var c=Math.cos(o.rot),s=Math.sin(o.rot),xx=(x-o.x)*c+(y-o.y)*s,yy=-(x-o.x)*s+(y-o.y)*c;
+   var ex=o.w/2+n.w/2+8,ey=o.h/2+n.h/2+8,q=Math.hypot(xx/ex,yy/ey);
+   // Smooth local potential, no route switching or global perimeter assignment.
+   var k=Math.exp(-2.5*q*q)*budget*1.7,px=xx/ex+.001,py=yy/ey+.001,d=Math.hypot(px,py);
+   dx+=(c*px-s*py)/d*k;dy+=(s*px+c*py)/d*k;
+  });return limit([dx,dy],budget);
+ }
+ ['stages','agents'].forEach(function(id){
+  var parent=by[id],children=nodes.filter(function(n){return id==='stages'?/^st[0-9]/.test(n.id):/^ag[0-9]/.test(n.id);});
+  // Keep the local fan readable when its branch turns edge-on; only the family anchor orbits.
+  children.forEach(function(n,j){var a=(id==='agents'?102*Math.PI/180+(j-2)*.62:-38*Math.PI/180+(j-1)*1.05)+.16*Math.sin(yaw);
+   var radius=id==='agents'?unit*(.105+(j%2)*.032):n.w/2+unit*.065;
+   n.x=parent.x+Math.cos(a)*radius;n.y=parent.y+Math.sin(a)*radius;
+  });
+  var group=[parent].concat(children),common=push(parent,parent.x,parent.y,unit*.035),positions=[];
+  group.forEach(function(n){
+   var x=n.x+common[0],y=n.y+common[1];
+   if(n!==parent){var local=push(n,x,y,unit*.035);x+=local[0];y+=local[1];}
+   positions.push([x,y]);
+  });
+  // Move the family together only if it reaches the viewport edge.
+  var loX=Infinity,hiX=-Infinity,loY=Infinity,hiY=-Infinity;
+  group.forEach(function(n,i){loX=Math.min(loX,positions[i][0]-n.w/2);hiX=Math.max(hiX,positions[i][0]+n.w/2);loY=Math.min(loY,positions[i][1]-n.h/2);hiY=Math.max(hiY,positions[i][1]+n.h/2);});
+  var sx=Math.max(0,12-loX)-Math.max(0,hiX-W+12),sy=Math.max(0,12-loY)-Math.max(0,hiY-H+12);
+  group.forEach(function(n,i){n.x=positions[i][0]+sx;n.y=positions[i][1]+sy;});
  });
- small.forEach(function(n,i){var a=-Math.PI*.70+i*TAU/small.length+.13*Math.sin(yaw+i*.6);
-  // Lane bulges gently toward the closest moving body, without switching routes.
-  var pressure=0;cards.forEach(function(o){var dx=(o.x-cx)/rx,dy=(o.y-cy)/ry;
-   pressure+=Math.exp(-8*Math.pow(-dx*Math.sin(a)+dy*Math.cos(a),2))*Math.max(0,dx*Math.cos(a)+dy*Math.sin(a));});
-  var f=.98+.02*Math.tanh(pressure);n.x=cx+Math.cos(a)*rx*f;n.y=cy+Math.sin(a)*ry*f;
- });
+ // Large cards may overlap each other, but cannot leave the preview.
+ sheets.forEach(function(n){var ex=(Math.abs(Math.cos(n.rot))*n.w+Math.abs(Math.sin(n.rot))*n.h)/2,ey=(Math.abs(Math.sin(n.rot))*n.w+Math.abs(Math.cos(n.rot))*n.h)/2;
+ n.x=Math.max(ex+8,Math.min(W-ex-8,n.x));n.y=Math.max(ey+8,Math.min(H-ey-8,n.y));});
 }
 window.EXPLORE_WIDGETS={backdrop:backdrop,print:print,info:info,short:function(id){return {hero:['Portfolio','€200.4M'],counts:['Calendar','Oct 2026'],gate:['Queue','12 ready'],rule:['Library','24 records'],bars:['Volume','€200.4M'],npl:['Coverage','92.4%']}[id];},blur:blur,stack:stack,route:route};
 })();
