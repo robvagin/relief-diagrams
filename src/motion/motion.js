@@ -28,6 +28,7 @@
 
   /* время кадра в секундах; __freeze/__jump держат override */
   function time(ctx) {
+    if (ctx && ctx.reduced) return 0;           // покой: кадр финальный, время не идёт (L6, P-M2)
     if (clock.override !== null) return clock.override;
     return (ctx.t || 0) / clock.fps;
   }

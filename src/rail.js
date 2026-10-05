@@ -76,7 +76,7 @@
       return {
         id: p.id, kind: p.kind || 'rect', x: p.x + m.dx, y: p.y + m.dy, w: p.w, h: sz,
         r: p.r == null ? (+P.radius || 0) * ui : p.r, rot: (p.rot || 0) + m.rot, holes: p.holes,
-        z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fill, noShadow: p.noShadow, src: p
+        z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fill, noShadow: p.noShadow, ghost: p.ghost, src: p
       };
     });
     F.plates = plates;
@@ -94,6 +94,7 @@
     R.shade.apply(g, R.shade.field(L, floorRect, 0, occ, { scale: scale, G: G }), floorRect, tn.shadow);
     // 5 · плашки по возрастанию высоты
     sortPlates(plates).forEach(function (s) {
+      if (s.ghost) return;                       // пробы: «призрак» отбрасывает тень, но сам не рисуется
       g.save();
       g.beginPath(); R.sdf.path(g, s);
       g.fillStyle = C.css(s.fill || tn.plate); g.fill('evenodd');

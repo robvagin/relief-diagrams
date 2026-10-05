@@ -31,7 +31,8 @@
       var o = R.light.offset(L, c.x, c.y, c.z, hr);
       var sig = R.light.sigma(L, dh), D = R.light.density(L, dh);
       var cont = dh <= 16 * ui, sc = (0.8 + 0.06 * dh / ui) * ui, oc = [0.25 * o[0], 0.25 * o[1]];
-      var Dc = cont ? L.contact * Math.max(0, 1 - dh / (16 * ui)) : 0, skirt = cont ? 0.04 : 0, ss = 2 * ui;
+      // «юбка» AO у опоры: 0,04 при контакте по умолчанию (0,12); ручка Контакт ведёт весь контактный слой
+      var Dc = cont ? L.contact * Math.max(0, 1 - dh / (16 * ui)) : 0, skirt = cont ? 0.04 * Math.min(2, L.contact / 0.12) : 0, ss = 2 * ui;
       var ex = SD().extent(c);
       var reach = 3.2 * sig, reachC = 3.2 * Math.max(sc, ss);
       var bx0 = Math.min(c.x + o[0] - ex[0] - reach, cont ? c.x - ex[0] - reachC : 1e9);

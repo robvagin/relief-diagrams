@@ -892,7 +892,8 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
       var o = R.light.offset(L, c.x, c.y, c.z, hr);
       var sig = R.light.sigma(L, dh), D = R.light.density(L, dh);
       var cont = dh <= 16 * ui, sc = (0.8 + 0.06 * dh / ui) * ui, oc = [0.25 * o[0], 0.25 * o[1]];
-      var Dc = cont ? L.contact * Math.max(0, 1 - dh / (16 * ui)) : 0, skirt = cont ? 0.04 : 0, ss = 2 * ui;
+      // «юбка» AO у опоры: 0,04 при контакте по умолчанию (0,12); ручка Контакт ведёт весь контактный слой
+      var Dc = cont ? L.contact * Math.max(0, 1 - dh / (16 * ui)) : 0, skirt = cont ? 0.04 * Math.min(2, L.contact / 0.12) : 0, ss = 2 * ui;
       var ex = SD().extent(c);
       var reach = 3.2 * sig, reachC = 3.2 * Math.max(sc, ss);
       var bx0 = Math.min(c.x + o[0] - ex[0] - reach, cont ? c.x - ex[0] - reachC : 1e9);
@@ -1089,18 +1090,18 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     if (!(pct > 0)) return;
     var key = [R.streamBase, W, H, seed, pct, T.theme].join('|');
     if (!unevenCache || unevenCache.key !== key) {
-      var cols = 8, rows = Math.max(4, Math.round(8 * H / W)), r = R.stream(seed, 'uneven');
+      var cols = 8, rows = Math.max(4, Math.round(8 * H / W)), r = R.stream(seed, 'uneven'), vals = [];
+      for (var vi = 0; vi < cols * rows; vi++) vals.push(r() - 0.5);       // одно знаковое поле на обе половины
       var mk = function (sign) {
         var c = document.createElement('canvas'); c.width = cols; c.height = rows;
         var cx = c.getContext('2d'), im = cx.createImageData(cols, rows);
         for (var i = 0; i < cols * rows; i++) {
-          var v = r() - 0.5;
-          var a = Math.max(0, sign * v) * 2 * pct / 100;
-          // знаковое наложение: светлее белым поверх, темнее чёрным поверх; доля нормирована на грунт
-          var Y = T.groundY > 0 ? Math.pow(T.groundY, 1 / 2.2) : 0.5;
-          a = sign > 0 ? a / Math.max(0.05, 1 - Y) : a / Math.max(0.05, Y);
-          im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = sign > 0 ? 255 : 0;
-          im.data[i * 4 + 3] = Math.min(255, a * 255);
+          var v = Math.max(0, vals[i] * sign) * 2 * pct / 100;
+          var Y = Math.max(0.05, Math.pow(T.groundY, 1 / 2.2));
+          // как у зерна: плюс сложением ('lighter'), минус множителем ('multiply'), у грунта ровно ±v
+          var c8 = sign > 0 ? Math.round(v * 255) : Math.round(255 * Math.max(0, 1 - v / Y));
+          im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = c8;
+          im.data[i * 4 + 3] = 255;
         }
         cx.putImageData(im, 0, 0);
         return c;
@@ -1108,8 +1109,8 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
       unevenCache = { key: key, pos: mk(1), neg: mk(-1) };
     }
     g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-    g.drawImage(unevenCache.pos, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
-    g.drawImage(unevenCache.neg, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
+    g.globalCompositeOperation = 'lighter'; g.drawImage(unevenCache.pos, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
+    g.globalCompositeOperation = 'multiply'; g.drawImage(unevenCache.neg, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
     g.restore();
   }
 
@@ -1134,13 +1135,14 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
   function grainTiles(pct, T) {
     var key = pct + '|' + T.theme;
     if (grainCache[key]) return grainCache[key];
-    var Y = Math.pow(T.groundY, 1 / 2.2), mk = function (sign) {
+    var Y = Math.max(0.05, Math.pow(T.groundY, 1 / 2.2)), mk = function (sign) {
       var c = document.createElement('canvas'); c.width = noise.w; c.height = noise.h;
       var cx = c.getContext('2d'), im = cx.createImageData(noise.w, noise.h), d = im.data;
       for (var i = 0; i < noise.n.length; i++) {
-        var v = (noise.n[i] - 0.5) * 2 * pct / 100 * sign, a = Math.max(0, v);
-        a = sign > 0 ? a / Math.max(0.05, 1 - Y) : a / Math.max(0.05, Y);
-        d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = sign > 0 ? 255 : 0; d[i * 4 + 3] = Math.min(255, Math.round(a * 255));
+        var v = Math.max(0, (noise.n[i] - 0.5) * 2 * pct / 100 * sign);
+        // плюс: прибавка v·255 поверх ('lighter'); минус: множитель 1 − v/Y ('multiply') — у грунта ровно −v·255
+        var c8 = sign > 0 ? Math.round(v * 255) : Math.round(255 * Math.max(0, 1 - v / Y));
+        d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = c8; d[i * 4 + 3] = 255;
       }
       cx.putImageData(im, 0, 0);
       return c;
@@ -1154,10 +1156,10 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     var ox = Math.floor(r() * noise.w), oy = Math.floor(r() * noise.h), cw = g.canvas.width, ch = g.canvas.height;
     g.save();
     g.setTransform(1, 0, 0, 1, -ox, -oy);                       // физические пиксели, сдвиг тайла от сида
-    [tiles.pos, tiles.neg].forEach(function (t) {
-      g.fillStyle = g.createPattern(t, 'repeat');
-      g.fillRect(0, 0, cw + ox, ch + oy);
-    });
+    g.globalCompositeOperation = 'lighter';
+    g.fillStyle = g.createPattern(tiles.pos, 'repeat'); g.fillRect(0, 0, cw + ox, ch + oy);
+    g.globalCompositeOperation = 'multiply';
+    g.fillStyle = g.createPattern(tiles.neg, 'repeat'); g.fillRect(0, 0, cw + ox, ch + oy);
     g.restore();
   }
 
@@ -1212,6 +1214,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
 
   /* время кадра в секундах; __freeze/__jump держат override */
   function time(ctx) {
+    if (ctx && ctx.reduced) return 0;           // покой: кадр финальный, время не идёт (L6, P-M2)
     if (clock.override !== null) return clock.override;
     return (ctx.t || 0) / clock.fps;
   }
@@ -1358,7 +1361,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
       return {
         id: p.id, kind: p.kind || 'rect', x: p.x + m.dx, y: p.y + m.dy, w: p.w, h: sz,
         r: p.r == null ? (+P.radius || 0) * ui : p.r, rot: (p.rot || 0) + m.rot, holes: p.holes,
-        z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fill, noShadow: p.noShadow, src: p
+        z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fill, noShadow: p.noShadow, ghost: p.ghost, src: p
       };
     });
     F.plates = plates;
@@ -1376,6 +1379,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     R.shade.apply(g, R.shade.field(L, floorRect, 0, occ, { scale: scale, G: G }), floorRect, tn.shadow);
     // 5 · плашки по возрастанию высоты
     sortPlates(plates).forEach(function (s) {
+      if (s.ghost) return;                       // пробы: «призрак» отбрасывает тень, но сам не рисуется
       g.save();
       g.beginPath(); R.sdf.path(g, s);
       g.fillStyle = C.css(s.fill || tn.plate); g.fill('evenodd');
@@ -1990,7 +1994,13 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     plates.push({ id: 'disc', kind: 'circle', x: c5.x, y: c5.y, w: d, z: R.zh(2, P, ui), assembleIndex: 6 });
     labels.push([c5.x, c5.y + d / 2 + 26 * ui, 'disc · z2']);
     if (only) plates = plates.filter(function (p) { return only.indexOf(p.id) >= 0; });
+    plates.forEach(function (p) { if (flags.ghost && flags.ghost.indexOf(p.id) >= 0) p.ghost = true; });
     return {
+      print: flags.gloss ? function (g, s) {          // грязный дубль P-L5: глянцевый блик
+        var gr = g.createRadialGradient(s.x - s.w * 0.2, s.y - s.h * 0.2, 0, s.x, s.y, Math.max(s.w, s.h) * 0.6);
+        gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr; g.fillRect(s.x - s.w, s.y - s.h, s.w * 2, s.h * 2);
+      } : null,
       plates: plates,
       floor: function (g, F) {
         header(g, F, 'Rail calibration · light', lightLabel(F));
@@ -2008,11 +2018,17 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
       floor: function (g, F) { header(g, F, 'Rail calibration · ruler', 'one line width at zoom 0.5 · 1 · 2 · lineW ' + F.lineW.toFixed(2) + ' px'); },
       print: function (g, s, F) {
         var i = +String(s.id).slice(1), z = Z[i], step = 22 * F.ui * z, x0 = s.x - s.w / 2, y0 = s.y - s.h / 2;
-        for (var x = x0 + step; x < x0 + s.w; x += step) R.ink.relief(g, F, [[x, y0], [x, y0 + s.h]], { alpha: 0.7 });
-        for (var y = y0 + step; y < y0 + s.h; y += step) R.ink.relief(g, F, [[x0, y], [x0 + s.w, y]], { alpha: 0.7 });
+        if (!flags.nogrid) for (var x = x0 + step; x < x0 + s.w; x += step) R.ink.relief(g, F, [[x, y0], [x, y0 + s.h]], { alpha: 0.7 });
+        if (!flags.nogrid) for (var y = y0 + step; y < y0 + s.h; y += step) R.ink.relief(g, F, [[x0, y], [x0 + s.w, y]], { alpha: 0.7 });
         var pts = [], r = 46 * F.ui * z;
-        for (var k = 0; k <= 64; k++) pts.push([s.x + r * Math.cos(k / 64 * Math.PI * 2), s.y + r * Math.sin(k / 64 * Math.PI * 2)]);
-        R.ink.print(g, F, pts, { tone: 'ink' });
+        if (flags.ctxscale) {                         // грязный дубль P-T2: масштаб пером вместо координат
+          g.save(); g.translate(s.x, s.y); g.scale(z, z);
+          for (var q = 0; q <= 64; q++) pts.push([46 * F.ui * Math.cos(q / 64 * Math.PI * 2), 46 * F.ui * Math.sin(q / 64 * Math.PI * 2)]);
+          R.ink.print(g, F, pts, { tone: 'ink' }); g.restore(); pts = null;
+        } else {
+          for (var k = 0; k <= 64; k++) pts.push([s.x + r * Math.cos(k / 64 * Math.PI * 2), s.y + r * Math.sin(k / 64 * Math.PI * 2)]);
+          R.ink.print(g, F, pts, { tone: 'ink' });
+        }
         R.ink.print(g, F, [[x0 + 12 * F.ui, y0 + s.h - 12 * F.ui], [x0 + s.w - 12 * F.ui, y0 + 12 * F.ui]], { tone: 'ink' });
         R.ink.text(g, F, '×' + z, x0 + 10 * F.ui, y0 + 20 * F.ui, { s: 1, mono: true, w: 500 });
       }
@@ -2033,7 +2049,8 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     }
     if (name === 'drop') {
       z = u < 1.5 ? z1 : u < 4.5 ? M.spring(z1, 0, u - 1.5) : M.spring(M.spring(z1, 0, 3), z1, u - 4.5);
-      env = u < 1.5 ? 1 : u < 4.5 ? 0 : M.smootherstep((u - 4.5) / 1.4);
+      // отклонено: плавание гаснет за settle с, пока плашка опускается; пробуждение мягкое
+      env = u < 1.5 ? 1 : u < 4.5 ? M.settle(u, 1.5, +P.settle || 0.9) : M.smootherstep((u - 4.5) / 1.4);
     }
     return { env: env, z: z };
   }
@@ -2076,6 +2093,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     draw: function (ctx) {
       var v = ctx.P.view, spec = v === '_ruler' ? viewRuler(ctx) : v === '_float' ? viewFloat(ctx) : v === '_grain' ? viewGrain(ctx) : viewLight(ctx);
       if (flags.nograin) { var g0 = ctx.P.grain; ctx.P.grain = 0; }
+      if (flags.ghost && spec.plates) spec.plates.forEach(function (p) { if (flags.ghost.indexOf(p.id) >= 0) p.ghost = true; });
       if (spec.lightOverride) {
         var keep = {}; Object.keys(spec.lightOverride).forEach(function (k) { keep[k] = ctx.P[k]; ctx.P[k] = spec.lightOverride[k]; });
         R.frame(ctx, spec);
@@ -2089,6 +2107,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
   /* служебные входы стендов (канон кинематики): __probe(id, t) без отрисовки, __freeze, __jump */
   window.__lab = {
     only: function (ids) { only = ids; }, flag: function (k, v) { flags[k] = v == null ? 1 : v; },
+    reset: function () { only = null; flags = {}; },
     stateAt: stateAt
   };
   window.__fxlist = function () { return STATES.map(function (s) { return { id: s, name: s, group: 'float' }; }); };

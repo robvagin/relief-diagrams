@@ -23,18 +23,18 @@
     if (!(pct > 0)) return;
     var key = [R.streamBase, W, H, seed, pct, T.theme].join('|');
     if (!unevenCache || unevenCache.key !== key) {
-      var cols = 8, rows = Math.max(4, Math.round(8 * H / W)), r = R.stream(seed, 'uneven');
+      var cols = 8, rows = Math.max(4, Math.round(8 * H / W)), r = R.stream(seed, 'uneven'), vals = [];
+      for (var vi = 0; vi < cols * rows; vi++) vals.push(r() - 0.5);       // одно знаковое поле на обе половины
       var mk = function (sign) {
         var c = document.createElement('canvas'); c.width = cols; c.height = rows;
         var cx = c.getContext('2d'), im = cx.createImageData(cols, rows);
         for (var i = 0; i < cols * rows; i++) {
-          var v = r() - 0.5;
-          var a = Math.max(0, sign * v) * 2 * pct / 100;
-          // знаковое наложение: светлее белым поверх, темнее чёрным поверх; доля нормирована на грунт
-          var Y = T.groundY > 0 ? Math.pow(T.groundY, 1 / 2.2) : 0.5;
-          a = sign > 0 ? a / Math.max(0.05, 1 - Y) : a / Math.max(0.05, Y);
-          im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = sign > 0 ? 255 : 0;
-          im.data[i * 4 + 3] = Math.min(255, a * 255);
+          var v = Math.max(0, vals[i] * sign) * 2 * pct / 100;
+          var Y = Math.max(0.05, Math.pow(T.groundY, 1 / 2.2));
+          // как у зерна: плюс сложением ('lighter'), минус множителем ('multiply'), у грунта ровно ±v
+          var c8 = sign > 0 ? Math.round(v * 255) : Math.round(255 * Math.max(0, 1 - v / Y));
+          im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = c8;
+          im.data[i * 4 + 3] = 255;
         }
         cx.putImageData(im, 0, 0);
         return c;
@@ -42,8 +42,8 @@
       unevenCache = { key: key, pos: mk(1), neg: mk(-1) };
     }
     g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-    g.drawImage(unevenCache.pos, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
-    g.drawImage(unevenCache.neg, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
+    g.globalCompositeOperation = 'lighter'; g.drawImage(unevenCache.pos, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
+    g.globalCompositeOperation = 'multiply'; g.drawImage(unevenCache.neg, -W / 12, -H / 12, W * 7 / 6, H * 7 / 6);
     g.restore();
   }
 
@@ -68,13 +68,14 @@
   function grainTiles(pct, T) {
     var key = pct + '|' + T.theme;
     if (grainCache[key]) return grainCache[key];
-    var Y = Math.pow(T.groundY, 1 / 2.2), mk = function (sign) {
+    var Y = Math.max(0.05, Math.pow(T.groundY, 1 / 2.2)), mk = function (sign) {
       var c = document.createElement('canvas'); c.width = noise.w; c.height = noise.h;
       var cx = c.getContext('2d'), im = cx.createImageData(noise.w, noise.h), d = im.data;
       for (var i = 0; i < noise.n.length; i++) {
-        var v = (noise.n[i] - 0.5) * 2 * pct / 100 * sign, a = Math.max(0, v);
-        a = sign > 0 ? a / Math.max(0.05, 1 - Y) : a / Math.max(0.05, Y);
-        d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = sign > 0 ? 255 : 0; d[i * 4 + 3] = Math.min(255, Math.round(a * 255));
+        var v = Math.max(0, (noise.n[i] - 0.5) * 2 * pct / 100 * sign);
+        // плюс: прибавка v·255 поверх ('lighter'); минус: множитель 1 − v/Y ('multiply') — у грунта ровно −v·255
+        var c8 = sign > 0 ? Math.round(v * 255) : Math.round(255 * Math.max(0, 1 - v / Y));
+        d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = c8; d[i * 4 + 3] = 255;
       }
       cx.putImageData(im, 0, 0);
       return c;
@@ -88,10 +89,10 @@
     var ox = Math.floor(r() * noise.w), oy = Math.floor(r() * noise.h), cw = g.canvas.width, ch = g.canvas.height;
     g.save();
     g.setTransform(1, 0, 0, 1, -ox, -oy);                       // физические пиксели, сдвиг тайла от сида
-    [tiles.pos, tiles.neg].forEach(function (t) {
-      g.fillStyle = g.createPattern(t, 'repeat');
-      g.fillRect(0, 0, cw + ox, ch + oy);
-    });
+    g.globalCompositeOperation = 'lighter';
+    g.fillStyle = g.createPattern(tiles.pos, 'repeat'); g.fillRect(0, 0, cw + ox, ch + oy);
+    g.globalCompositeOperation = 'multiply';
+    g.fillStyle = g.createPattern(tiles.neg, 'repeat'); g.fillRect(0, 0, cw + ox, ch + oy);
     g.restore();
   }
 

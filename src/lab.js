@@ -46,7 +46,13 @@
     plates.push({ id: 'disc', kind: 'circle', x: c5.x, y: c5.y, w: d, z: R.zh(2, P, ui), assembleIndex: 6 });
     labels.push([c5.x, c5.y + d / 2 + 26 * ui, 'disc · z2']);
     if (only) plates = plates.filter(function (p) { return only.indexOf(p.id) >= 0; });
+    plates.forEach(function (p) { if (flags.ghost && flags.ghost.indexOf(p.id) >= 0) p.ghost = true; });
     return {
+      print: flags.gloss ? function (g, s) {          // грязный дубль P-L5: глянцевый блик
+        var gr = g.createRadialGradient(s.x - s.w * 0.2, s.y - s.h * 0.2, 0, s.x, s.y, Math.max(s.w, s.h) * 0.6);
+        gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr; g.fillRect(s.x - s.w, s.y - s.h, s.w * 2, s.h * 2);
+      } : null,
       plates: plates,
       floor: function (g, F) {
         header(g, F, 'Rail calibration · light', lightLabel(F));
@@ -64,11 +70,17 @@
       floor: function (g, F) { header(g, F, 'Rail calibration · ruler', 'one line width at zoom 0.5 · 1 · 2 · lineW ' + F.lineW.toFixed(2) + ' px'); },
       print: function (g, s, F) {
         var i = +String(s.id).slice(1), z = Z[i], step = 22 * F.ui * z, x0 = s.x - s.w / 2, y0 = s.y - s.h / 2;
-        for (var x = x0 + step; x < x0 + s.w; x += step) R.ink.relief(g, F, [[x, y0], [x, y0 + s.h]], { alpha: 0.7 });
-        for (var y = y0 + step; y < y0 + s.h; y += step) R.ink.relief(g, F, [[x0, y], [x0 + s.w, y]], { alpha: 0.7 });
+        if (!flags.nogrid) for (var x = x0 + step; x < x0 + s.w; x += step) R.ink.relief(g, F, [[x, y0], [x, y0 + s.h]], { alpha: 0.7 });
+        if (!flags.nogrid) for (var y = y0 + step; y < y0 + s.h; y += step) R.ink.relief(g, F, [[x0, y], [x0 + s.w, y]], { alpha: 0.7 });
         var pts = [], r = 46 * F.ui * z;
-        for (var k = 0; k <= 64; k++) pts.push([s.x + r * Math.cos(k / 64 * Math.PI * 2), s.y + r * Math.sin(k / 64 * Math.PI * 2)]);
-        R.ink.print(g, F, pts, { tone: 'ink' });
+        if (flags.ctxscale) {                         // грязный дубль P-T2: масштаб пером вместо координат
+          g.save(); g.translate(s.x, s.y); g.scale(z, z);
+          for (var q = 0; q <= 64; q++) pts.push([46 * F.ui * Math.cos(q / 64 * Math.PI * 2), 46 * F.ui * Math.sin(q / 64 * Math.PI * 2)]);
+          R.ink.print(g, F, pts, { tone: 'ink' }); g.restore(); pts = null;
+        } else {
+          for (var k = 0; k <= 64; k++) pts.push([s.x + r * Math.cos(k / 64 * Math.PI * 2), s.y + r * Math.sin(k / 64 * Math.PI * 2)]);
+          R.ink.print(g, F, pts, { tone: 'ink' });
+        }
         R.ink.print(g, F, [[x0 + 12 * F.ui, y0 + s.h - 12 * F.ui], [x0 + s.w - 12 * F.ui, y0 + 12 * F.ui]], { tone: 'ink' });
         R.ink.text(g, F, '×' + z, x0 + 10 * F.ui, y0 + 20 * F.ui, { s: 1, mono: true, w: 500 });
       }
@@ -89,7 +101,8 @@
     }
     if (name === 'drop') {
       z = u < 1.5 ? z1 : u < 4.5 ? M.spring(z1, 0, u - 1.5) : M.spring(M.spring(z1, 0, 3), z1, u - 4.5);
-      env = u < 1.5 ? 1 : u < 4.5 ? 0 : M.smootherstep((u - 4.5) / 1.4);
+      // отклонено: плавание гаснет за settle с, пока плашка опускается; пробуждение мягкое
+      env = u < 1.5 ? 1 : u < 4.5 ? M.settle(u, 1.5, +P.settle || 0.9) : M.smootherstep((u - 4.5) / 1.4);
     }
     return { env: env, z: z };
   }
@@ -132,6 +145,7 @@
     draw: function (ctx) {
       var v = ctx.P.view, spec = v === '_ruler' ? viewRuler(ctx) : v === '_float' ? viewFloat(ctx) : v === '_grain' ? viewGrain(ctx) : viewLight(ctx);
       if (flags.nograin) { var g0 = ctx.P.grain; ctx.P.grain = 0; }
+      if (flags.ghost && spec.plates) spec.plates.forEach(function (p) { if (flags.ghost.indexOf(p.id) >= 0) p.ghost = true; });
       if (spec.lightOverride) {
         var keep = {}; Object.keys(spec.lightOverride).forEach(function (k) { keep[k] = ctx.P[k]; ctx.P[k] = spec.lightOverride[k]; });
         R.frame(ctx, spec);
@@ -145,6 +159,7 @@
   /* служебные входы стендов (канон кинематики): __probe(id, t) без отрисовки, __freeze, __jump */
   window.__lab = {
     only: function (ids) { only = ids; }, flag: function (k, v) { flags[k] = v == null ? 1 : v; },
+    reset: function () { only = null; flags = {}; },
     stateAt: stateAt
   };
   window.__fxlist = function () { return STATES.map(function (s) { return { id: s, name: s, group: 'float' }; }); };
