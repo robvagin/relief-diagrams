@@ -2477,7 +2477,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
       g.beginPath(); g.arc(s.x, s.y, r, 0, Math.PI * 2); g.fill();
     });
     // подписи сегментов наружу по лучу
-    if (P.labels !== 'none') {
+    if (P.labels !== 'none' && 11.67 * sc * 0.95 >= 7) {          // мельче 7 px подпись не читается — не печатаем
       var Fw = Object.assign({}, F, { ui: sc * 0.95 }), wu = Fw.ui, segs = S.filter(function (s) { return s.nd.role === 'segment'; });
       // препятствия: все плашки кругами (семечки — облаком вокруг сегмента), уже поставленные подписи
       var obs = S.filter(function (s) { return s.nd.role !== 'loan'; }).map(function (s) {
@@ -2502,6 +2502,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
       });
     }
     // легенда «How to read»
+    if (F.H < 420) return;                                          // во фрагменте легенду несёт страница (паспорт)
     var lx = F.W * 0.04, ly = F.H - F.H * 0.06 - 52 * ui;
     R.ink.text(g, F, 'How to read', lx, ly, { s: 0, caps: true, tone: 'ink3' });
     ['Area — exposure', 'Distance from the parent — share of it', 'Height — verified · flat — non-performing'].forEach(function (t, k) {
@@ -2527,6 +2528,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     } else if (nd.role === 'stage') {
       g.save(); g.translate(s.x, s.y); g.rotate(s.rot || 0);
       var x0 = -s.w / 2 + 14 * ui, y0 = -s.h / 2;
+      if (11.67 * ui < 7) { I.text(g, F, pct(nd.share), x0, s.h / 2 - 14 * ui, { s: 5, mono: true, alpha: al }); g.restore(); return; }
       I.text(g, F, nd.label, x0, y0 + 26 * ui, { s: 2, w: 500, alpha: al });
       I.text(g, F, money(nd.value) + ' · ' + nd.count + ' loans', x0, y0 + 44 * ui, { s: 0, mono: true, tone: 'ink2', alpha: al });
       I.text(g, F, pct(nd.share), x0, s.h / 2 - 14 * ui, { s: 5, w: 400, mono: true, tone: 'ink', alpha: al });
