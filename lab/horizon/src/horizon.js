@@ -58,7 +58,7 @@
     function rebuild(ctx, keepNav) {
       if (!S.G) S.G = H.buildGraph(ctx.data);
       S.tree = H.buildTree(S.G, ctx.P.focus, Math.round(+ctx.P.depthH));
-      H.layout(S.tree, +ctx.P.link);
+      H.layout(S.tree, +ctx.P.link, V.wedge ? V.wedge[0] : undefined, V.wedge ? V.wedge[1] : undefined);
       if (!keepNav) { S.nav = H.Nav(); S.nav.center = S.tree.root.id; S.settledAt = -10; }
       if (V.prepare) V.prepare(S, ctx);
     }
@@ -95,6 +95,7 @@
         });
         nd.plate = plates[plates.length - 1];
       });
+      if (V.plates) V.plates(S, ctx, U, plates);
       var out = R.render(ctx, {
         plates: plates,
         floor: function (g, T, U2) { floor(g, T, U2, ctx, nodes); },

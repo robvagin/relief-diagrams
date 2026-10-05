@@ -148,7 +148,7 @@
 
   // раскладка Лэмпинга: ребёнок на гипер-дистанции link в системе родителя,
   // клин ребёнка = концы клина родителя, увиденные из ребёнка, × 0.7 на уровень
-  function layout(tree, link) {
+  function layout(tree, link, a0, half) {
     var r = Math.tanh(link / 2);
     function place(t, F, a0, half) {
       t.z = apply(F, [0, 0]);
@@ -166,7 +166,7 @@
         place(k, Fk, ang, Math.min(kh, Math.PI * 0.45));
       });
     }
-    place(tree.root, ID, -Math.PI / 2, Math.PI);
+    place(tree.root, ID, a0 === undefined ? -Math.PI / 2 : a0, half === undefined ? Math.PI : half);
   }
 
   // дистанции по дереву от узла (для высот и колец подписей)
