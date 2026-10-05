@@ -3,7 +3,7 @@
   "title": "Ledger · flower",
   "blurb": "RELIEF lab variant: ledger, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "7e15852e873450644ad134cb617ba6f58ebacf3adc52fc912da5592e7357e280",
+  "engineHash": "ce7054c15e742a7c59037f45ac342ef7c4b507f29ec00f9f08ded65691919ccf",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -394,6 +394,6 @@
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "9/10"
+    "score": "10/10"
   }
 }

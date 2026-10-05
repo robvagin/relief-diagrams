@@ -39,6 +39,7 @@
   }
   // легенда «How to read» печатью на полу
   function howTo(g, F, I, x, y, lines) {
+    if (F.W < 700) return;                       // узкий кадр и фрагмент: легенда уходит в подсказку панели
     K.text(g, F, 'How to read', x, y, { size: 1, caps: true, weight: 500, color: I.ink3, min: 7 });
     lines.forEach(function (l, i) { K.text(g, F, l, x, y + (16 + 14 * i) * F.ui, { size: 1, color: I.ink2, min: 7 }); });
   }

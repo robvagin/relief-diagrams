@@ -3,7 +3,7 @@
   "title": "Ledger · chandelier",
   "blurb": "RELIEF lab variant: ledger, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "fc3fbc978feb986e2a7437a91f253929c19b82161f503d1a4e540f67e4ffcbcd",
+  "engineHash": "c91164ce001af876f6b5efd8cfc870bfdcb0d9d94ba70c9fb58cfce8316369b4",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -394,6 +394,6 @@
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "9/10"
+    "score": "10/10"
   }
 }

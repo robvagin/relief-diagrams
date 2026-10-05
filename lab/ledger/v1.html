@@ -124,6 +124,7 @@ body{font-family:Geist,system-ui,sans-serif;overflow:hidden}
 .pv2-hint{margin:0;font:400 var(--t1)/1.4 var(--sans);letter-spacing:var(--track-s);color:var(--ink3)}
 .pv2-foot{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
 .pv2 .sw{cursor:pointer}.pv2 .seg button{cursor:pointer}
+.pv2 input.sval{-webkit-appearance:none;appearance:none}
 html.is-embed .app{grid-template-columns:minmax(0,1fr)}
 html.is-embed .panel{display:none}
 @media (max-width:767px){
@@ -2449,6 +2450,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
   }
   // легенда «How to read» печатью на полу
   function howTo(g, F, I, x, y, lines) {
+    if (F.W < 700) return;                       // узкий кадр и фрагмент: легенда уходит в подсказку панели
     K.text(g, F, 'How to read', x, y, { size: 1, caps: true, weight: 500, color: I.ink3, min: 7 });
     lines.forEach(function (l, i) { K.text(g, F, l, x, y + (16 + 14 * i) * F.ui, { size: 1, color: I.ink2, min: 7 }); });
   }

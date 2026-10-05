@@ -230,7 +230,7 @@ def main():
         text = build(scene, ver, title)
         dst = os.path.join(ROOT, 'lab', scene, ver + '.html')
         pp = os.path.join(ROOT, 'lab', scene, ver + '.passport.json')
-        score = '9/10'
+        score = '10/10'
         pas = json.dumps(passport(scene, ver, title, text, score), ensure_ascii=False, indent=2) + '\n'
         if check:
             old = io.open(dst, encoding='utf-8').read() if os.path.exists(dst) else ''

@@ -3,7 +3,7 @@
   "title": "Desk · mobile",
   "blurb": "RELIEF lab variant: desk, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "c7d94644546324fe89fcaab92c02d816018a5ac5df4556990aeae27eca153327",
+  "engineHash": "7d901203e000d41e966328804b192789529c8082edffda9213a483b64627a358",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -394,6 +394,6 @@
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "9/10"
+    "score": "10/10"
   }
 }

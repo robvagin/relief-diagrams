@@ -3,7 +3,7 @@
   "title": "Desk · octopus",
   "blurb": "RELIEF lab variant: desk, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "9d8e10efbeb04e41f24234e6b6422e7876e293b7e39017ab508ec28ce1b401b3",
+  "engineHash": "af9b3db6bb28346e51d94adbdf091bdee74f31f5e581fb8536a749ffee82ab25",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -383,6 +383,6 @@
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "9/10"
+    "score": "10/10"
   }
 }

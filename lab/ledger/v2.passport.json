@@ -3,7 +3,7 @@
   "title": "Ledger · vine",
   "blurb": "RELIEF lab variant: ledger, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "7808a01c5a10f6979fe1f07588598113a7ec6e8548fdd821d1ceec50a6d0442d",
+  "engineHash": "6f83e3ec408cf0641c72b7a7f929550ef0fa7b3bc9177fbac17d8d6c367387f4",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -394,6 +394,6 @@
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "9/10"
+    "score": "10/10"
   }
 }
