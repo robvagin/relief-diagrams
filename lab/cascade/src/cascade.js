@@ -132,37 +132,40 @@
     kids.forEach((k) => rec(k, 2));
   }
 
-  // v3 · мобиль сверху вниз: ярусы, коромысла, нити; share кладёт глубину подвеса по доле
+  // v3 · мобиль сверху вниз (Calder): дети на коромысле, коромысло висит в центре масс,
+  // поэтому Σ w_i·x_i = 0 точно и тяжёлое ближе к точке подвеса. Порядок на коромысле: по весу
+  // по убыванию попеременно справа и слева от центра. Пролёты поддеревьев не наезжают (снизу вверх).
+  // share: длина нити = u + Ld·доля (дистанция несёт долю); balance: нити равные, несут только плечи
   function mobile(T, P, rect, S, u) {
-    const root = T.root;
-    root.x = rect.x + rect.w / 2; root.y = rect.y + root.r + rect.h * 0.04; root.span = rect.w;
-    const Ld0 = rect.h * 0.30;
+    const root = T.root, gap = u * 0.9;
+    const Ld0 = rect.h * 0.20;
+    const ext = (n) => {
+      n.L = -n.r; n.R = n.r;
+      if (!n.kids.length) return;
+      n.kids.forEach(ext);
+      const s = n.kids.slice().sort((a, b) => b.v - a.v), seq = [];
+      s.forEach((c, i) => { if (i % 2) seq.unshift(c); else seq.push(c); });
+      let x = 0;
+      seq.forEach((c, i) => { if (i) x += seq[i - 1].R + gap - c.L; c.rx = x; });
+      const W = seq.reduce((t, c) => t + c.v, 0), com = seq.reduce((t, c) => t + c.v * c.rx, 0) / W;
+      seq.forEach((c) => { c.rx -= com; n.L = Math.min(n.L, c.rx + c.L); n.R = Math.max(n.R, c.rx + c.R); });
+      n.seq = seq;
+    };
+    ext(root);
     T.links = [];
+    root.x = rect.x + rect.w / 2 + (root.L + root.R) / -2; root.y = rect.y + root.r;
     const rec = (p, depth) => {
       if (!p.kids.length) return;
       const Ld = Ld0 * Math.pow(0.62, depth - 1);
-      const maxr = Math.max(...p.kids.map((c) => c.r));
-      if (P.mode === 'balance' && !P.phyllo) {
-        const span = Math.min(p.span * 0.46, rect.w * 0.42 * Math.pow(0.5, depth - 1));
-        const ord = arms(p.kids, span);
-        const rodY = p.y + p.r + u + Ld * 0.35;
-        const bar = { cx: p.x, cy: rodY, pr: [1, 0], xs: [] };
-        ord.forEach((c) => {
-          c.x = p.x + c.arm; c.y = rodY + u + Ld * 0.45 + c.r; c.span = span * 1.1; bar.xs.push(c.arm);
-          T.links.push({ a: p, b: c, depth, bar, hang: true });
-        });
-        T.links.push({ rod: bar, a: p, depth });
-      } else {
-        // доля: подвес длиннее у большей доли; братья по слотам ∝ (листьев)^0.7 внутри пролёта родителя
-        const Wk = p.kids.map((c) => Math.pow(c.leaves, 0.7)), SWk = Wk.reduce((x, y) => x + y, 0);
-        let x0 = p.x - p.span / 2;
-        p.kids.forEach((c, j) => {
-          const w = p.span * Wk[j] / SWk;
-          c.x = x0 + w / 2; c.span = w; x0 += w;
-          c.y = p.y + p.r + maxr + u + (P.phyllo ? Ld * 0.5 * Math.sqrt(j + 1) : Ld * (0.25 + c.share));
-          T.links.push({ a: p, b: c, depth, elbow: true });
-        });
-      }
+      const rodY = p.y + p.r + u + Ld * 0.35;
+      p.kids.forEach((c) => {
+        c.x = p.x + c.rx;
+        const str = P.mode === 'share' ? u + Ld * c.share : u + Ld * 0.45;
+        c.y = rodY + str + c.r;
+      });
+      const xs = p.kids.map((c) => c.rx);
+      T.links.push({ hangRod: { y: rodY, x0: p.x + Math.min(0, ...xs), x1: p.x + Math.max(0, ...xs) }, a: p, depth });
+      p.kids.forEach((c) => T.links.push({ a: p, b: c, depth, string: rodY }));
       p.kids.forEach((c) => rec(c, depth + 1));
     };
     rec(root, 1);
@@ -200,7 +203,7 @@
     const s = Math.min(1, rect.w / (x1 - x0 + 2 * pad), rect.h / (y1 - y0 + 2 * pad));
     const bx = (x0 + x1) / 2, by = (y0 + y1) / 2, tx = rect.x + rect.w / 2, ty = rect.y + rect.h / 2;
     T.all.forEach((n) => { n.x = tx + (n.x - bx) * s; n.y = ty + (n.y - by) * s; n.r *= s; });
-    T.links.forEach((l) => { if (l.bar && !l.bar._f) { l.bar._f = 1; l.bar.cx = tx + (l.bar.cx - bx) * s; l.bar.cy = ty + (l.bar.cy - by) * s; l.bar.xs = l.bar.xs.map((x) => x * s); } if (l.rod && !l.rod._f) { l.rod._f = 1; l.rod.cx = tx + (l.rod.cx - bx) * s; l.rod.cy = ty + (l.rod.cy - by) * s; l.rod.xs = l.rod.xs.map((x) => x * s); } });
+    T.links.forEach((l) => { if (l.hangRod) { l.hangRod.y = ty + (l.hangRod.y - by) * s; l.hangRod.x0 = tx + (l.hangRod.x0 - bx) * s; l.hangRod.x1 = tx + (l.hangRod.x1 - bx) * s; } if (l.string != null) l.string = ty + (l.string - by) * s; if (l.bar && !l.bar._f) { l.bar._f = 1; l.bar.cx = tx + (l.bar.cx - bx) * s; l.bar.cy = ty + (l.bar.cy - by) * s; l.bar.xs = l.bar.xs.map((x) => x * s); } if (l.rod && !l.rod._f) { l.rod._f = 1; l.rod.cx = tx + (l.rod.cx - bx) * s; l.rod.cy = ty + (l.rod.cy - by) * s; l.rod.xs = l.rod.xs.map((x) => x * s); } });
     T.fitScale = s;
   }
 
@@ -273,7 +276,7 @@
     const T = tree(P); T.S = S; T.W = W; T.H = H;
     radii(T, P, S);
     if (V === 'v3') mobile(T, P, rect, S, u); else radial(T, P, rect, S, u, ctx.rand);
-    relax(T, u);
+    if (V !== 'v3') relax(T, u);
     fit(T, rect);
     const labs = labels(g, T, P, S);
     T.labs = labs; T.rect = rect; T.u = u;
@@ -328,7 +331,19 @@
           RL.relief(gg, L, (ox, oy) => { gg.beginPath(); gg.moveTo(a.x + ex / el * (l.a.r + gap) + ox, a.y + ey / el * (l.a.r + gap) + oy); gg.lineTo(b.cx + dx + ox, b.cy + dy + oy); });
           return;
         }
+        if (l.hangRod) {
+          const r = l.hangRod, a = at(l.a);
+          RL.relief(gg, L, (ox, oy) => { gg.beginPath(); gg.moveTo(r.x0 + ox, r.y + oy); gg.lineTo(r.x1 + ox, r.y + oy); });
+          RL.relief(gg, L, (ox, oy) => { gg.beginPath(); gg.moveTo(a.x + ox, a.y + l.a.r + gap + oy); gg.lineTo(a.x + ox, r.y + oy); });
+          return;
+        }
         const a = at(l.a), b = at(l.b);
+        if (l.string != null) {
+          const sx = l.a.x + l.b.rx * T.fitScale;
+          RL.relief(gg, L, (ox, oy) => { gg.beginPath(); gg.moveTo(sx + ox, l.string + oy); gg.lineTo(b.x + ox, b.y - l.b.r - gap + oy); });
+          if (P.ticks && P.mode === 'share') ticks(gg, L, sx, l.string, b.x, b.y - l.b.r, l.b.share, T.rect.h * 0.20 * Math.pow(0.62, l.depth - 1) * T.fitScale, S, true);
+          return;
+        }
         if (l.bar) {
           const bar = l.bar, dx = a.x - l.a.x, dy = a.y - l.a.y;
           const sx = bar.cx + bar.pr[0] * l.b.arm + dx, sy = bar.cy + bar.pr[1] * l.b.arm + dy;
@@ -405,7 +420,7 @@
     const lines = [
       'HOW TO READ',
       'Area = ' + (P.metric === 'count' ? 'number of loans' : 'exposure, EUR'),
-      P.mode === 'share' ? 'Distance = share of parent' : 'Arm = 1 / weight',
+      P.mode === 'share' ? 'Distance = share of parent' : (V === 'v3' ? 'Each rod hangs at its centre of mass' : 'Arm = 1 / weight'),
       P.mode === 'share' && P.ticks ? 'Tick = 10 % of parent' : 'Heavier hangs closer',
       'Height = level: book, stage › segment, country'
     ];
