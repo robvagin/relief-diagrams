@@ -60,6 +60,11 @@
     var g = ctx.g, P = ctx.P, W = ctx.W, H = ctx.H, ui = R.ui(W, H), C = R.color;
     var T = R.tokens(ctx.theme, P.accent), tn = R.material.tints(T, +P.temp || 0);
     var L = R.light.state(P, W, H, ui), tsec = R.motion.time(ctx), still = !!ctx.reduced;
+    // лампа поднимает альбедо под собой (пятно = свет, а не только тень по краям); ночью базальт без этого пропадает
+    if (L.mode === 'lamp' && L.lamp.pool > 0) {
+      var gain = 1 + (T.theme === 'night' ? 2.6 : 0.3) * L.lamp.pool, up = function (c) { return c.map(function (x) { return Math.min(255, x * gain); }); };
+      tn = Object.assign({}, tn, { ground: up(tn.ground), plate: up(tn.plate) });
+    }
     var F = { ctx: ctx, g: g, P: P, W: W, H: H, ui: ui, u: Math.min(W, H) / 48, T: T, tn: tn, L: L, tsec: tsec,
       lineW: R.lineW(ui), still: still };
 

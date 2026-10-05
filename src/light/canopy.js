@@ -8,7 +8,7 @@
   'use strict';
   var R = window.RELIEF = window.RELIEF || {};
   var TAU = Math.PI * 2, Q = 0.25, HC = 600;
-  var LAYERS = [{ h: 0.55, wind: 1.3, a: 0.80 }, { h: 1.0, wind: 1.0, a: 0.72 }, { h: 1.5, wind: 0.7, a: 0.62 }];
+  var LAYERS = [{ h: 0.55, wind: 1.3, a: 0.52 }, { h: 1.0, wind: 1.0, a: 0.44 }, { h: 1.5, wind: 0.7, a: 0.36 }];
   var cv = null, cg = null, lay = null, lg = null, cache = null;
 
   function layout(seed, W, H, ui) {
@@ -16,12 +16,14 @@
     if (cache && cache.key === key) return cache;
     var r = R.stream(seed, 'canopy'), cl = [], fl = [], M = 80 * ui;
     for (var i = 0; i < 70; i++) {
-      var size = (18 + 46 * r()) * ui * (1.4 + r());              // кластер = горсть листьев
-      cl.push({
-        x: -M + r() * (W + 2 * M), y: -M + r() * (H + 2 * M), rx: size, ry: size * (0.45 + 0.4 * r()),
-        rot: r() * Math.PI, layer: i % 3, branch: Math.floor(r() * 7),
-        p1: r() * TAU, p2: r() * TAU, p3: r() * TAU, p4: r() * TAU, p5: r() * TAU, p6: r() * TAU
-      });
+      // кластер = горсть листьев: 7 эллипсов 18–64 px вокруг центра ветки
+      var cx = -M + r() * (W + 2 * M), cy = -M + r() * (H + 2 * M), spread = (30 + 50 * r()) * ui, leaves = [];
+      for (var q = 0; q < 7; q++) {
+        var len = (18 + 46 * r()) * ui;
+        leaves.push({ dx: (r() - 0.5) * 2 * spread, dy: (r() - 0.5) * 2 * spread, rx: len / 2, ry: len * (0.18 + 0.14 * r()), rot: r() * Math.PI });
+      }
+      cl.push({ x: cx, y: cy, leaves: leaves, layer: i % 3, branch: Math.floor(r() * 7),
+        p1: r() * TAU, p2: r() * TAU, p3: r() * TAU });
     }
     for (var k = 0; k < 12; k++) fl.push({ x: r() * W, y: r() * H, rad: (7 + 12 * r()) * ui, p: r() * TAU, rank: k });
     var br = []; for (var b = 0; b < 7; b++) br.push([r() * TAU, r() * TAU]);
@@ -54,8 +56,13 @@
         var bp = c.br[e.branch];
         var dx = (band(1, 6, c.trunk[0]) + band(3, 2.5, bp[0]) + band(12, 0.8, e.p1)) * gust * Ld.wind * ui;
         var dy = (band(1, 3, c.trunk[1]) + band(3, 1.5, bp[1]) + band(12, 0.6, e.p2)) * gust * Ld.wind * ui;
+        var tw = 0.04 * band(3, 1, e.p3);
         lg.beginPath();
-        lg.ellipse((e.x + dx) * Q, (e.y + dy) * Q, e.rx * Q, e.ry * Q, e.rot + 0.04 * band(3, 1, e.p3), 0, TAU);
+        for (var q = 0; q < e.leaves.length; q++) {
+          var lf = e.leaves[q], lx = (e.x + lf.dx + dx) * Q, ly = (e.y + lf.dy + dy) * Q;
+          lg.moveTo(lx + lf.rx * Q, ly);
+          lg.ellipse(lx, ly, lf.rx * Q, lf.ry * Q, lf.rot + tw, 0, TAU);
+        }
         lg.fill();
       }
       // ближняя крона резче, дальняя мягче: σ растёт с высотой слоя
