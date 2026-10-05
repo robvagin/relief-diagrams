@@ -677,3 +677,13 @@ Skills applied: canvas-frame-budget, adaptive-typography, ui-state-completeness,
 - No close support-plane shadow. A faint diffuse backdrop trace and depth-clipped paper-to-paper shadows preserve air between sheets. Connectors are depth sorted with a subtle matte light edge.
 - Small sheets use concise summaries; tap/keyboard focus retains full details. Other scene outputs are unchanged.
 - Verified four orbit views, mobile day/night, 88 typography cases, 360/720-sample motion continuity and reduced-motion stability. Rendered loop closes pixel-identically; quarter-turn negative control changes 21.9% of pixels. Runtime gate: 19/19.
+
+### 2026-10-05 - Лёгкий оборот исходного mobile
+
+Skills applied: canvas-frame-budget, motion-kinematics-canon.
+
+- V4 возвращён к геометрии v1: те же 17 узлов, 16 связей и размеры шести листов. Деформация бумаги убрана. V1 не изменён.
+- Общий оборот96s, небольшая глубина без локального вращения карточек. Тени только на пересечениях, из кешированных силуэтов; тяжёлые пиксельные поля и полосовая отрисовка удалены.
+- Сравнение Chromium1440×900 после прогрева,180rAF-интервалов: старый вариант24.83fps,46кадров>25ms; новый60.00fps,0кадров>25ms. Пустая страница60.00fps. CPU-отрисовка p95:243.2ms→0.5ms. Это измерение тестовой машины.
+- Проверки: геометрия исходника, цикл360/720сэмплов,92типографических случая, мобильный день/ночь, клавиатура/детали и PNG3840×2160 без подмены живого графа.
+- Финальная приёмка:19/19. Сохранён детерминированный таймер проекта для повторяемых кадров и экспорта. Последняя строка гейта: `приёмка закрыта.`
