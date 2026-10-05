@@ -3,7 +3,7 @@
   "title": "Desk · Letter ensemble",
   "blurb": "RELIEF lab variant: desk, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "b56f1e5c1e3a8a3367d0b28e2bf935a6efb5b58e17bcc7e8f0958751caaa4655",
+  "engineHash": "e6e9deed2d3dfc0bf8643c0e9fb552739a449bec4bf554fdd63fe020c0783fb4",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -373,6 +373,24 @@
       "default": 0.65,
       "min": 0,
       "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "refresh",
+      "label": "Content refresh",
+      "type": "boolean",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    {
+      "id": "refreshWeight",
+      "label": "Refresh weight",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
       "step": 0.01
     }
   ],
