@@ -6,8 +6,16 @@
   'use strict';
   var R = window.RELIEF = window.RELIEF || {};
 
-  /* поток случайности: та же конструкция, что у kit-scene (cyrb128 + sfc32), свой слой на назначение,
-     чтобы канопи, неровность и фазы не сдвигали поток геометрии сцены */
+  /* поток случайности рельса (L11): база берётся из потока kit-scene ctx.randNoise (четыре числа,
+     затем reset — сцена получает свой поток нетронутым), слой на назначение — cyrb128 + sfc32 от базы,
+     чтобы канопи, неровность и фазы не сдвигали поток геометрии сцены и друг друга */
+  R.streamBase = '';
+  R.seedFrom = function (ctx) {
+    var b = [ctx.randNoise(), ctx.randNoise(), ctx.randNoise(), ctx.randNoise()].join(',');
+    ctx.randNoise.reset();
+    R.streamBase = b;
+    return b;
+  };
   function cyrb128(str) {
     var h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
     for (var i = 0, k; i < str.length; i++) {
@@ -20,7 +28,7 @@
     return [(h1 ^ h2 ^ h3 ^ h4) >>> 0, (h2 ^ h1) >>> 0, (h3 ^ h1) >>> 0, (h4 ^ h1) >>> 0];
   }
   R.stream = function (seed, layer) {
-    var s = cyrb128(String(seed) + '/relief/' + layer), a = s[0], b = s[1], c = s[2], d = s[3];
+    var s = cyrb128(R.streamBase + '/' + String(seed) + '/relief/' + layer), a = s[0], b = s[1], c = s[2], d = s[3];
     return function () {
       a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
       var t = (a + b) | 0;
@@ -48,6 +56,7 @@
                     floor(g,F), print(g,plate,F), above(g,F)}
      Плашка в F.plates: та же форма после плавания и сборки, z — итоговая высота. */
   R.frame = function (ctx, spec) {
+    R.seedFrom(ctx);
     var g = ctx.g, P = ctx.P, W = ctx.W, H = ctx.H, ui = R.ui(W, H), C = R.color;
     var T = R.tokens(ctx.theme, P.accent), tn = R.material.tints(T, +P.temp || 0);
     var L = R.light.state(P, W, H, ui), tsec = R.motion.time(ctx), still = !!ctx.reduced;

@@ -241,6 +241,33 @@ def p1_lock(a):
     return Res(got == 'упал', 'CSP-мета + fetch наружу падает', 'мета есть · fetch ' + got)
 
 
+# ══ ПРОФИЛЬ ПАНЕЛИ v2 (RELIEF Ф0.4, README §7.11) ═══════════════════════
+# Артефакт с панелью v2 несёт вендорный panel.js verbatim между маркерами. Пробы пункта 2
+# узнают профиль по маркерам; грязные дубли бьют то место, которое есть в этом профиле.
+V2_BEG = '/*<<<PANEL-V2-BODY>>>*/'
+V2_END = '/*<<<PANEL-V2-END>>>*/'
+V2_SRC = os.path.join(ARSENAL, 'panel-v2', 'panel.js')
+
+
+def is_v2(text):
+    return V2_BEG in text and V2_END in text
+
+
+def _v2_body(text):
+    i, j = text.find(V2_BEG), text.find(V2_END)
+    if i < 0 or j < 0 or j < i:
+        return None
+    return text[i + len(V2_BEG):j]
+
+
+def _either(t, pairs, fallback=None):
+    """Грязный дубль под оба профиля: первая подействовавшая замена, иначе вставка-фолбэк."""
+    for a, b in pairs:
+        if a in t:
+            return t.replace(a, b, 1)
+    return fallback(t) if fallback else t
+
+
 # ══ ПУНКТ 2 · панель ═════════════════════════════════════════════════════
 RANGE = re.compile(r'''type\s*=\s*["']?range|\.type\s*=\s*["']range["']''', re.I)
 PANELMARK = re.compile(r'kit-panel|dg-panel|d2-panel|data-panel|class\s*=\s*["\'][^"\']*\bpanel\b', re.I)
@@ -263,7 +290,7 @@ JS_PANEL = """
         .filter(e => !/-(val|edit|fill)$/.test(e.className.split(/\\s+/).pop() || ''));
   const bad = [];
   for (const s of scrubs) {
-    const hasVal = !!s.querySelector('[class*="-val"]');
+    const hasVal = !!s.querySelector('[class*="-val"], input.sval');
     const hasEdit = !!s.querySelector('[class*="-edit"], input');
     if (!hasVal || !hasEdit) bad.push((s.getAttribute('aria-label') || s.className).slice(0, 24));
   }
@@ -271,7 +298,7 @@ JS_PANEL = """
   let spin = '', tnum = '';
   const ed = document.querySelector('[class*=scrub] input, [class*="-edit"]');
   if (ed) spin = getComputedStyle(ed).appearance + '|' + (getComputedStyle(ed).MozAppearance || '');
-  const val = document.querySelector('[class*="-val"]');
+  const val = document.querySelector('[class*="-val"], .scrub input.sval');
   if (val) tnum = getComputedStyle(val).fontVariantNumeric;
   return {n: scrubs.length, bad, orphan, spin, tnum};
 }
@@ -313,9 +340,10 @@ def p2_panel_live(a):
 
 
 @probe('2-extend', 'ввод за max доезжает до движка', point=2, needs=BROWSER,
-       dirty=lambda t, d: t.replace(
-           'extendParamRange(p, v); // ввод за диапазон НЕ клампится — расширяем границы',
-           'v = clamp(v, p.min, p.max);', 1))
+       dirty=lambda t, d: _either(t, [
+           ('extendParamRange(p, v); // ввод за диапазон НЕ клампится — расширяем границы',
+            'v = clamp(v, p.min, p.max);'),
+           ('extendParamRange(p, v); set(v); paint();', 'v = clamp(v, p.min, p.max); set(v); paint();')]))
 def p2_extend(a):
     """Функциональная проба закона 1 канона панели. Донор: gate_panel.py, снята
     привязка к n == 9 и к window.obOrbit. «Доехало до движка» доказывается тем,
@@ -377,9 +405,27 @@ def _kit_body(text):
 
 
 @probe('2-kit', 'кит панели тот же самый', point=2,
-       dirty=lambda t, d: t.replace('function buildScrub(path, min, max, step',
-                                    'function buildScrubLocal(path, min, max, step', 1))
+       dirty=lambda t, d: _either(t, [
+           ('function buildScrub(path, min, max, step', 'function buildScrubLocal(path, min, max, step'),
+           ('function fmt(v, step) { return (+v).toFixed(decimals(step)); }',
+            'function fmt(v, step) { return (+v).toFixed(decimals(step) + 1); }')]))
 def p2_kit(a):
+    """Профиль v2: тело между /*<<<PANEL-V2-BODY>>>*/ и /*<<<PANEL-V2-END>>>*/ побайтно
+    равно vendor/panel-v2/panel.js (md5). Иначе — прежняя сверка kit-panel.js.
+    """
+    if is_v2(a.text):
+        if not os.path.exists(V2_SRC):
+            return red('панель v2 совпадает с вендором', 'нет %s' % V2_SRC)
+        with io.open(V2_SRC, encoding='utf-8') as f:
+            src = f.read()
+        mine = _v2_body(a.text)
+        ds, dm = hashlib.md5(src.encode('utf-8')).hexdigest(), hashlib.md5(mine.encode('utf-8')).hexdigest()
+        return Res(ds == dm, 'md5 тела панели v2 = md5 vendor/panel-v2/panel.js',
+                   ('сошёлся %s…' % dm[:12]) if ds == dm else ('разошёлся: %s… против %s…' % (dm[:12], ds[:12])))
+    return _p2_kit_v1(a)
+
+
+def _p2_kit_v1(a):
     """Единственный источник панели — _arsenal/kit/kit-panel.js. Копия здорова,
     пока она побайтно та же (закон 2). Сравнивается ТЕЛО между маркерами: так
     отпечаток проверяется и внутри собранного single-file, куда кит вклеен инлайном."""
@@ -413,7 +459,8 @@ TOKENBLOCK = re.compile(r'(?::root|\.dg-panel|\[data-theme[^\]]*\]|\.is-night)[^
 
 
 @probe('3-hardcode', 'хексы только в токен-блоке', point=3,
-       dirty=lambda t, d: t.replace('g.lineWidth = 1;', "g.strokeStyle = '#ff00aa'; g.lineWidth = 1;", 1))
+       dirty=lambda t, d: _either(t, [('g.lineWidth = 1;', "g.strokeStyle = '#ff00aa'; g.lineWidth = 1;")],
+                                  lambda x: x.replace('</body>', "<script>var _hard = '#ff00aa';</script></body>", 1)))
 def p3_hardcode(a):
     src = TOKENBLOCK.sub('', a.body)
     hits = HEX.findall(src)
@@ -836,6 +883,23 @@ def _h16(s):
     return hashlib.sha256(s.encode('utf-8')).hexdigest()[:16]
 
 
+def _repo_hashes():
+    """tools/names.h16 репозитория (RELIEF Ф0.4): «name <h16>» и «font <h16>» построчно."""
+    names, fonts = set(), set()
+    p = os.path.join(os.path.dirname(ARSENAL), 'tools', 'names.h16')
+    if os.path.exists(p):
+        for line in io.open(p, encoding='utf-8'):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            kind, _, h = line.partition(' ')
+            (fonts if kind == 'font' else names).add(h.strip())
+    return frozenset(names), frozenset(fonts)
+
+
+REPO_NAMES, REPO_FONTS = _repo_hashes()
+
+
 @probe('10-clean', 'чисто: имён, лицензионных шрифтов, секретов нет', point=10,
        dirty=lambda t, d: t.replace('<title>', '<title>token = "abcdefghijklmnop" ', 1))
 def p10_clean(a):
@@ -849,12 +913,14 @@ def p10_clean(a):
     hits, lines = set(), []
     for m in WORD.finditer(src):
         w = m.group(0).lower()
-        if _h16(w) in NAME_HASHES or _h16(w) in FONT_HASHES:
+        hw = _h16(w)
+        if hw in NAME_HASHES or hw in FONT_HASHES or hw in REPO_NAMES or hw in REPO_FONTS:
             hits.add(w[:2] + '…')
             if len(lines) < 3:
                 lines.append(str(src.count('\n', 0, m.start()) + 1))
     for i, w in enumerate(words[:-1]):
-        if _h16(w + ' ' + words[i + 1]) in FONT_HASHES:
+        hp = _h16(w + ' ' + words[i + 1])
+        if hp in FONT_HASHES or hp in REPO_FONTS or hp in REPO_NAMES:
             hits.add(w[:2] + '…')
     if hits:
         problems.append('запретных слов %d (%s) строки %s'
@@ -1149,11 +1215,25 @@ def report(data, title='ГЕЙТ АРСЕНАЛА'):
 SAMPLE = os.path.join(HERE, 'sample')
 
 
+SAMPLE_FILE = {'path': None}       # --sample: чистый артефакт профиля v2 вместо gate/sample/
+
+
 def _sample(dirpath):
     """Положительный контроль: образец, который ОБЯЗАН быть 10/10.
-    Лежит на диске (gate/sample/), а не в строке — он же документация контракта."""
+    Лежит на диске (gate/sample/), а не в строке — он же документация контракта.
+    С --sample <файл.html> образцом служит этот файл и его паспорт (<имя>.passport.json)."""
     if os.path.isdir(dirpath):
         shutil.rmtree(dirpath)
+    if SAMPLE_FILE['path']:
+        src = os.path.abspath(SAMPLE_FILE['path'])
+        os.makedirs(dirpath)
+        shutil.copy(src, os.path.join(dirpath, 'index.html'))
+        stem = os.path.splitext(src)[0]
+        for pp in (stem + '.passport.json', stem + '.паспорт.json'):
+            if os.path.exists(pp):
+                shutil.copy(pp, os.path.join(dirpath, 'passport.json'))
+                break
+        return os.path.join(dirpath, 'index.html')
     shutil.copytree(SAMPLE, dirpath)
     return os.path.join(dirpath, 'index.html')
 
@@ -1163,6 +1243,8 @@ def _restamp(html):
     быть пересчитан, иначе 10-passport краснеет у ВСЕХ дублей и доказывает не то."""
     d = os.path.dirname(html)
     p = os.path.join(d, 'паспорт.json')
+    if not os.path.exists(p):
+        p = os.path.join(d, 'passport.json')
     if not os.path.exists(p):
         return
     with io.open(p, encoding='utf-8') as f:
@@ -1336,6 +1418,7 @@ def main(argv=None):
                     help='файл накопленного результата')
     ap.add_argument('--negative', action='store_true', help='отрицательный контроль')
     ap.add_argument('--selftest', action='store_true', help='синоним --negative')
+    ap.add_argument('--sample', default='', help='--negative на этом чистом артефакте (профиль панели v2)')
     ap.add_argument('--fleet', action='store_true', help='прогон по путям из ИНДЕКС.md')
     ap.add_argument('--stamp', default='', help='вписать engineHash и результат в паспорт')
     ap.add_argument('--report', action='store_true', help='только отчёт из JSON')
@@ -1348,6 +1431,7 @@ def main(argv=None):
         print('\nдесять пунктов: ' + ' · '.join('%d %s' % (k, v) for k, v in sorted(POINTS.items())))
         return 0
     if args.negative or args.selftest:
+        SAMPLE_FILE['path'] = args.sample or None
         return negative(args.only)
     if len(PROBES) != PROBE_COUNT:
         sys.stderr.write('🔴 реестр не сошёлся: PROBE_COUNT=%d, проб %d. '

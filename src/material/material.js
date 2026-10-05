@@ -21,7 +21,7 @@
   var unevenCache = null;
   function uneven(g, W, H, seed, pct, T) {
     if (!(pct > 0)) return;
-    var key = [W, H, seed, pct, T.theme].join('|');
+    var key = [R.streamBase, W, H, seed, pct, T.theme].join('|');
     if (!unevenCache || unevenCache.key !== key) {
       var cols = 8, rows = Math.max(4, Math.round(8 * H / W)), r = R.stream(seed, 'uneven');
       var mk = function (sign) {

@@ -35,7 +35,7 @@
   /* фазы плашки: десять из собственного потока по id плашки (добавление плашки не сдвигает соседей) */
   var phaseCache = {};
   function phases(seed, id) {
-    var k = seed + '|' + id;
+    var k = R.streamBase + '|' + seed + '|' + id;
     if (!phaseCache[k]) { var r = R.stream(seed, 'float/' + id), a = []; for (var i = 0; i < 10; i++) a.push(r() * TAU); phaseCache[k] = a; }
     return phaseCache[k];
   }

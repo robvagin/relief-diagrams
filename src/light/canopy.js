@@ -12,7 +12,7 @@
   var cv = null, cg = null, lay = null, lg = null, cache = null;
 
   function layout(seed, W, H, ui) {
-    var key = seed + '|' + W + '|' + H + '|' + ui;
+    var key = R.streamBase + '|' + seed + '|' + W + '|' + H + '|' + ui;
     if (cache && cache.key === key) return cache;
     var r = R.stream(seed, 'canopy'), cl = [], fl = [], M = 80 * ui;
     for (var i = 0; i < 70; i++) {

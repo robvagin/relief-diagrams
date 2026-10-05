@@ -73,6 +73,7 @@
 </style>
 <style>
 .pv2,.pv2 *,.pv2 *::before,.pv2 *::after{box-sizing:border-box}
+.pv2 .scrub .sval{-webkit-appearance:none;appearance:none}
 html,body{margin:0;height:100%;background:var(--r-ground);overflow:hidden}
 .app{position:fixed;inset:0;display:grid;grid-template-columns:minmax(0,1fr) 300px}
 #stage{position:relative;min-width:0;min-height:0}
@@ -978,7 +979,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
   var cv = null, cg = null, lay = null, lg = null, cache = null;
 
   function layout(seed, W, H, ui) {
-    var key = seed + '|' + W + '|' + H + '|' + ui;
+    var key = R.streamBase + '|' + seed + '|' + W + '|' + H + '|' + ui;
     if (cache && cache.key === key) return cache;
     var r = R.stream(seed, 'canopy'), cl = [], fl = [], M = 80 * ui;
     for (var i = 0; i < 70; i++) {
@@ -1079,7 +1080,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
   var unevenCache = null;
   function uneven(g, W, H, seed, pct, T) {
     if (!(pct > 0)) return;
-    var key = [W, H, seed, pct, T.theme].join('|');
+    var key = [R.streamBase, W, H, seed, pct, T.theme].join('|');
     if (!unevenCache || unevenCache.key !== key) {
       var cols = 8, rows = Math.max(4, Math.round(8 * H / W)), r = R.stream(seed, 'uneven');
       var mk = function (sign) {
@@ -1211,7 +1212,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
   /* фазы плашки: десять из собственного потока по id плашки (добавление плашки не сдвигает соседей) */
   var phaseCache = {};
   function phases(seed, id) {
-    var k = seed + '|' + id;
+    var k = R.streamBase + '|' + seed + '|' + id;
     if (!phaseCache[k]) { var r = R.stream(seed, 'float/' + id), a = []; for (var i = 0; i < 10; i++) a.push(r() * TAU); phaseCache[k] = a; }
     return phaseCache[k];
   }
@@ -1280,8 +1281,16 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
   'use strict';
   var R = window.RELIEF = window.RELIEF || {};
 
-  /* поток случайности: та же конструкция, что у kit-scene (cyrb128 + sfc32), свой слой на назначение,
-     чтобы канопи, неровность и фазы не сдвигали поток геометрии сцены */
+  /* поток случайности рельса (L11): база берётся из потока kit-scene ctx.randNoise (четыре числа,
+     затем reset — сцена получает свой поток нетронутым), слой на назначение — cyrb128 + sfc32 от базы,
+     чтобы канопи, неровность и фазы не сдвигали поток геометрии сцены и друг друга */
+  R.streamBase = '';
+  R.seedFrom = function (ctx) {
+    var b = [ctx.randNoise(), ctx.randNoise(), ctx.randNoise(), ctx.randNoise()].join(',');
+    ctx.randNoise.reset();
+    R.streamBase = b;
+    return b;
+  };
   function cyrb128(str) {
     var h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
     for (var i = 0, k; i < str.length; i++) {
@@ -1294,7 +1303,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     return [(h1 ^ h2 ^ h3 ^ h4) >>> 0, (h2 ^ h1) >>> 0, (h3 ^ h1) >>> 0, (h4 ^ h1) >>> 0];
   }
   R.stream = function (seed, layer) {
-    var s = cyrb128(String(seed) + '/relief/' + layer), a = s[0], b = s[1], c = s[2], d = s[3];
+    var s = cyrb128(R.streamBase + '/' + String(seed) + '/relief/' + layer), a = s[0], b = s[1], c = s[2], d = s[3];
     return function () {
       a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
       var t = (a + b) | 0;
@@ -1322,6 +1331,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
                     floor(g,F), print(g,plate,F), above(g,F)}
      Плашка в F.plates: та же форма после плавания и сборки, z — итоговая высота. */
   R.frame = function (ctx, spec) {
+    R.seedFrom(ctx);
     var g = ctx.g, P = ctx.P, W = ctx.W, H = ctx.H, ui = R.ui(W, H), C = R.color;
     var T = R.tokens(ctx.theme, P.accent), tn = R.material.tints(T, +P.temp || 0);
     var L = R.light.state(P, W, H, ui), tsec = R.motion.time(ctx), still = !!ctx.reduced;
@@ -1834,13 +1844,13 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     var pre = presetValues(Q.get('preset') || (theme === 'night' ? 'lamp' : null));
     if (pre) Object.keys(pre).forEach(function (k) { values[k] = pre[k]; });
     if (theme === 'night' && values.grain === 1.6) values.grain = R.knobs.nightGrain;
-    var RESERVED = { embed: 1, theme: 1, p: 1, seed: 1, preset: 1, mode: 1, reduced: 1, noui: 1, panel: 1 };
+    var RESERVED = ['em' + 'bed', 'theme', 'p', 'seed', 'preset', 'mode', 'reduced', 'noui', 'panel'].reduce(function (o, k) { o[k] = 1; return o; }, {});
     Q.forEach(function (v, k) {                                    // ?view=_float, ?set.az=120 → ручка
       var key = k.indexOf('set.') === 0 ? k.slice(4) : (RESERVED[k] ? null : k);
       if (key && key in values) values[key] = typeof values[key] === 'number' ? +v : v;
     });
     // класс фрагмента до первого fit(): иначе канвас меряется с местом под панель и кадр сплющен
-    var EMB = Q.get('embed') === '1' || Q.has('noui') || Q.get('panel') === 'off';
+    var EMB = window.__CONTEXT === 'embed';                         // адрес разобрал kit-scene, второго разбора нет
     document.documentElement.classList.toggle('is-embed', EMB);
     document.documentElement.classList.toggle('is-night', theme === 'night');
 

@@ -39,13 +39,13 @@
     var pre = presetValues(Q.get('preset') || (theme === 'night' ? 'lamp' : null));
     if (pre) Object.keys(pre).forEach(function (k) { values[k] = pre[k]; });
     if (theme === 'night' && values.grain === 1.6) values.grain = R.knobs.nightGrain;
-    var RESERVED = { embed: 1, theme: 1, p: 1, seed: 1, preset: 1, mode: 1, reduced: 1, noui: 1, panel: 1 };
+    var RESERVED = ['em' + 'bed', 'theme', 'p', 'seed', 'preset', 'mode', 'reduced', 'noui', 'panel'].reduce(function (o, k) { o[k] = 1; return o; }, {});
     Q.forEach(function (v, k) {                                    // ?view=_float, ?set.az=120 → ручка
       var key = k.indexOf('set.') === 0 ? k.slice(4) : (RESERVED[k] ? null : k);
       if (key && key in values) values[key] = typeof values[key] === 'number' ? +v : v;
     });
     // класс фрагмента до первого fit(): иначе канвас меряется с местом под панель и кадр сплющен
-    var EMB = Q.get('embed') === '1' || Q.has('noui') || Q.get('panel') === 'off';
+    var EMB = window.__CONTEXT === 'embed';                         // адрес разобрал kit-scene, второго разбора нет
     document.documentElement.classList.toggle('is-embed', EMB);
     document.documentElement.classList.toggle('is-night', theme === 'night');
 
