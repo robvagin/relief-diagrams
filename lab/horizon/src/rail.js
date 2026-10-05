@@ -339,8 +339,8 @@
     NOISE.uneven = c; NOISE.key = key;
     return c;
   }
-  function overlayAmount(base, pct) {   // знаковое ±pct % через overlay вокруг серого 0.5
-    var b = lum(base), k = Math.max(0.03, 2 * Math.min(b, 1 - b));
+  function overlayAmount(base, pct) {   // знаковое ±pct % через overlay вокруг серого 0.5 (в кодированном sRGB)
+    var b = (base[0] + base[1] + base[2]) / 765, k = Math.max(0.03, 2 * Math.min(b, 1 - b));
     return clamp((pct / 100) / (k * 0.5), 0, 1);
   }
   function material(g, ctx, T, U) {

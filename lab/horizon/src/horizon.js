@@ -236,7 +236,7 @@
         g.fillText('Click to bring forward · drag to pan · double-click: home', m, ly + U.fs(1) * 2.6);
       }
       R.font(g, U, 1, 400, true); g.textAlign = 'right'; g.fillStyle = R.rgba(T.ink3);
-      g.fillText('Fictional data', ctx.W - m, ctx.H - m - U.fs(1));
+      g.fillText('Fictional data', ctx.W - m, m);
       g.textAlign = 'left';
       if (V.overlayExtra) V.overlayExtra(g, T, U, ctx, S, nodes);
     }

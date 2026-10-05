@@ -25,6 +25,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
 .pv2 fieldset{border:0;margin:0 0 16px;padding:0;min-width:0}
 .pv2 legend{padding:0;margin:0 0 8px;font:500 var(--t1)/1.2 var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}
 .pv2 .acts{display:flex;gap:8px;margin-top:8px}
+.pv2 .scrub .sval{appearance:none;-webkit-appearance:none}
 @media (max-width:767px){
   #stage{right:0;bottom:44vh}
   #panel{top:auto;left:0;width:auto;height:44vh}
@@ -928,8 +929,8 @@ window.RELIEF_DATA = {"meta":{"name":"Fictional loan book","currency":"EUR","asO
     NOISE.uneven = c; NOISE.key = key;
     return c;
   }
-  function overlayAmount(base, pct) {   // знаковое ±pct % через overlay вокруг серого 0.5
-    var b = lum(base), k = Math.max(0.03, 2 * Math.min(b, 1 - b));
+  function overlayAmount(base, pct) {   // знаковое ±pct % через overlay вокруг серого 0.5 (в кодированном sRGB)
+    var b = (base[0] + base[1] + base[2]) / 765, k = Math.max(0.03, 2 * Math.min(b, 1 - b));
     return clamp((pct / 100) / (k * 0.5), 0, 1);
   }
   function material(g, ctx, T, U) {
@@ -1698,7 +1699,7 @@ window.RELIEF_DATA = {"meta":{"name":"Fictional loan book","currency":"EUR","asO
         g.fillText('Click to bring forward · drag to pan · double-click: home', m, ly + U.fs(1) * 2.6);
       }
       R.font(g, U, 1, 400, true); g.textAlign = 'right'; g.fillStyle = R.rgba(T.ink3);
-      g.fillText('Fictional data', ctx.W - m, ctx.H - m - U.fs(1));
+      g.fillText('Fictional data', ctx.W - m, m);
       g.textAlign = 'left';
       if (V.overlayExtra) V.overlayExtra(g, T, U, ctx, S, nodes);
     }

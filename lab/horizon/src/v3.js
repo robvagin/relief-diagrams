@@ -46,6 +46,7 @@
           g.strokeStyle = R.rgba(T.ink, i % 5 === 0 ? 0.22 : 0.12); g.stroke();
         });
       }
+      if (ctx.W < 560) return;
       R.font(g, U, 1, 400, true); g.fillStyle = R.rgba(T.ink3); g.textAlign = 'right'; g.textBaseline = 'bottom';
       g.fillText('horizon · the rest of the model', ctx.W - U.margin, G.yH - 4 * U.ui);
       g.textAlign = 'left'; g.textBaseline = 'top';

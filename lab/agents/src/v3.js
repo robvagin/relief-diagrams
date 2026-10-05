@@ -21,6 +21,13 @@
       var y0 = top + avail / 2 - (rh * 5 + gap * 4) / 2;
       var rows = [0, 1, 2, 3, 4].map(function (i) { return [colX, y0 + i * (rh + gap), colW, rh]; });
       var hx = stage[0] + stage[2] + (colX - stage[0] - stage[2]) * 0.5;
+      if (W < 560) {   // узкий кадр: сцена сверху, прочтения списком под ней, узел слева от списка
+        stage = [model[0] + pad, top, model[2] - 2 * pad, avail * 0.56];
+        var ry = stage[1] + stage[3] + 10 * U.ui, rH = (model[1] + model[3] - pad - ry - 4 * 3 * U.ui) / 5;
+        colX = model[0] + pad + 30 * U.ui; colW = model[0] + model[2] - pad - colX;
+        rows = [0, 1, 2, 3, 4].map(function (i) { return [colX, ry + i * (rH + 3 * U.ui), colW, rH]; });
+        return { model: model, agents: [], stage: stage, rows: rows, hub2: [model[0] + pad + 10 * U.ui, ry + (rH * 5 + 12 * U.ui) / 2, 9 * U.ui], noPolyline: true, narrow: true };
+      }
       return { model: model, agents: [], stage: stage, rows: rows, hub2: [hx, top + avail / 2, 16 * U.ui], noPolyline: true };
     },
     extra: function (ctx, U, L, S, plates, cards, ms) {
@@ -52,7 +59,7 @@
         g.beginPath(); g.moveTo(p0[0], p0[1]); g.bezierCurveTo(p0[0] - sw, p0[1], p3[0] + sw, p3[1], p3[0], p3[1]); g.stroke();
       });
       var c = cards[0];
-      if (c && c.selLocal) {
+      if (c && c.selLocal && !L.narrow) {
         var q0 = [hx - L.hub2[2], hy], q3 = [c.rect[0] + c.rect[2] + 3 * U.ui, c.selLocal[1]], s2 = (q0[0] - q3[0]) * 0.5;
         g.beginPath(); g.moveTo(q0[0], q0[1]); g.bezierCurveTo(q0[0] - s2, q0[1], q3[0] + s2, q3[1], q3[0], q3[1]);
         g.strokeStyle = R.rgba(T.ink, 0.42); g.setLineDash([2 * U.ui, 3 * U.ui]); g.stroke(); g.setLineDash([]);

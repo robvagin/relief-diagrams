@@ -1,0 +1,386 @@
+{
+  "id": "horizon",
+  "title": "Horizon · Lens",
+  "blurb": "Ontology in focus: the object sits in the centre, its grounds around it, the rest compressed toward the horizon.",
+  "version": "0.1.0",
+  "engineHash": "7356d3bb2189a927b00586e0ca28b87a0bf1db7e518c4d6a3e9f10bdb469dda3",
+  "kind": "fragment",
+  "contract": {
+    "embed": {
+      "params": [
+        "embed",
+        "theme",
+        "p",
+        "seed",
+        "preset",
+        "mode",
+        "reduced"
+      ],
+      "aliases": [
+        "noui",
+        "panel=off"
+      ]
+    },
+    "postMessage": {
+      "out": [
+        "ready",
+        "frame"
+      ],
+      "in": [
+        "es:progress",
+        "es:replay",
+        "pause",
+        "play"
+      ],
+      "selfplay": true
+    },
+    "api": [
+      "Scene.set",
+      "Scene.get",
+      "Scene.export",
+      "KIT.scene.register",
+      "KIT.scene.start"
+    ]
+  },
+  "params": [
+    {
+      "id": "focus",
+      "label": "Фокус",
+      "type": "select",
+      "options": [
+        "L-0005",
+        "B-0005",
+        "R-104",
+        "A4"
+      ],
+      "default": "L-0005"
+    },
+    {
+      "id": "labels",
+      "label": "Подписи",
+      "type": "select",
+      "options": [
+        "focus",
+        "ring1",
+        "ring2"
+      ],
+      "default": "ring1"
+    },
+    {
+      "id": "horizon",
+      "label": "Горизонт",
+      "type": "boolean",
+      "min": 0,
+      "max": 1,
+      "step": 1,
+      "default": 1
+    },
+    {
+      "id": "light",
+      "label": "Свет",
+      "type": "select",
+      "options": [
+        "soft",
+        "raking",
+        "lamp",
+        "canopy"
+      ],
+      "default": "soft"
+    },
+    {
+      "id": "az",
+      "label": "Азимут, °",
+      "type": "number",
+      "min": 0,
+      "max": 360,
+      "step": 1,
+      "default": 135
+    },
+    {
+      "id": "elev",
+      "label": "Высота, °",
+      "type": "number",
+      "min": 8,
+      "max": 80,
+      "step": 1,
+      "default": 42
+    },
+    {
+      "id": "soft",
+      "label": "Мягкость",
+      "type": "number",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "default": 0.28
+    },
+    {
+      "id": "dens",
+      "label": "Плотность тени",
+      "type": "number",
+      "min": 0,
+      "max": 0.6,
+      "step": 0.01,
+      "default": 0.2
+    },
+    {
+      "id": "amb",
+      "label": "Рассеянный",
+      "type": "number",
+      "min": 0.2,
+      "max": 0.95,
+      "step": 0.01,
+      "default": 0.72
+    },
+    {
+      "id": "contact",
+      "label": "Контакт",
+      "type": "number",
+      "min": 0,
+      "max": 0.3,
+      "step": 0.01,
+      "default": 0.12
+    },
+    {
+      "id": "pool",
+      "label": "Пятно лампы",
+      "type": "number",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "default": 0
+    },
+    {
+      "id": "lampH",
+      "label": "Высота лампы",
+      "type": "number",
+      "min": 300,
+      "max": 2000,
+      "step": 10,
+      "default": 900
+    },
+    {
+      "id": "canopy",
+      "label": "Листва",
+      "type": "number",
+      "min": 0,
+      "max": 0.6,
+      "step": 0.01,
+      "default": 0
+    },
+    {
+      "id": "temp",
+      "label": "Температура",
+      "type": "number",
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "default": 0.25
+    },
+    {
+      "id": "grain",
+      "label": "Зерно, %",
+      "type": "number",
+      "min": 0,
+      "max": 4,
+      "step": 0.1,
+      "default": 1.6
+    },
+    {
+      "id": "uneven",
+      "label": "Неровность, %",
+      "type": "number",
+      "min": 0,
+      "max": 2,
+      "step": 0.1,
+      "default": 0.8
+    },
+    {
+      "id": "rim",
+      "label": "Кант",
+      "type": "number",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "default": 0.5
+    },
+    {
+      "id": "radius",
+      "label": "Радиус плашки",
+      "type": "number",
+      "min": 0,
+      "max": 8,
+      "step": 0.5,
+      "default": 6
+    },
+    {
+      "id": "zscale",
+      "label": "Шкала высот",
+      "type": "number",
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "default": 1
+    },
+    {
+      "id": "accent",
+      "label": "Акцент",
+      "type": "select",
+      "options": [
+        "terracotta",
+        "cobalt",
+        "olive"
+      ],
+      "default": "terracotta"
+    },
+    {
+      "id": "hand",
+      "label": "Рука",
+      "type": "boolean",
+      "min": 0,
+      "max": 1,
+      "step": 1,
+      "default": 0
+    },
+    {
+      "id": "float",
+      "label": "Плавание",
+      "type": "number",
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "default": 1
+    },
+    {
+      "id": "period",
+      "label": "Период, с",
+      "type": "number",
+      "min": 12,
+      "max": 72,
+      "step": 1,
+      "default": 36
+    },
+    {
+      "id": "sway",
+      "label": "Качание, °",
+      "type": "number",
+      "min": 0,
+      "max": 1.5,
+      "step": 0.05,
+      "default": 0.3
+    },
+    {
+      "id": "bob",
+      "label": "Дыхание тени",
+      "type": "number",
+      "min": 0,
+      "max": 0.2,
+      "step": 0.01,
+      "default": 0.08
+    },
+    {
+      "id": "settle",
+      "label": "Оседание, с",
+      "type": "number",
+      "min": 0.3,
+      "max": 2,
+      "step": 0.05,
+      "default": 0.9
+    },
+    {
+      "id": "assemble",
+      "label": "Сборка",
+      "type": "boolean",
+      "min": 0,
+      "max": 1,
+      "step": 1,
+      "default": 1
+    },
+    {
+      "id": "link",
+      "label": "Дистанция связи",
+      "type": "number",
+      "min": 0.8,
+      "max": 2,
+      "step": 0.01,
+      "default": 1.25
+    },
+    {
+      "id": "depthH",
+      "label": "Глубина",
+      "type": "number",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "id": "format",
+      "label": "Формат",
+      "type": "select",
+      "options": [
+        "screen",
+        "16:9",
+        "1:1",
+        "4:5"
+      ],
+      "default": "screen"
+    },
+    {
+      "id": "scale",
+      "label": "Масштаб",
+      "type": "number",
+      "min": 1,
+      "max": 3,
+      "step": 1,
+      "default": 2
+    }
+  ],
+  "aspect": "auto",
+  "minHeight": 320,
+  "hover": "horizon: ничего; agents: подсказка z3 у займа под курсором",
+  "click": "horizon: ход Мёбиуса к узлу, протяжка = непрерывный Мёбиус, двойной клик = домой; agents: выбор займа для следа",
+  "reducedMotion": "плавание, сборка и морф сняты, рисуется финальный кадр; клик переводит фокус без хода",
+  "narrow390": "панель нижним листом 44vh, сцена над ней; в embed панели нет",
+  "forbidden": [
+    "класть на цветной грунт",
+    "растягивать неравномерно",
+    "подкрашивать тени руками"
+  ],
+  "export": {
+    "png": true,
+    "svg": false,
+    "pdf": false,
+    "zpl": false
+  },
+  "fonts": [
+    {
+      "family": "Geist",
+      "license": "OFL-1.1",
+      "embedded": "local"
+    },
+    {
+      "family": "Geist Mono",
+      "license": "OFL-1.1",
+      "embedded": "local"
+    }
+  ],
+  "tokensIn": [
+    "--sc-ground",
+    "--sc-plate",
+    "--sc-ink",
+    "--sc-ink2",
+    "--sc-ink3",
+    "--sc-shadow",
+    "--sc-light",
+    "--sc-acc-terracotta",
+    "--sc-acc-cobalt",
+    "--sc-acc-olive"
+  ],
+  "brandFree": true,
+  "gate": {
+    "date": "2026-10-05",
+    "score": "10/10",
+    "report": "gate/acceptance.json"
+  }
+}

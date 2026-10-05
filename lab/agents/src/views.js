@@ -277,7 +277,7 @@
       if (!S.loans.length) subset(ctx);
       S.T = R.tokens(); S.hit = []; S.hoverAt = null;
       var L = V.layout(ctx, U, P, S), ms = morphState(ctx, ts);
-      var morph = P.view === 'morph' || V.single;
+      var morph = P.view === 'morph' || V.single || ctx.W < 560;   // узкий кадр: пять плашек не читаются, одна сцена
       var cards = morph ? [{ a: AG[ms.cur], rect: L.stage, idx: ms.cur }] : L.agents.map(function (rc, i) { return { a: AG[i], rect: rc, idx: i }; });
       // позиции следа: где выбранный займ лежит в каждом виде (для ломаной и сходимости)
       cards.forEach(function (c) {

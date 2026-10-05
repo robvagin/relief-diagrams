@@ -3,6 +3,7 @@
 
   python3 lab/horizon/src/build.py            собрать все варианты, у которых есть исходник
   python3 lab/horizon/src/build.py --check    собрать в память и сверить с файлами
+  python3 lab/horizon/src/build.py --passport собрать и написать паспорта рядом (нужен python-playwright)
 
 Вклеивается verbatim: vendor/kit/kit-scene.js, vendor/panel-v2/panel.js (между маркерами
 /*<<<PANEL-V2-BODY>>>*/ … /*<<<PANEL-V2-END>>>*/), panel.css и house.tokens.css со скоупом
@@ -101,7 +102,7 @@ def build_one(scene, n):
     src = os.path.join(folder, 'v%d.js' % n)
     if not os.path.exists(os.path.join(ROOT, src)):
         return None
-    shell = rd('lab', 'horizon', 'src', 'shell.html')
+    shell = rd('lab', 'horizon', 'src', 'shell.src.html')
     data = json.dumps(json.loads(rd('data', 'portfolio.json')), ensure_ascii=False, separators=(',', ':'))
     scripts = []
     for p in common + [src]:
@@ -125,6 +126,63 @@ def build_one(scene, n):
     return out
 
 
+PASS_JS = """() => { const d = KIT.scene.list()[0];
+  return { id: d.id, title: d.title, blurb: d.blurb,
+           params: d.params.map(KIT.scene.toObjectParam).map(p => { const o = Object.assign({}, p); delete o.multi; return o; }) }; }"""
+
+
+def passport(scene, n, html_path):
+    """Паспорт рядом с вариантом (vendor/passport.schema.json). Ручки читаются из
+    собранного файла в headless Chromium; engineHash = sha256 файла, счёт вписывает gate --stamp."""
+    import hashlib
+    import time
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception:
+        print('· паспорт v%d %s пропущен: нет python-playwright' % (n, scene))
+        return
+    with sync_playwright() as pw:
+        br = pw.chromium.launch()
+        pg = br.new_page(viewport={'width': 900, 'height': 640})
+        pg.goto('file://' + html_path)
+        pg.wait_for_function('window.__READY === true', timeout=15000)
+        info = pg.evaluate(PASS_JS)
+        br.close()
+    pp = html_path[:-5] + '.passport.json'
+    old = {}
+    if os.path.exists(pp):
+        with io.open(pp, encoding='utf-8') as f:
+            old = json.load(f)
+    with open(html_path, 'rb') as f:
+        h = hashlib.sha256(f.read()).hexdigest()
+    data = {
+        'id': info['id'], 'title': info['title'], 'blurb': info['blurb'], 'version': '0.1.0',
+        'engineHash': h, 'kind': 'fragment',
+        'contract': {'embed': {'params': ['embed', 'theme', 'p', 'seed', 'preset', 'mode', 'reduced'],
+                               'aliases': ['noui', 'panel=off']},
+                     'postMessage': {'out': ['ready', 'frame'], 'in': ['es:progress', 'es:replay', 'pause', 'play'],
+                                     'selfplay': True},
+                     'api': ['Scene.set', 'Scene.get', 'Scene.export', 'KIT.scene.register', 'KIT.scene.start']},
+        'params': info['params'],
+        'aspect': 'auto', 'minHeight': 320,
+        'hover': 'horizon: ничего; agents: подсказка z3 у займа под курсором',
+        'click': 'horizon: ход Мёбиуса к узлу, протяжка = непрерывный Мёбиус, двойной клик = домой; agents: выбор займа для следа',
+        'reducedMotion': 'плавание, сборка и морф сняты, рисуется финальный кадр; клик переводит фокус без хода',
+        'narrow390': 'панель нижним листом 44vh, сцена над ней; в embed панели нет',
+        'forbidden': ['класть на цветной грунт', 'растягивать неравномерно', 'подкрашивать тени руками'],
+        'export': {'png': True, 'svg': False, 'pdf': False, 'zpl': False},
+        'fonts': [{'family': 'Geist', 'license': 'OFL-1.1', 'embedded': 'local'},
+                  {'family': 'Geist Mono', 'license': 'OFL-1.1', 'embedded': 'local'}],
+        'tokensIn': ['--sc-ground', '--sc-plate', '--sc-ink', '--sc-ink2', '--sc-ink3', '--sc-shadow', '--sc-light',
+                     '--sc-acc-terracotta', '--sc-acc-cobalt', '--sc-acc-olive'],
+        'brandFree': True,
+        'gate': old.get('gate') or {'date': time.strftime('%Y-%m-%d'), 'score': '0/10'},
+    }
+    with io.open(pp, 'w', encoding='utf-8') as f:
+        f.write(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+    print('паспорт %s/v%d.passport.json' % (scene, n))
+
+
 def main():
     check = '--check' in sys.argv
     bad = 0
@@ -143,6 +201,8 @@ def main():
                 with io.open(dst, 'w', encoding='utf-8') as f:
                     f.write(text)
                 print('собран lab/%s/v%d.html · %d КБ' % (scene, n, len(text.encode('utf-8')) // 1024))
+                if '--passport' in sys.argv:
+                    passport(scene, n, dst)
     return 1 if bad else 0
 
 
