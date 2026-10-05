@@ -1,0 +1,75 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src data:; connect-src 'self'; frame-src 'self'; child-src 'self'">
+<title><!--@title--></title>
+<!--@fonts-->
+<!--@pv2-css-->
+<style>
+.pv2,.pv2 *,.pv2 *::before,.pv2 *::after{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:var(--pg-bg)}
+.pg{--pg-bg:var(--bg);position:fixed;inset:0;display:grid;grid-template-columns:232px minmax(0,1fr) 300px;grid-template-rows:minmax(0,1fr);
+  grid-template-areas:"list frame side";background:var(--bg);color:var(--ink);font:400 var(--t2)/1.35 var(--sans)}
+#list{grid-area:list;min-height:0;overflow:auto;padding:14px 10px 16px 14px;box-sizing:border-box}
+#frame{grid-area:frame;position:relative;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px;padding:12px 6px 12px 6px;box-sizing:border-box}
+#side{grid-area:side;min-height:0;overflow:auto;padding:12px 12px 16px;box-sizing:border-box}
+.brand{display:flex;align-items:baseline;gap:8px;margin:0 0 14px}
+.brand b{font:600 var(--t3)/1.2 var(--display);letter-spacing:-.005em}
+.grp-h{margin:14px 0 4px;font:500 var(--t1)/1.2 var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);display:flex;justify-content:space-between}
+.grp-h .n{font-family:var(--mono);letter-spacing:0;text-transform:none}
+.it{appearance:none;display:flex;align-items:baseline;gap:8px;width:100%;border:0;border-radius:var(--r-ctl);background:transparent;color:var(--ink2);
+  padding:6px 8px;min-height:30px;text-align:left;font:400 var(--t2)/1.25 var(--sans);cursor:pointer;transition:background-color var(--dur-pop) var(--ease)}
+.it .id{flex:none;font:500 var(--t1)/1 var(--mono);color:var(--ink3);min-width:44px}
+.it .tt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.it[aria-current="true"]{background:var(--fill-strong);color:var(--ink)}
+.it[aria-current="true"] .id{color:var(--ink)}
+.it:focus-visible,.btn:focus-visible,.view:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.none{padding:4px 8px 2px;color:var(--ink3);font-size:var(--t1);letter-spacing:var(--track-s)}
+.view{flex:1;min-height:0;border-radius:var(--r-card);overflow:hidden;background:var(--card);position:relative}
+.view iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+.view .wait{position:absolute;inset:0;display:grid;place-items:center;color:var(--ink3);font:500 var(--t1)/1 var(--mono);pointer-events:none;transition:opacity var(--dur-pop) var(--ease)}
+.view[data-ready="1"] .wait{opacity:0}
+.metaline{display:flex;justify-content:space-between;gap:12px;color:var(--ink3);font:500 var(--t1)/1.2 var(--mono);font-variant-numeric:tabular-nums;padding:0 4px;min-width:0}
+.metaline span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv2 fieldset.grp{border:0;margin:0 0 14px;padding:0;min-width:0}
+.pv2 fieldset.grp legend{padding:0 0 6px;font:500 var(--t1)/1.2 var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 14px}
+.acts .btn{height:30px;padding:0 10px}
+.pgnote{margin:0 0 12px;color:var(--ink3);font-size:var(--t1);letter-spacing:var(--track-s);line-height:1.4}
+.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,8px);opacity:0;background:var(--ink);color:var(--on-ink);border-radius:var(--r-pill);
+  padding:8px 14px;font:500 var(--t1)/1 var(--sans);box-shadow:0 2px 10px var(--shadow);transition:opacity var(--dur-pop) var(--ease),transform var(--dur-pop) var(--ease);pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media (max-width:1099px){
+  .pg{grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"list list" "frame side"}
+  #list{display:flex;gap:6px;align-items:center;overflow-x:auto;overflow-y:hidden;padding:10px 12px;white-space:nowrap}
+  #list .brand{margin:0 8px 0 0}
+  #list .grp-h{margin:0 2px 0 10px}
+  #list .grp-h .n{display:none}
+  #list .it{width:auto;flex:none}
+  #list .it .tt{display:none}
+  #list .none{display:none}
+}
+@media (max-width:767px){
+  .pg{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) 44vh;grid-template-areas:"list" "frame" "side"}
+  #side{border-top:1px solid var(--hair)}
+}
+@media (prefers-reduced-motion:reduce){.pg *{transition:none!important}}
+</style></head><body>
+<div class="pv2 pg" id="pg" data-theme="light">
+  <nav id="list" aria-label="Scenes and variants"><div class="brand"><b>Relief</b><span class="pill">playground</span></div><div id="items"></div></nav>
+  <main id="frame">
+    <div class="view" id="view"><div class="wait" id="wait">loading…</div></div>
+    <div class="metaline"><span id="meta"></span><span id="meta2"></span></div>
+  </main>
+  <aside id="side" aria-label="Controls" data-panel>
+    <div id="top"></div>
+    <div class="acts" id="acts"></div>
+    <p class="pgnote" id="note" hidden></p>
+    <div id="knobs"></div>
+  </aside>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+<script src="../vendor/panel-v2/panel.js"></script>
+<script src="panel-adapter.js"></script>
+<script src="playground.js"></script>
+</body></html>

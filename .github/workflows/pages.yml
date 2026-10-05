@@ -20,13 +20,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: clean check (public repo)
         run: python3 tools/clean_check.py
-      - name: site from dist/
-        run: |
-          mkdir -p _site
-          if [ -d dist ]; then cp -R dist/. _site/; fi
-          if [ ! -f _site/index.html ]; then
-            printf '<!doctype html><meta charset="utf-8"><title>relief</title><p style="font:16px system-ui;margin:48px">The stand is not built yet. See README.</p>' > _site/index.html
-          fi
+      - name: site (dist/ + lab/ + lab/index.json + gate sample)
+        run: python3 tools/site.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
