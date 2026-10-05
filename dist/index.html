@@ -524,6 +524,8 @@ body{background:var(--pg-bg)}
   function attach(f, cw) {
     st.cw = cw; st.live = true;
     view.setAttribute('data-ready', '1');
+    // сцена могла измерить канвас до того, как embed убрал место под свою панель: пусть kit перемерит коробку
+    try { cw.dispatchEvent(new cw.Event('resize')); } catch (e) { }
     var def = cw.KIT.scene.list()[0], ctx = cw.KIT.scene.ctx;
     Object.keys(st.set).forEach(function (k) {
       if (k in ctx.P) cw.Scene.set(k, typeof ctx.P[k] === 'number' ? +st.set[k] : st.set[k]);
