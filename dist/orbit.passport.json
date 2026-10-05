@@ -1,9 +1,9 @@
 {
-  "id": "lab",
-  "title": "Rail calibration",
-  "blurb": "Калибровка рельса RELIEF: свет, линия, плавание, зерно.",
+  "id": "orbit",
+  "title": "Loan book orbit",
+  "blurb": "Вся книга живым организмом: хаб, листы стадий, диски сегментов, займы.",
   "version": "0.1.0",
-  "engineHash": "854585c8336dc20dd44a2ffe6342db4deff6360a7f3c4ecb41ac007f4fd6bb8d",
+  "engineHash": "e7757c980f41e351112dc2a33dc71fe66ce4d2aa4dcc8811f3e73d00730807b2",
   "kind": "tool",
   "contract": {
     "embed": {
@@ -48,16 +48,68 @@
   },
   "params": [
     {
-      "id": "view",
-      "label": "Вид",
+      "id": "labels",
+      "label": "Подписи",
       "type": "select",
-      "default": "_light",
+      "default": "hubs",
       "options": [
-        "_light",
-        "_ruler",
-        "_float",
-        "_grain"
+        "hubs",
+        "none"
       ]
+    },
+    {
+      "id": "loans",
+      "label": "Займы",
+      "type": "boolean",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    {
+      "id": "tilt",
+      "label": "Наклон листов, °",
+      "type": "number",
+      "default": 6,
+      "min": 0,
+      "max": 8,
+      "step": 0.5
+    },
+    {
+      "id": "parallax",
+      "label": "Параллакс",
+      "type": "number",
+      "default": 0.6,
+      "min": 0,
+      "max": 1.5,
+      "step": 0.01
+    },
+    {
+      "id": "drift",
+      "label": "Дыхание графа",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01
+    },
+    {
+      "id": "springK",
+      "label": "Пружины",
+      "type": "number",
+      "default": 30,
+      "min": 5,
+      "max": 80,
+      "step": 1
+    },
+    {
+      "id": "repel",
+      "label": "Отталкивание",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01
     },
     {
       "id": "light",
@@ -306,8 +358,8 @@
   "frozen": [],
   "aspect": "auto",
   "minHeight": 240,
-  "hover": "ничего",
-  "click": "клик по скрабу без протяжки открывает ввод числа; P пауза, R переиграть, E PNG, I тема",
+  "hover": "узел поднимается с соседями, остальное притухает цветом; подсказка листом z3",
+  "click": "клик по узлу = фокус, протяжка узла = соседи на пружинах, колесо = зум, протяжка по пустому = панорама, двойной клик или Esc = домой",
   "reducedMotion": "плавание снято, листва стоит на w = 0, сборка пропущена: один финальный кадр",
   "narrow390": "панель нижним листом 44vh, открыта всегда; в embed панели нет",
   "forbidden": [
@@ -348,6 +400,6 @@
   "gate": {
     "date": "2026-10-05",
     "score": "10/10",
-    "report": "vendor/gate/gate.py dist/_lab.html"
+    "report": "vendor/gate/gate.py dist/orbit.html"
   }
 }

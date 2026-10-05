@@ -151,5 +151,21 @@
     g.restore();
   }
 
-  R.material = { tints: tints, uneven: uneven, grain: grain, rim: rim, loadNoise: loadNoise, surface: surface };
+  /* ── бумага: едва заметный провис листа. Середина ниже кромок, поэтому половина со стороны света
+     смотрит от света (чуть темнее), дальняя — к свету (как была). Множитель по профилю sin, ≤ amount ── */
+  function sag(g, s, L, tn, amount) {
+    if (!(amount > 0) || s.kind === 'circle') return;
+    var l = R.light.toLight(L, s.x, s.y, s.z), n = Math.hypot(l[0], l[1]) || 1, ux = l[0] / n, uy = l[1] / n;
+    var ext = Math.abs(ux) * s.w / 2 + Math.abs(uy) * s.h / 2;
+    var gr = g.createLinearGradient(s.x + ux * ext, s.y + uy * ext, s.x - ux * ext, s.y - uy * ext);
+    var C = R.color, sh = tn.shadow, stops = 7;
+    for (var i = 0; i <= stops; i++) {
+      var u = i / stops, k = amount * Math.max(0, Math.sin(Math.PI * u)) * (u < 0.5 ? 1 : 0.25);   // ближняя к свету половина
+      gr.addColorStop(u, 'rgb(' + [0, 1, 2].map(function (c) { return Math.round(255 - k * (255 - sh[c])); }).join(',') + ')');
+    }
+    g.save(); g.globalCompositeOperation = 'multiply'; g.fillStyle = gr;
+    g.fillRect(s.x - s.w, s.y - s.h, s.w * 2, s.h * 2); g.restore();
+  }
+
+  R.material = { sag: sag, tints: tints, uneven: uneven, grain: grain, rim: rim, loadNoise: loadNoise, surface: surface };
 })();

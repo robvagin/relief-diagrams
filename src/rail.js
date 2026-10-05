@@ -118,6 +118,7 @@
       g.fillStyle = C.css(s.fill || tn.plate); g.fill('evenodd');
       g.clip('evenodd');
       if (spec.print) spec.print(g, s, F);
+      if (s.src && s.src.paper) R.material.sag(g, s, L, tn, s.src.paper === true ? 0.035 : +s.src.paper);   // бумага провисает
       var si = plates.indexOf(s), sq = shadePl[si] || s;
       if (!(si in cache.plates)) {
         var above = occ.filter(function (c) { return c.z > sq.z + 1e-3; }), ex = R.sdf.extent(sq);

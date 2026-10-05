@@ -39,3 +39,12 @@ Skills applied: autonomous-build-loop, motion-kinematics-canon (+ kin.mjs), canv
 - `dist/scenes/`, `dist/relief.html`, стенд и контакт-лист — после слияния вариантов на рельс (Ф1–Ф2); сцены переезжают со своего света на `src/light/` через `RELIEF.frame(ctx, {plates, floor, print})`
 - P-R1, P-T1, P-C2, P-W как пробы-файлы (P-W проверен разово: 390 · 768 · 1280 · 1440 без горизонтали, панель на 768 = 37–39 % кадра)
 - SVG-выгрузка: печать сцен в SVG через `svgPrint(plate, F)` у самих сцен
+
+---
+
+## Волна 3 · приказ владельца «всё не то» (главнее волны 2)
+
+Skills applied: autonomous-build-loop, naryad-crafting, panel-canon, motion-kinematics-canon, ai-presence-canon, gates-that-prove, acceptance-harness, solid-viz-builder (+ references/pseudo-3d-layers.md), canvas-frame-budget, canvas-scene-covers, single-file-delivery-canon, generative-fragment-handoff, gfonts-canon, adaptive-typography, design-tokens-oklch, web-ui-canon, responsive-canon, release-scrub; vendor/panel-v2/PANEL_V2.md
+
+| время (UTC) | пункт | что сделано | чем проверено | хеш |
+|---|---|---|---|---|

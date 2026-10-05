@@ -44,6 +44,12 @@ TARGETS = [
     {'out': 'dist/_lab.html', 'src': 'src/shell.src.html', 'title': 'Relief · rail calibration',
      'scene': ['lab.js'], 'data': False, 'passport': {
          'id': 'lab', 'title': 'Rail calibration', 'blurb': 'Калибровка рельса RELIEF: свет, линия, плавание, зерно.'}},
+    {'out': 'dist/orbit.html', 'src': 'src/shell.src.html', 'title': 'Relief · loan book orbit',
+     'scene': ['orbit.js'], 'data': True, 'passport': {
+         'id': 'orbit', 'title': 'Loan book orbit', 'blurb': 'Вся книга живым организмом: хаб, листы стадий, диски сегментов, займы.'},
+     'rows': [['labels', 'Подписи', ['hubs', 'none'], 'hubs'], ['loans', 'Займы', 0, 1, 1, 1], ['tilt', 'Наклон листов, °', 0, 8, 0.5, 6],
+              ['parallax', 'Параллакс', 0, 1.5, 0.01, 0.6], ['drift', 'Дыхание графа', 0, 2, 0.01, 1],
+              ['springK', 'Пружины', 5, 80, 1, 30], ['repel', 'Отталкивание', 0, 2, 0.01, 1]]},
     {'out': 'dist/index.html', 'src': 'src/playground.src.html', 'title': 'Relief · playground',
      'scene': [], 'data': False, 'passport': None},
 ]
@@ -133,10 +139,10 @@ def build(t):
     text = text.replace('<!--@scene-->', '\n'.join('<script src="%s"></script>' % s for s in t['scene']))
     missing = []
     text = inline_scripts(text, os.path.dirname(srcp), missing)
-    text = text.replace('<!--@fonts-->', fonts_css())
-    text = text.replace('<!--@pv2-css-->', '<style id="pv2-css">\n%s\n</style>' % pv2_css())
-    text = text.replace('<!--@assets-->', assets_js())
-    text = text.replace('<!--@data-->', data_js() if t.get('data') else '')
+    text = text.replace('<!--@fonts-->', fonts_css(), 1)
+    text = text.replace('<!--@pv2-css-->', '<style id="pv2-css">\n%s\n</style>' % pv2_css(), 1)
+    text = text.replace('<!--@assets-->', assets_js(), 1)
+    text = text.replace('<!--@data-->', data_js() if t.get('data') else '', 1)
     if missing:
         raise SystemExit('не нашлись вложения: %s' % ' '.join(missing))
     return text
@@ -146,7 +152,7 @@ def passport(t, html):
     """Паспорт по схеме vendor/passport.schema.json; params — объектная форма деклараций."""
     p = t['passport']
     knobs = json.load(io.open(os.path.join(SRC, 'knobs.json'), encoding='utf-8'))
-    rows = [['view', 'Вид', ['_light', '_ruler', '_float', '_grain'], '_light', ['Свет', 'Линейка', 'Плавание', 'Зерно']]]
+    rows = list(t.get('rows') or [['view', 'Вид', ['_light', '_ruler', '_float', '_grain'], '_light', ['Свет', 'Линейка', 'Плавание', 'Зерно']]])
     for g in knobs['order']:
         rows += knobs['common'].get(g, [])
     params = []
@@ -167,7 +173,9 @@ def passport(t, html):
                      'api': ['Scene.set', 'Scene.get', 'Scene.export', 'KIT.scene.register', 'KIT.scene.start',
                              '__probe', '__freeze', '__jump', '__lab']},
         'params': params, 'presets': [], 'frozen': [], 'aspect': 'auto', 'minHeight': 240,
-        'hover': 'ничего', 'click': 'клик по скрабу без протяжки открывает ввод числа; P пауза, R переиграть, E PNG, I тема',
+        'hover': 'ничего' if p['id'] == 'lab' else 'узел поднимается с соседями, остальное притухает цветом; подсказка листом z3',
+        'click': 'клик по скрабу без протяжки открывает ввод числа; P пауза, R переиграть, E PNG, I тема' if p['id'] == 'lab'
+                 else 'клик по узлу = фокус, протяжка узла = соседи на пружинах, колесо = зум, протяжка по пустому = панорама, двойной клик или Esc = домой',
         'reducedMotion': 'плавание снято, листва стоит на w = 0, сборка пропущена: один финальный кадр',
         'narrow390': 'панель нижним листом 44vh, открыта всегда; в embed панели нет',
         'forbidden': ['править dist/ руками вместо src/', 'задавать тени вне src/light/'],

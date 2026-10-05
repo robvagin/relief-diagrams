@@ -7,6 +7,7 @@
 (function () {
   'use strict';
   var SCENES = ['gate', 'desk', 'cascade', 'stack', 'horizon', 'agents', 'ledger', 'glyph'];
+  var ORBIT = [{ group: 'orbit', id: 'orbit', path: 'orbit.html', title: 'The whole book, alive' }];
   var RAIL = [
     { group: 'rail', id: '_light', path: '_lab.html?view=_light', title: 'Light: z0–z3, plate over plate' },
     { group: 'rail', id: '_ruler', path: '_lab.html?view=_ruler', title: 'Ruler: one line width' },
@@ -25,7 +26,7 @@
 
   var Q = new URLSearchParams(location.search);
   var st = {
-    items: RAIL.slice(), cur: null, theme: Q.get('theme') === 'night' ? 'night' : 'day',
+    items: ORBIT.concat(Q.get('dev') === '1' ? RAIL : []), cur: null, theme: Q.get('theme') === 'night' ? 'night' : 'day',
     seed: Q.get('seed') || 'relief-01', preset: Q.get('preset') || '', set: {}, paused: false, cw: null, live: false
   };
   Q.forEach(function (v, k) { if (k.indexOf('set.') === 0) st.set[k.slice(4)] = v; });
@@ -38,7 +39,8 @@
   /* ── список ─────────────────────────────────────────────────────────── */
   function renderList() {
     var box = $('items'); box.textContent = '';
-    var groups = [['rail', 'Rail']].concat(SCENES.map(function (s) { return [s, s]; }));
+    var groups = [['orbit', 'Orbit']].concat(SCENES.map(function (s) { return [s, s]; }))
+      .concat(Q.get('dev') === '1' ? [['rail', 'Rail · dev']] : []);
     groups.forEach(function (gp) {
       var its = st.items.filter(function (i) { return i.group === gp[0]; });
       var h = document.createElement('div'); h.className = 'grp-h';
@@ -187,6 +189,7 @@
   function shareURL() {
     var u = new URL(location.href), q = new URLSearchParams();
     if (st.cur) q.set('v', st.cur.path);
+    if (Q.get('dev') === '1') q.set('dev', '1');
     q.set('theme', st.theme); q.set('seed', st.seed);
     if (st.preset) q.set('preset', st.preset);
     Object.keys(st.set).forEach(function (k) { q.set('set.' + k, st.set[k]); });
@@ -238,7 +241,7 @@
   buildTop(); setTheme();
   loadIndex().then(function () {
     var want = Q.get('v'), it = st.items.filter(function (i) { return i.path === want; })[0];
-    if (!it) it = st.items.filter(function (i) { return i.group !== 'rail'; })[0] || st.items[0];
+    if (!it) it = st.items[0];                                   // открывается на orbit
     select(it);
   });
 })();
