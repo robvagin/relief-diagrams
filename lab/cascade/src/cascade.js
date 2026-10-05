@@ -39,7 +39,11 @@
     T.forEach(function (n) {
       var r = Math.max(3 * ui, K * Math.sqrt(n.v));
       n.r = r; n.re = r;
-      if (sheetAt(n)) { var A = Math.PI * r * r, a = n.depth === 0 ? 1.5 : 1.35; n.sheet = true; n.w = Math.sqrt(A * a); n.h = A / n.w; n.re = Math.sqrt(n.w * n.w + n.h * n.h) / 2 * 0.86; }
+      if (sheetAt(n)) {
+        if (n.depth === 0) { n.sheet = true; n.card = true; n.w = 232 * ui; n.h = 128 * ui; }       // книга = карточка-хаб, итог печатается числом
+        else { var A = Math.PI * r * r, a = 1.35; n.sheet = true; n.w = Math.max(30 * ui, Math.sqrt(A * a)); n.h = Math.max(22 * ui, A / Math.sqrt(A * a)); }
+        n.re = Math.sqrt(n.w * n.w + n.h * n.h) / 2 * 0.86;
+      }
     });
     return K;
   }
@@ -63,8 +67,8 @@
     };
     var p = pose(), x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     T.forEach(function (n, i) { var e = n.sheet ? Math.max(n.w, n.h) / 2 : n.r; x0 = Math.min(x0, p[i][0] - e); x1 = Math.max(x1, p[i][0] + e); y0 = Math.min(y0, p[i][1] - e); y1 = Math.max(y1, p[i][1] + e); });
-    var s = Math.min(1, rect.w / (x1 - x0), rect.h / (y1 - y0));
-    T.forEach(function (n) { n.len *= s; n.r *= s; n.re *= s; if (n.full) n.full *= s; if (n.sheet) { n.w *= s; n.h *= s; } });
+    var s = Math.min(2.2, rect.w / (x1 - x0), rect.h / (y1 - y0));
+    T.forEach(function (n) { n.len *= s; n.r *= s; n.re *= s; if (n.full) n.full *= s; if (n.sheet && !n.card) { n.w *= s; n.h *= s; } });
     var root = T[0];
     root.x = rect.x + rect.w / 2 + (root.x - (x0 + x1) / 2) * s; root.y = rect.y + rect.h / 2 + (root.y - (y0 + y1) / 2) * s;
     return s;
@@ -100,24 +104,46 @@
       var sec = avail * Wt[i] / SW; k.ang = a + sec / 2; k.sector = sec; a += sec + gap;
       k.len = root.re + k.re + u + L1 * k.share; k.full = L1; k.sway = 0.9;
     });
-    // уровни ниже стадий: веер внутри сектора своей стадии
+    // сегменты: веер внутри сектора стадии, дистанция = доля; страны: веер на лучах своего сегмента,
+    // шаг угла ровно на касание соседей + зазор, между семьями воздух (лестница акцентов Satellites)
     kids.forEach(function (k) {
-      (function rec(p, depth) {
-        if (!p.kids.length) return;
-        var Ld = L1 * Math.pow(0.55, depth - 1), half = Math.min(60 * D2R, (p.sector || TAU) / 2) * 0.92;
-        var ks = p.kids.map(function (q) { return T[q]; }), Wk = ks.map(function (c) { return Math.pow(c.leaves, 0.7); }), SWk = Wk.reduce(function (x, y) { return x + y; }, 0), acc = 0;
-        ks.forEach(function (c, j) {
-          var f = ks.length === 1 ? 0.5 : (acc + Wk[j] / 2) / SWk; acc += Wk[j];
-          if (P.phyllo) { c.ang = p.ang + (j + 1) * 137.508 * D2R; c.len = p.re + c.re + u + Ld * 0.42 * Math.sqrt(j + 1); }
-          else { c.ang = p.ang - half + 2 * half * f; c.len = (depth === 3 ? 0.9 : 1) * (p.re + c.re) + u * (depth === 3 ? 0.2 : 1) + Ld * c.share; }
-          c.sector = 2 * half * Wk[j] / SWk; c.full = Ld; c.sway = depth === 3 ? 1.6 : 1.2;
-          if (c.sheet) c.rot = ((j % 2) ? 1 : -1) * (4 + 3 * (j % 3) / 2) * D2R;
-          rec(c, depth + 1);
-        });
-      })(k, 2);
+      var Ld = L1 * 0.62, half = Math.min(62 * D2R, k.sector / 2) * 0.94;
+      var ks = k.kids.map(function (q) { return T[q]; }), Wk = ks.map(function (c) { return Math.pow(c.leaves, 0.7) * (0.6 + Math.sqrt(c.share)); }), SWk = Wk.reduce(function (x, y) { return x + y; }, 0), acc = 0;
+      ks.forEach(function (c, j) {
+        var f = ks.length === 1 ? 0.5 : (acc + Wk[j] / 2) / SWk; acc += Wk[j];
+        c.ang = P.phyllo ? k.ang + (j + 1) * 137.508 * D2R : k.ang - half + 2 * half * f;
+        c.len = k.re + c.re + u + Ld * c.share; c.full = Ld; c.sector = 2 * half * Wk[j] / SWk; c.sway = 1.1;
+        c.rot = c.ang + Math.PI / 2 + ((j % 2) ? 1 : -1) * 6 * D2R;
+        var cs = c.kids.map(function (q) { return T[q]; }).sort(function (x, y) { return y.v - x.v; });
+        if (!cs.length) return;
+        var Lc = L1 * 0.30, gap = u * 0.35;
+        cs.forEach(function (d) { d.len = c.re + d.r + u * 0.8 + Lc * d.share; d.full = Lc; d.sway = 1.6; });
+        // угловой шаг: соседи касаются через зазор; порядок от большего к меньшему попеременно от оси
+        var order = []; cs.forEach(function (d, q) { if (q % 2) order.push(d); else order.unshift(d); });
+        var angs = [0];
+        for (var q = 1; q < order.length; q++) {
+          var A = order[q - 1], B = order[q], R2 = Math.min(A.len, B.len);
+          angs.push(angs[q - 1] + 2 * Math.asin(Math.min(0.99, (A.r + B.r + gap) / (2 * R2))));
+        }
+        var mid = angs[angs.length - 1] / 2;
+        order.forEach(function (d, q) { d.ang = c.ang + angs[q] - mid; });
+      });
     });
     relax(T, u);
     T.forEach(function (n) { if (n.parent >= 0) n.ray = true; });
+    // поворот всего организма под кадр: из 24 углов берётся тот, что вписывается крупнее всего
+    var best = 0, bestS = -1;
+    for (var q = 0; q < 24; q++) {
+      var th = q * 15 * D2R, p = [], x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      T.forEach(function (n, i) {
+        p[i] = n.parent < 0 ? [n.x, n.y] : [p[n.parent][0] + Math.cos(n.ang + th) * n.len, p[n.parent][1] + Math.sin(n.ang + th) * n.len];
+        var e = n.sheet ? Math.max(n.w, n.h) / 2 : n.r;
+        x0 = Math.min(x0, p[i][0] - e); x1 = Math.max(x1, p[i][0] + e); y0 = Math.min(y0, p[i][1] - e); y1 = Math.max(y1, p[i][1] + e);
+      });
+      var sc = Math.min(rect.w / (x1 - x0), rect.h / (y1 - y0));
+      if (sc > bestS + 1e-6) { bestS = sc; best = th; }
+    }
+    T.forEach(function (n) { if (n.parent >= 0) { n.ang += best; if (n.rot) n.rot += best; } });
   }
 
   /* ── v2 · octopus ────────────────────────────────────────────────────── */
@@ -161,7 +187,7 @@
     var st0 = root.kids.map(function (k) { return T[k]; }).sort(function (x, y) { return y.share - x.share; }), n = st0.length;
     var st = n === 3 ? [st0[1], st0[0], st0[2]] : st0;
     // стебли: веер вверх, высота = доля стадии; на стебле листья-сегменты по очереди слева и справа
-    var span = Math.min(80, P.spread * 0.25) * D2R;
+    var span = Math.min(130, P.spread * 0.45) * D2R;
     T.stems = [];
     st.forEach(function (s, i) {
       var base = -Math.PI / 2 + (n === 1 ? 0 : -span / 2 + span * i / (n - 1));
@@ -208,7 +234,7 @@
       n.lab = null;
       if (n.depth === 0) return;
       // подпись внутри: большой диск стадии, крупный лист сегмента, диск страны от 12 px
-      n.inside = (!n.sheet && n.depth === 1 && n.r >= 30 * ui && V !== 'v2') || (n.sheet && n.w > 74 * ui && n.h > 36 * ui) || (!n.sheet && n.depth === 3 && n.r >= 12 * ui);
+      n.inside = (!n.sheet && n.depth === 1 && n.r >= Math.max(30 * ui, n.label.length * 4.4 * ui) && V !== 'v2') || (n.sheet && n.w > 74 * ui && n.h > 36 * ui) || (!n.sheet && n.depth === 3 && n.r >= 12 * ui);
       if (n.inside) return;
       if (n.depth === 3 && n.r < 6 * ui) return;
       var big = n.depth === 1, sz = big ? 14 : 11.67, wch = (n.label.length + (n.depth < 3 ? 9 : 0)) * sz * 0.58 * ui, hh = (n.depth < 3 ? 2.4 : 1.2) * sz * ui;
@@ -245,7 +271,7 @@
     var focusStage = -1; T.forEach(function (n, i) { if (n.depth === 1 && n.label === 'non-performing') focusStage = i; });
 
     var links = [];
-    if (V === 'v1') T.forEach(function (n, i) { if (n.parent >= 0) links.push({ a: n.parent, b: i, ticks: n.depth <= 2 ? { share: n.share, full: n.full } : null, alpha: n.depth === 3 ? 0.75 : 1 }); });
+    if (V === 'v1') T.forEach(function (n, i) { if (n.parent >= 0) links.push({ a: n.parent, b: i, ticks: n.depth <= 2 ? { share: n.share, full: n.full } : null, alpha: n.depth === 3 ? 0.8 : 1 }); });
     var mod = {
       nodes: nodes, links: links,
       tip: function (n) { var t = n.src; return { lines: [t.depth === 0 ? 'Loan book' : t.label, fmtEUR(t.value) + ' · ' + t.count + ' loans', t.depth ? (t.share * 100).toFixed(1) + ' % of parent' : 'as of ' + D.meta.asOf], w: 176 }; },
@@ -316,6 +342,7 @@
         }
         if (n.inside) {
           g.save(); g.translate(s2.x, s2.y); g.rotate(s2.rot || 0);
+          if (Math.cos(s2.rot || 0) < 0) g.rotate(Math.PI);                 // подпись листа не вверх ногами
           R.ink.text(g, F, n.label, -s2.w / 2 + 8 * ui, -s2.h / 2 + 16 * ui, { s: 0, w: 500 });
           R.ink.text(g, F, fmt(n, P.metric), -s2.w / 2 + 8 * ui, -s2.h / 2 + 31 * ui, { s: 0, mono: true, tone: 'ink3' });
           g.restore();
@@ -343,11 +370,13 @@
     id: 'cascade', title: TITLES[V] || TITLES.v1,
     blurb: 'Loan book as a living organism of matte discs and paper sheets: area is exposure, distance is share.',
     layoutKeys: ['levels', 'spread', 'phyllo', 'rmax', 'metric', 'ticks', 'zscale'],
+    // плашки отделены от пола светом: выше лестница высот и ярче кант, чем у общего дефолта
+    defaults: { zscale: 1.6, rim: 0.85, dens: 0.24 },
     build: build,
     groups: {
       'Сцена': [['levels', 'Уровней', 1, 3, 1, 3]],
       'Ритм': [['spread', 'Раскрытие, °', 90, 360, 1, V === 'v1' ? 320 : V === 'v2' ? 300 : 240], ['ticks', 'Засечки', 0, 1, 1, 1],
-        ['phyllo', 'Филлотаксис', 0, 1, 1, 0], ['rmax', 'Крупнейший, px', 40, 200, 1, V === 'v1' ? 96 : V === 'v2' ? 70 : 78]],
+        ['phyllo', 'Филлотаксис', 0, 1, 1, 0], ['rmax', 'Крупнейший, px', 40, 240, 1, V === 'v1' ? 150 : V === 'v2' ? 110 : 120]],
       'Данные': [['metric', 'Мера', ['value', 'count'], 'value', ['Объём', 'Число']]]
     }
   });

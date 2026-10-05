@@ -47,12 +47,12 @@
     }
     var H = rect.h, W = rect.w;
     tier([{ id: 'dec', kind: 'disc', r: 46 * ui, label: Ly.dec.id, dec: true }], H * 0.22, 0.0001, 0.3, 3, 'decision');
-    tier(Ly.rules.map(function (r) { return { id: r.id, kind: 'sheet', w: 116 * ui, h: 64 * ui, label: r.id, rule: r }; }), H * 0.40, W * 0.17, 0.32, 2, 'rules');
+    tier(Ly.rules.map(function (r) { return { id: r.id, kind: 'sheet', w: 136 * ui, h: 76 * ui, label: r.id, rule: r }; }), H * 0.40, W * 0.23, 0.34, 2, 'rules');
     tier(Ly.classes.map(function (c) { return { id: 'k-' + c, kind: 'disc', r: 15 * ui, label: c, cls: c }; }), H * 0.62, W * 0.28, 0.28, 1, 'knowledge');
     // листы данных через равные промежутки кольца, точки займов между ними
     var dat = [];
     for (var i = 0; i < 15; i++) {
-      if (i % 5 === 0) { var d = Ly.data[i / 5]; dat.push({ id: 'd-' + d.key, kind: 'sheet', w: 132 * ui, h: 76 * ui, label: d.label, data: d }); }
+      if (i % 5 === 0) { var d = Ly.data[i / 5]; dat.push({ id: 'd-' + d.key, kind: 'sheet', w: 150 * ui, h: 86 * ui, label: d.label, data: d }); }
       else dat.push({ id: 'dot' + i, kind: 'disc', r: 7 * ui, label: '', dot: true });
     }
     tier(dat, H * 0.86, W * 0.38, 0.22, 1, 'data');
@@ -68,7 +68,7 @@
     var ruleIx = {};
     Ly.rules.forEach(function (r, k) {
       var a = -Math.PI / 2 + k / Ly.rules.length * TAU;
-      ruleIx[r.id] = N.push(node({ id: r.id, kind: 'sheet', w: 112 * ui, h: 62 * ui, parent: dec, len: Rm * 0.36 * E, ang: a, sway: 1.2, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', rot: (k % 2 ? 1 : -1) * 5 * D2R })) - 1;
+      ruleIx[r.id] = N.push(node({ id: r.id, kind: 'sheet', w: 140 * ui, h: 80 * ui, parent: dec, len: Rm * 0.36 * E, ang: a, sway: 1.2, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', rot: (k % 2 ? 1 : -1) * 5 * D2R })) - 1;
     });
     // класс висит на первом правиле, которое его читает; остальные чтения — мягкими дугами
     var clsIx = {}, extra = [];
@@ -82,7 +82,7 @@
     Ly.data.forEach(function (d, k) {
       var cls = FEEDS[d.key], host = clsIx[cls[0]];
       var a = N[host].ang + (k - 1) * 10 * D2R;
-      var di = N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 128 * ui, h: 72 * ui, parent: host, len: Rm * 0.36 * E, ang: N[host].ang + (k % 2 ? 0.25 : -0.25), sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', rot: (k % 2 ? -1 : 1) * 6 * D2R })) - 1;
+      var di = N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 156 * ui, h: 88 * ui, parent: host, len: Rm * 0.36 * E, ang: N[host].ang + (k % 2 ? 0.25 : -0.25), sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', rot: (k % 2 ? -1 : 1) * 6 * D2R })) - 1;
       cls.slice(1).forEach(function (c) { if (clsIx[c] != null) extra.push({ a: clsIx[c], b: di }); });
       // точки займов: по 20 займов на диск, веером за листом данных
       if (d.key === 'loans') for (var i = 0; i < 6; i++) N.push(node({ id: 'dot' + i, kind: 'disc', r: 7 * ui, parent: di, len: 64 * ui + i * 4 * ui, ang: N[host].ang + (i - 2.5) * 16 * D2R, sway: 3, depth: 4, z: 1, dot: true, layer: 'data' }));
@@ -98,7 +98,7 @@
     // лепестки-правила: длинные листы по радиусу, внутренним краем под сердцевиной (тень сердцевины на них)
     Ly.rules.forEach(function (r, k) {
       var a = -Math.PI / 2 + k / Ly.rules.length * TAU;
-      N.push(node({ id: r.id, kind: 'sheet', w: 150 * ui, h: 70 * ui, parent: core, len: (52 + 62) * ui * E, ang: a, rot: a, spin: 1, sway: 1.3, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', petal: true }));
+      N.push(node({ id: r.id, kind: 'sheet', w: 176 * ui, h: 84 * ui, parent: core, len: (52 + 62) * ui * E, ang: a, rot: a, spin: 1, sway: 1.3, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', petal: true }));
     });
     // внешние лепестки-знания: диски в просветах между правилами, частично под ними
     Ly.classes.forEach(function (c, k) {
@@ -108,7 +108,7 @@
     // венчик данных: три листа и точки займов по внешнему кругу
     Ly.data.forEach(function (d, k) {
       var a = -Math.PI / 2 + Math.PI / 3 + k / 3 * TAU;
-      N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 128 * ui, h: 72 * ui, parent: core, len: Rm * 0.88 * E, ang: a, rot: a + Math.PI / 2, spin: 1, sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', petal: true }));
+      N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 156 * ui, h: 88 * ui, parent: core, len: Rm * 0.88 * E, ang: a, rot: a + Math.PI / 2, spin: 1, sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', petal: true }));
     });
     for (var i = 0; i < 18; i++) {
       var a = -Math.PI / 2 + (i + 0.5) / 18 * TAU;
@@ -122,7 +122,7 @@
     var p = []; N.forEach(function (n, i) { p[i] = n.parent < 0 ? [n.x, n.y] : [p[n.parent][0] + Math.cos(n.ang) * n.len, p[n.parent][1] + Math.sin(n.ang) * n.len]; });
     var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     N.forEach(function (n, i) { var e = n.kind === 'disc' ? n.r : Math.max(n.w, n.h) / 2; x0 = Math.min(x0, p[i][0] - e); x1 = Math.max(x1, p[i][0] + e); y0 = Math.min(y0, p[i][1] - e); y1 = Math.max(y1, p[i][1] + e); });
-    var s = Math.min(1, rect.w / (x1 - x0), rect.h / (y1 - y0));
+    var s = Math.min(2.2, rect.w / (x1 - x0), rect.h / (y1 - y0));
     N.forEach(function (n) { n.len *= s; if (n.kind === 'disc') n.r *= s; else { n.w *= s; n.h *= s; } });
     var root = N[0];
     root.x = rect.x + rect.w / 2 + (root.x - (x0 + x1) / 2) * s; root.y = rect.y + rect.h / 2 + (root.y - (y0 + y1) / 2) * s;
@@ -234,6 +234,7 @@
     id: 'stack', title: TITLES[V] || TITLES.v1,
     blurb: 'Model of record as hanging paper sheets and discs lifted by height: data, knowledge, rules, decision.',
     layoutKeys: ['explode', 'callouts', 'zscale'],
+    defaults: { zscale: 1.6, rim: 0.85, dens: 0.24 },
     build: build,
     groups: {
       'Сцена': [['explode', 'Разнос', 0, 1, 0.01, V === 'v1' ? 0.8 : 0.6]],

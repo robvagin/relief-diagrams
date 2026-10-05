@@ -876,16 +876,17 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
   function ensure(c, w, h) { if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); } }
 
   /* ── спрайты: покрытие из поля расстояний, один раз на ключ ─────────── */
-  var SPR = new Map(), LIMIT = 600;
+  var SPR = new Map(), LIMIT = 2400;
   function sprite(c, sig, dens, tint) {
     var sq = Math.max(0.25, Math.round(sig * 4) / 4), dq = Math.round(dens * 200) / 200;
     if (dq <= 0) return null;
-    var key = [tint.join(','), c.kind, c.w.toFixed(1), c.h.toFixed(1), (c.r || 0).toFixed(1), sq, dq, c.holes ? JSON.stringify(c.holes) : ''].join('|');
+    var qs = function (v) { return (Math.round(v * 2) / 2).toFixed(1); };        // размер квантуется 0,5 px: семья мелких дисков делит спрайты
+    var key = [tint.join(','), c.kind, qs(c.w), qs(c.h), qs(c.r || 0), sq, dq, c.holes ? JSON.stringify(c.holes) : ''].join('|');
     var s = SPR.get(key);
     if (s) { SPR.delete(key); SPR.set(key, s); return s; }      // LRU: свежий в конец
-    var pad = Math.ceil(3.4 * sq) + 2, w = Math.ceil(c.w) + 2 * pad, h = Math.ceil(c.h) + 2 * pad;
+    var pad = Math.ceil(3.4 * sq) + 2, w = Math.ceil(+qs(c.w)) + 2 * pad, h = Math.ceil(+qs(c.h)) + 2 * pad;
     var cv = canvas(w, h), g = cv.getContext('2d'), im = g.createImageData(w, h), d = im.data;
-    var shape = { kind: c.kind, x: w / 2, y: h / 2, w: c.w, h: c.h, r: c.r, holes: c.holes };
+    var shape = { kind: c.kind, x: w / 2, y: h / 2, w: +qs(c.w), h: +qs(c.h), r: +qs(c.r || 0), holes: c.holes };
     var sd = R.sdf.sd, cover = R.sdf.cover;
     for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) {
       var v = Math.min(1, dq * cover(sd(shape, i + 0.5, j + 0.5), sq)), p = (j * w + i) * 4;
@@ -945,13 +946,23 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     }
     if (!started) return null;
     // поле уходит в собственный холст: рельс держит его в кеше и кладёт multiply сколько угодно кадров
-    var out = canvas(w, h); out.getContext('2d').drawImage(dark, 0, 0, w, h, 0, 0, w, h);
+    var out = pooled(w, h); out.getContext('2d').drawImage(dark, 0, 0, w, h, 0, 0, w, h);
     return { cv: out, x: x0, y: y0, w: w, h: h };
   }
+  /* пул холстов полей: кадр берёт новые, прошлый кадр отдаёт свои (shade.recycle в начале сборки) */
+  var POOL = [], USED = [];
+  function pooled(w, h) {
+    var c = null;
+    for (var i = 0; i < POOL.length; i++) if (POOL[i].width >= w && POOL[i].height >= h) { c = POOL.splice(i, 1)[0]; break; }
+    if (!c) c = canvas(w, h);
+    var x = c.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'copy';
+    USED.push(c); return c;
+  }
+  function recycle() { POOL = POOL.concat(USED); USED = []; if (POOL.length > 600) POOL.length = 600; }
   function put(g, F) {
     if (!F) return;
     g.save(); g.globalCompositeOperation = 'multiply';
-    g.drawImage(F.cv, F.x, F.y); g.restore();
+    g.drawImage(F.cv, 0, 0, F.w, F.h, F.x, F.y, F.w, F.h); g.restore();
   }
 
   /* ── пятно лампы: lit = mix(1, E^0.6, pool), E = cos³; кеш на размер и лампу, ¼ разрешения ── */
@@ -989,7 +1000,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     g.drawImage(tmp, 0, 0, w, h, 0, 0, W, H); g.restore();
   }
 
-  R.shade = { layer: layer, put: put, pool: pool, canopy: canopy, sprite: sprite };
+  R.shade = { layer: layer, put: put, recycle: recycle, pool: pool, canopy: canopy, sprite: sprite };
 })();
 </script>
 <script>
@@ -1609,14 +1620,12 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     };
   };
 
-  /* ключ кеша теней: свет, тон, кадр и состояние плашек на tq (округлено до 1/64 px) */
-  function shadeKey(L, tn, W, H, ps) {
+  /* ключ кеша теней: свет, тон, кадр, СОСТАВ плашек и tq. Позиции в ключ не входят: поле строится
+     раз на tq по позициям этого кадра (физика графа двигает узлы каждый кадр, иначе пересборка каждый кадр) */
+  function shadeKey(L, tn, W, H, ps, tq) {
     var q = function (v) { return Math.round(v * 64); };
-    var parts = [W, H, L.mode, q(L.az), q(L.elev), q(L.soft), q(L.dens), q(L.contact), q(L.lamp.x), q(L.lamp.y), q(L.lamp.h), q(L.ui), tn.shadow.join(',')];
-    for (var i = 0; i < ps.length; i++) {
-      var p = ps[i];
-      parts.push(p.kind, q(p.x), q(p.y), q(p.w), q(p.h), q(p.r || 0), q(p.rot || 0), q(p.z), p.noShadow ? 1 : 0, p.holes ? JSON.stringify(p.holes) : '');
-    }
+    var parts = [tq, W, H, L.mode, q(L.az), q(L.elev), q(L.soft), q(L.dens), q(L.contact), q(L.lamp.x), q(L.lamp.y), q(L.lamp.h), q(L.ui), tn.shadow.join(','), ps.length];
+    for (var i = 0; i < ps.length; i++) parts.push(ps[i].kind, ps[i].noShadow ? 1 : 0, ps[i].id == null ? i : ps[i].id);
     return parts.join('|');
   }
 
@@ -1658,7 +1667,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
       return {
         id: p.id, kind: p.kind || 'rect', x: p.x + m.dx, y: p.y + m.dy, w: p.w, h: sz,
         r: p.r == null ? (+P.radius || 0) * ui : p.r, rot: (p.rot || 0) + m.rot, holes: p.holes,
-        z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fill, noShadow: p.noShadow, ghost: p.ghost, src: p
+        z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fade > 0.005 ? C.mix(p.fill || tn.plate, tn.ground, Math.min(1, p.fade)) : p.fill, noShadow: p.noShadow, ghost: p.ghost, src: p
       };
     }
     var plates = (spec.plates || []).map(function (p, i) { return place(p, i, tsec); });
@@ -1671,7 +1680,7 @@ RELIEF.knobs={"_":"Ручки §6.10, грамматика панели v2: чи
     var G = (L.canopy > 0) ? R.canopy.mask(ctx.seed, W, H, ui, tq, Math.max(1, +P.period || 36), still) : null;
     var occ = shadePl.filter(function (s) { return s.z > 0 && !s.noShadow; });
     F.G = G;
-    var key = shadeKey(L, tn, W, H, shadePl), cache = R._shade && R._shade.key === key ? R._shade : (R._shade = { key: key, floor: undefined, plates: {} });
+    var key = shadeKey(L, tn, W, H, shadePl, still ? 'still' : tq), cache = R._shade && R._shade.key === key ? R._shade : (R.shade.recycle(), R._shade = { key: key, floor: undefined, plates: {} });
 
 
     g.save();
@@ -2387,7 +2396,17 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
       return M;
     }
 
+    var seeded = false;
     function draw(ctx) {
+      // дефолты сцены поверх общих ручек: один раз, если адрес не задал своё; панель показывает их же
+      if (!seeded && opts.defaults) {
+        seeded = true;
+        var Q = new URLSearchParams(location.search);
+        Object.keys(opts.defaults).forEach(function (k) {
+          if (Q.has(k) || Q.has('set.' + k) || !(k in ctx.P)) return;
+          ctx.P[k] = opts.defaults[k]; if (window.DG && DG.panel) DG.panel.setValue(k, opts.defaults[k]);
+        });
+      }
       var P = ctx.P, W = ctx.W, H = ctx.H, ui = R.ui(W, H), still = !!ctx.reduced;
       var mod = model(ctx), N = mod.nodes, tsec = R.motion.time(ctx);
       // якоря = качание цепочкой (кинематика); пружины графа тянут узлы к ним, перетаскивание и соседи — там
@@ -2531,12 +2550,12 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     }
     var H = rect.h, W = rect.w;
     tier([{ id: 'dec', kind: 'disc', r: 46 * ui, label: Ly.dec.id, dec: true }], H * 0.22, 0.0001, 0.3, 3, 'decision');
-    tier(Ly.rules.map(function (r) { return { id: r.id, kind: 'sheet', w: 116 * ui, h: 64 * ui, label: r.id, rule: r }; }), H * 0.40, W * 0.17, 0.32, 2, 'rules');
+    tier(Ly.rules.map(function (r) { return { id: r.id, kind: 'sheet', w: 136 * ui, h: 76 * ui, label: r.id, rule: r }; }), H * 0.40, W * 0.23, 0.34, 2, 'rules');
     tier(Ly.classes.map(function (c) { return { id: 'k-' + c, kind: 'disc', r: 15 * ui, label: c, cls: c }; }), H * 0.62, W * 0.28, 0.28, 1, 'knowledge');
     // листы данных через равные промежутки кольца, точки займов между ними
     var dat = [];
     for (var i = 0; i < 15; i++) {
-      if (i % 5 === 0) { var d = Ly.data[i / 5]; dat.push({ id: 'd-' + d.key, kind: 'sheet', w: 132 * ui, h: 76 * ui, label: d.label, data: d }); }
+      if (i % 5 === 0) { var d = Ly.data[i / 5]; dat.push({ id: 'd-' + d.key, kind: 'sheet', w: 150 * ui, h: 86 * ui, label: d.label, data: d }); }
       else dat.push({ id: 'dot' + i, kind: 'disc', r: 7 * ui, label: '', dot: true });
     }
     tier(dat, H * 0.86, W * 0.38, 0.22, 1, 'data');
@@ -2552,7 +2571,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     var ruleIx = {};
     Ly.rules.forEach(function (r, k) {
       var a = -Math.PI / 2 + k / Ly.rules.length * TAU;
-      ruleIx[r.id] = N.push(node({ id: r.id, kind: 'sheet', w: 112 * ui, h: 62 * ui, parent: dec, len: Rm * 0.36 * E, ang: a, sway: 1.2, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', rot: (k % 2 ? 1 : -1) * 5 * D2R })) - 1;
+      ruleIx[r.id] = N.push(node({ id: r.id, kind: 'sheet', w: 140 * ui, h: 80 * ui, parent: dec, len: Rm * 0.36 * E, ang: a, sway: 1.2, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', rot: (k % 2 ? 1 : -1) * 5 * D2R })) - 1;
     });
     // класс висит на первом правиле, которое его читает; остальные чтения — мягкими дугами
     var clsIx = {}, extra = [];
@@ -2566,7 +2585,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     Ly.data.forEach(function (d, k) {
       var cls = FEEDS[d.key], host = clsIx[cls[0]];
       var a = N[host].ang + (k - 1) * 10 * D2R;
-      var di = N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 128 * ui, h: 72 * ui, parent: host, len: Rm * 0.36 * E, ang: N[host].ang + (k % 2 ? 0.25 : -0.25), sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', rot: (k % 2 ? -1 : 1) * 6 * D2R })) - 1;
+      var di = N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 156 * ui, h: 88 * ui, parent: host, len: Rm * 0.36 * E, ang: N[host].ang + (k % 2 ? 0.25 : -0.25), sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', rot: (k % 2 ? -1 : 1) * 6 * D2R })) - 1;
       cls.slice(1).forEach(function (c) { if (clsIx[c] != null) extra.push({ a: clsIx[c], b: di }); });
       // точки займов: по 20 займов на диск, веером за листом данных
       if (d.key === 'loans') for (var i = 0; i < 6; i++) N.push(node({ id: 'dot' + i, kind: 'disc', r: 7 * ui, parent: di, len: 64 * ui + i * 4 * ui, ang: N[host].ang + (i - 2.5) * 16 * D2R, sway: 3, depth: 4, z: 1, dot: true, layer: 'data' }));
@@ -2582,7 +2601,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     // лепестки-правила: длинные листы по радиусу, внутренним краем под сердцевиной (тень сердцевины на них)
     Ly.rules.forEach(function (r, k) {
       var a = -Math.PI / 2 + k / Ly.rules.length * TAU;
-      N.push(node({ id: r.id, kind: 'sheet', w: 150 * ui, h: 70 * ui, parent: core, len: (52 + 62) * ui * E, ang: a, rot: a, spin: 1, sway: 1.3, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', petal: true }));
+      N.push(node({ id: r.id, kind: 'sheet', w: 176 * ui, h: 84 * ui, parent: core, len: (52 + 62) * ui * E, ang: a, rot: a, spin: 1, sway: 1.3, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', petal: true }));
     });
     // внешние лепестки-знания: диски в просветах между правилами, частично под ними
     Ly.classes.forEach(function (c, k) {
@@ -2592,7 +2611,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     // венчик данных: три листа и точки займов по внешнему кругу
     Ly.data.forEach(function (d, k) {
       var a = -Math.PI / 2 + Math.PI / 3 + k / 3 * TAU;
-      N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 128 * ui, h: 72 * ui, parent: core, len: Rm * 0.88 * E, ang: a, rot: a + Math.PI / 2, spin: 1, sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', petal: true }));
+      N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 156 * ui, h: 88 * ui, parent: core, len: Rm * 0.88 * E, ang: a, rot: a + Math.PI / 2, spin: 1, sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', petal: true }));
     });
     for (var i = 0; i < 18; i++) {
       var a = -Math.PI / 2 + (i + 0.5) / 18 * TAU;
@@ -2606,7 +2625,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     var p = []; N.forEach(function (n, i) { p[i] = n.parent < 0 ? [n.x, n.y] : [p[n.parent][0] + Math.cos(n.ang) * n.len, p[n.parent][1] + Math.sin(n.ang) * n.len]; });
     var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     N.forEach(function (n, i) { var e = n.kind === 'disc' ? n.r : Math.max(n.w, n.h) / 2; x0 = Math.min(x0, p[i][0] - e); x1 = Math.max(x1, p[i][0] + e); y0 = Math.min(y0, p[i][1] - e); y1 = Math.max(y1, p[i][1] + e); });
-    var s = Math.min(1, rect.w / (x1 - x0), rect.h / (y1 - y0));
+    var s = Math.min(2.2, rect.w / (x1 - x0), rect.h / (y1 - y0));
     N.forEach(function (n) { n.len *= s; if (n.kind === 'disc') n.r *= s; else { n.w *= s; n.h *= s; } });
     var root = N[0];
     root.x = rect.x + rect.w / 2 + (root.x - (x0 + x1) / 2) * s; root.y = rect.y + rect.h / 2 + (root.y - (y0 + y1) / 2) * s;
@@ -2718,6 +2737,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     id: 'stack', title: TITLES[V] || TITLES.v1,
     blurb: 'Model of record as hanging paper sheets and discs lifted by height: data, knowledge, rules, decision.',
     layoutKeys: ['explode', 'callouts', 'zscale'],
+    defaults: { zscale: 1.6, rim: 0.85, dens: 0.24 },
     build: build,
     groups: {
       'Сцена': [['explode', 'Разнос', 0, 1, 0.01, V === 'v1' ? 0.8 : 0.6]],

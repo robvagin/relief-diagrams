@@ -125,7 +125,17 @@
       return M;
     }
 
+    var seeded = false;
     function draw(ctx) {
+      // дефолты сцены поверх общих ручек: один раз, если адрес не задал своё; панель показывает их же
+      if (!seeded && opts.defaults) {
+        seeded = true;
+        var Q = new URLSearchParams(location.search);
+        Object.keys(opts.defaults).forEach(function (k) {
+          if (Q.has(k) || Q.has('set.' + k) || !(k in ctx.P)) return;
+          ctx.P[k] = opts.defaults[k]; if (window.DG && DG.panel) DG.panel.setValue(k, opts.defaults[k]);
+        });
+      }
       var P = ctx.P, W = ctx.W, H = ctx.H, ui = R.ui(W, H), still = !!ctx.reduced;
       var mod = model(ctx), N = mod.nodes, tsec = R.motion.time(ctx);
       // якоря = качание цепочкой (кинематика); пружины графа тянут узлы к ним, перетаскивание и соседи — там

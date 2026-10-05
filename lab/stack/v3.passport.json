@@ -3,7 +3,7 @@
   "title": "Stack · flower",
   "blurb": "Model of record as hanging paper sheets and discs lifted by height: data, knowledge, rules, decision.",
   "version": "0.3.0",
-  "engineHash": "d1c15019f85dbb60377f0ded8b00ba45df245f6c507087da89fbcc3b29850571",
+  "engineHash": "bd50656e265fbd8954a36780ac63519c1adc88476efa1edc7daf176f7738497e",
   "kind": "engine",
   "contract": {
     "embed": {
