@@ -23,9 +23,9 @@ TARGETS = [
     ('lab/gate/v1.html', 'Gate · v1 Mobile', ['gate.js', 'gate-v1.js']),
     ('lab/gate/v2.html', 'Gate · v2 Sprout', ['gate.js', 'gate-v2.js']),
     ('lab/gate/v3.html', 'Gate · v3 Octopus', ['gate.js', 'gate-v3.js']),
-    ('lab/glyph/v1.html', 'Glyph · v1 Mobile', ['../../glyph/src/glyph-common.js', '../../glyph/src/glyph-v1.js']),
-    ('lab/glyph/v2.html', 'Glyph · v2 Octopus', ['../../glyph/src/glyph-common.js', '../../glyph/src/glyph-v2.js']),
-    ('lab/glyph/v3.html', 'Glyph · v3 Sprout', ['../../glyph/src/glyph-common.js', '../../glyph/src/glyph-v3.js']),
+    ('lab/glyph/v1.html', 'Glyph · v1 Mobile', ['gate.js', '../../glyph/src/glyph-common.js', '../../glyph/src/glyph-v1.js']),
+    ('lab/glyph/v2.html', 'Glyph · v2 Octopus', ['gate.js', '../../glyph/src/glyph-common.js', '../../glyph/src/glyph-v2.js']),
+    ('lab/glyph/v3.html', 'Glyph · v3 Sprout', ['gate.js', '../../glyph/src/glyph-common.js', '../../glyph/src/glyph-v3.js']),
 ]
 
 
