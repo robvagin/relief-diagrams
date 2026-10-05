@@ -62,9 +62,9 @@
       x0 = Math.min(x0, e.x - hw); x1 = Math.max(x1, e.x + hw); y0 = Math.min(y0, e.y - hh); y1 = Math.max(y1, e.y + hh);
     });
     Lr.stems.forEach(function (s) { s.pts.forEach(function (p) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }); });
-    var top = m + 80 * Lr.ui, bw = W - 2 * m, bh = H - top - m * 0.6;
-    var k = Math.min(1.15, bw / (x1 - x0), bh / (y1 - y0));
-    var dx = m + (bw - (x1 - x0) * k) / 2 - x0 * k, dy = top + (bh - (y1 - y0) * k) - y0 * k;
+    var top = m + 80 * Lr.ui, bw = W - 2 * m, bh = H - top - m * 1.3;
+    var k = Math.min(1.1, bw / (x1 - x0), bh / (y1 - y0)) * 0.94;            // запас на ветер и опадание
+    var dx = m + (bw - (x1 - x0) * k) / 2 - x0 * k, dy = top + (bh - (y1 - y0) * k) * 0.6 - y0 * k;
     var T = function (p) { return [p[0] * k + dx, p[1] * k + dy]; };
     Lo.els.forEach(function (e) { var q = T([e.x, e.y]); e.x = q[0]; e.y = q[1]; e.att = T(e.att); if (e.tip) e.tip = T(e.tip); e.half *= k;
       e.z = { kind: e.z.kind, w: e.z.w * k, h: e.z.h ? e.z.h * k : undefined }; });
@@ -88,7 +88,7 @@
       var plates = Lo.els.map(function (e) {
         var zp = G.zpx(e.st.lv + (e.st.flat ? 0 : V.lift(e.step.id) * 0.9), P, ui), sp = V.pos(e.step.id, zp);
         // опавший лист соскальзывает к полу вдоль стебля: вниз на треть своего размера
-        if (e.st.flat && e.step.role !== 'decision') sp = [sp[0] + e.side * e.half * 0.25, sp[1] + e.half * 0.5];
+        if (e.st.flat && e.step.role !== 'decision') sp = [sp[0] + e.side * e.half * 0.12, sp[1] + e.half * 0.22];
         e.sx = sp[0]; e.sy = sp[1];
         return { id: e.step.id, kind: e.z.kind, x: sp[0], y: sp[1], w: e.z.w * V.k, h: (e.z.h || e.z.w) * V.k, r: e.z.kind === 'rect' ? 3 * ui : null,
           rot: e.rot, z: zp, env: e.st.env, step: e.step, el: e, fill: V.fade(e.step.id) > 0.01 ? O.fadeFill({ tn: TN }, V.fade(e.step.id)) : null };
