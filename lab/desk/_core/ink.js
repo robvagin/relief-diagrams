@@ -1,105 +1,79 @@
-// ink.js — печать и рельеф §7.4, типографика §8, чарты §7.9 (общие для desk и ledger).
-// Иерархия: рельеф = каркас (вырезан в материале), печать = данные (чернила), акцент = решение.
-// Доноры устройства: chart-3d (niceStep, band-шкала, пилюли подписей), sunburst (разбиение дуг,
-// labelMin), radial (радиальные столбцы, большой номер с подписью), pitch-composer (одна шкала K,
-// число к подписи ≈ 5:1, подпись моно). Их свет и тени не взяты: тени только из relief.js.
+// ink.js — печать для организмов desk и ledger: текст (Geist, Geist Mono, трекинг по кеглю по
+// adaptive-typography), числа, мягкие кривые стеблей и щупалец одной толщины (L7), рельефная линия.
+// Цвета только из R.tokens (src/tokens.scene.js): хексов здесь нет.
 (function () {
   'use strict';
-  const R = window.RELIEF, TAU = R.TAU;
+  var R = window.RELIEF;
+  var TAU = Math.PI * 2;
   // шкала ×1,2 от 14 (§8): t1..t8, крупные числа t9..t11
-  const TS = [0, 11.67, 14, 16.8, 20.16, 24.19, 29.03, 34.84, 41.8, 50.2, 60.2, 72.2];
-  function track(px) { return px < 13 ? 0.02 : px <= 20.5 ? 0 : px < 50 ? -0.01 : -0.02; }
-  function font(g, F, step, o) {
-    o = o || {};
-    const px = Math.max(o.min || 8, (typeof step === 'number' && step < 12 ? TS[step] : step) * F.ui * (o.k || 1));
-    g.font = (o.weight || (o.mono ? 400 : 400)) + ' ' + px.toFixed(2) + 'px ' + (o.mono ? '"Geist Mono", ui-monospace, monospace' : 'Geist, system-ui, sans-serif');
-    const tr = o.caps ? 0.07 : track(px);
-    if ('letterSpacing' in g) g.letterSpacing = (tr * px).toFixed(2) + 'px';
-    return px;
+  var TS = [0, 11.67, 14, 16.8, 20.16, 24.19, 29.03, 34.84, 41.8, 50.2, 60.2, 72.2];
+  // трекинг по кеглю: мелкое в плюс, 14–20 ноль, крупное в минус; капс +0.07em
+  function track(px, caps) { return caps ? 0.07 : px < 13 ? 0.02 : px <= 20.5 ? 0 : px < 50 ? -0.01 : -0.02; }
+  function px(F, step, k) { return (step < 12 && step === Math.floor(step) ? TS[step] : step) * F.ui * (k || 1); }
+  function font(g, F, o) {
+    var p = Math.max(o.min || 8, o.px || px(F, o.size || 2, o.k));
+    g.font = (o.weight || 400) + ' ' + p.toFixed(2) + 'px ' + (o.mono ? '"Geist Mono", ui-monospace, monospace' : 'Geist, system-ui, sans-serif');
+    if ('letterSpacing' in g) g.letterSpacing = (track(p, o.caps) * p).toFixed(2) + 'px';
+    return p;
   }
   function text(g, F, s, x, y, o) {
     o = o || {};
-    const px = font(g, F, o.size || 2, o);
-    g.fillStyle = o.color || 'black';
+    var p = font(g, F, o);
+    g.fillStyle = o.color;
     g.textAlign = o.align || 'left';
     g.textBaseline = o.base || 'alphabetic';
-    g.fillText(o.caps ? String(s).toUpperCase() : s, x, y);
-    return px;
+    g.fillText(o.caps ? String(s).toUpperCase() : String(s), x, y);
+    return p;
   }
-  function measure(g, F, s, o) { font(g, F, o.size || 2, o); return g.measureText(o.caps ? String(s).toUpperCase() : s).width; }
+  function measure(g, F, s, o) { font(g, F, o || {}); return g.measureText(o && o.caps ? String(s).toUpperCase() : String(s)).width; }
+  // самый крупный кегль, при котором строка влезает в ширину w и высоту h
+  function fit(g, F, s, w, h, o) {
+    var w100 = measure(g, F, s, Object.assign({}, o, { px: 100, min: 1 })) / 100;
+    return Math.max(o.min || 8, Math.min(w / Math.max(0.01, w100), h));
+  }
 
-  // числа: моно, табличные (Geist Mono равноширинный)
   function eur(v, d) {
-    const a = Math.abs(v);
+    var a = Math.abs(v);
     if (a >= 1e9) return '€' + (v / 1e9).toFixed(d == null ? 2 : d) + 'B';
     if (a >= 1e6) return '€' + (v / 1e6).toFixed(d == null ? 1 : d) + 'M';
     if (a >= 1e3) return '€' + (v / 1e3).toFixed(d == null ? 0 : d) + 'k';
     return '€' + v.toFixed(0);
   }
-  const pct = (v, d) => (v * 100).toFixed(d == null ? 1 : d) + '%';
-  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthOf = s => MON[(+s.slice(5, 7)) - 1];
+  function pct(v, d) { return (v * 100).toFixed(d == null ? 1 : d) + '%'; }
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function month(s) { return MON[(+s.slice(5, 7)) - 1]; }
 
-  // niceStep донора chart-3d: первый из [1,2,5,10]·10^k не меньше raw
-  function niceStep(span, n) {
-    const raw = span / Math.max(1, n), p = Math.pow(10, Math.floor(Math.log10(raw || 1)));
-    for (const m of [1, 2, 5, 10]) if (m * p >= raw) return m * p;
-    return 10 * p;
-  }
-  function niceScale(lo, hi, n) {
-    const st = niceStep(hi - lo, n);
-    const a = Math.floor(lo / st) * st, b = Math.ceil(hi / st) * st;
-    const ticks = []; for (let v = a; v <= b + st * 1e-6; v += st) ticks.push(+v.toFixed(10));
-    return { lo: a, hi: b, step: st, ticks };
-  }
-
-  // цвета чернил в токенах сцены
-  function inks(ctx) {
-    const T = ctx.tok;
+  // палитра кадра: чернила и акцент из токенов
+  function inks(F) {
+    var T = F.T, C = R.color;
     return {
-      ink: R.rgba(T.ink), ink2: R.rgba(T.ink2), ink3: R.rgba(T.ink3),
-      line: R.rgba(T.ink, ctx.theme === 'night' ? 0.26 : 0.22),
-      acc: R.rgba(T.acc[ctx.P.accent] || T.acc.terracotta),
-      accC: T.acc[ctx.P.accent] || T.acc.terracotta,
-      a: (k, al) => R.rgba(T[k], al)
+      ink: C.css(T.ink), ink2: C.css(T.ink2), ink3: C.css(T.ink3), acc: C.css(T.accent),
+      line: C.css(T.ink, T.lineA), a: function (k, al) { return C.css(T[k], al); }
     };
   }
-  // рельефная линия: тёмный штрих ink2 α .45 и светлый lightTint α .55 со сдвигом −0.75·l_xy
-  function relief(g, ctx, F, L, path, on) {
-    const T = ctx.tok;
-    g.save();
-    g.lineWidth = F.lineW; g.lineCap = 'butt';
-    if (on === false) {
-      g.strokeStyle = R.rgba(T.ink, ctx.theme === 'night' ? 0.26 : 0.22);
-      path(g, 0, 0); g.stroke(); g.restore(); return;
-    }
-    // ночью ink2 светлый: вырез даёт приглушённая чернильная линия и слабый тёплый кант
-    g.strokeStyle = R.rgba(T.ink2, ctx.theme === 'night' ? 0.16 : 0.45);
-    path(g, 0, 0); g.stroke();
-    g.strokeStyle = R.rgba(L.lightTint, ctx.theme === 'night' ? 0.08 : 0.55);
-    path(g, -0.75 * L.lxy[0], -0.75 * L.lxy[1]); g.stroke();
+
+  // мягкая кривая с натяжением: кубика a → b, касательные ta, tb (единичные), длина ручек ∝ расстоянию
+  function curve(g, a, b, ta, tb, tension) {
+    var d = Math.hypot(b[0] - a[0], b[1] - a[1]), k = d * (0.25 + 0.3 * (1 - (tension == null ? 0.5 : tension)));
+    g.moveTo(a[0], a[1]);
+    g.bezierCurveTo(a[0] + ta[0] * k, a[1] + ta[1] * k, b[0] - tb[0] * k, b[1] - tb[1] * k, b[0], b[1]);
+  }
+  // рельефная линия (структура вырезана, §7.4): тёмный штрих и светлый со сдвигом −0.75·l_xy
+  function relief(g, F, path, al) {
+    var T = F.T, C = R.color, night = T.theme === 'night', l = F.L.l, n = Math.hypot(l[0], l[1]) || 1;
+    al = al == null ? 1 : al;
+    g.save(); g.lineWidth = F.lineW; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = C.css(T.ink2, (night ? 0.2 : 0.42) * al); g.beginPath(); path(g, 0, 0); g.stroke();
+    g.strokeStyle = C.css(F.tn.light, (night ? 0.1 : 0.6) * al); g.beginPath(); path(g, -0.75 * l[0] / n, -0.75 * l[1] / n); g.stroke();
     g.restore();
   }
-  function hline(x0, x1, y) { return (g, ox, oy) => { g.beginPath(); g.moveTo(x0 + ox, y + oy); g.lineTo(x1 + ox, y + oy); }; }
-  function vline(x, y0, y1) { return (g, ox, oy) => { g.beginPath(); g.moveTo(x + ox, y0 + oy); g.lineTo(x + ox, y1 + oy); }; }
-
-  // ── рука §6.9: штрих perfect-freehand (если вклеен) вокруг ключевого числа ──
-  function handRing(g, ctx, F, cx, cy, rx, ry, rand) {
-    const PF = window.PerfectFreehand; if (!PF) return;
-    const pts = [], n = 44, a0 = -2.2 + rand() * 0.4, turn = TAU * 1.08;
-    for (let i = 0; i <= n; i++) {
-      const a = a0 + turn * i / n, j = 1 + (rand() - 0.5) * 0.05;
-      pts.push([cx + Math.cos(a) * rx * j, cy + Math.sin(a) * ry * j, 0.5]);
-    }
-    const out = PF.getStroke(pts, { size: 1.6 * Math.max(1, F.ui * 1.4), thinning: 0.5, smoothing: 0.6, streamline: 0.5 });
-    if (!out.length) return;
-    g.save();
-    g.fillStyle = R.rgba(ctx.tok.ink2, 0.75);
-    g.beginPath(); g.moveTo(out[0][0], out[0][1]);
-    for (let i = 1; i < out.length; i++) g.lineTo(out[i][0], out[i][1]);
-    g.closePath(); g.fill();
-    g.restore();
+  // печатная линия данных
+  function stroke(g, F, path, color, al) {
+    g.save(); g.lineWidth = F.lineW; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.globalAlpha = al == null ? 1 : al; g.strokeStyle = color; g.beginPath(); path(g); g.stroke(); g.restore();
   }
+  function dot(g, x, y, r, color) { g.fillStyle = color; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
 
-  window.RINK = { TS, font, text, measure, eur, pct, monthOf, MON, niceStep, niceScale, inks, relief, hline, vline, handRing };
+  window.RINK = { TS: TS, px: px, font: font, text: text, measure: measure, fit: fit, eur: eur, pct: pct, month: month, MON: MON,
+    inks: inks, curve: curve, relief: relief, stroke: stroke, dot: dot, TAU: TAU };
 })();

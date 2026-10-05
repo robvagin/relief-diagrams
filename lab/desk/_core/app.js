@@ -1,49 +1,49 @@
-// app.js — адаптер панели v2 к контракту kit-scene (README §7.11) и оболочка варианта:
-// DG.panel поверх Podacha.Panel без правки обоих файлов; панель видна всегда (приказ 2026-10-05 (2)),
-// хоткеи §6.10 (кроме H: панель не прячется), действия PNG и Ссылка в подвале панели.
+// app.js — оболочка варианта desk/ledger на рельсе src/ (свет, тени, материал, движение приняты владельцем):
+// адаптер DG.panel поверх Podacha.Panel v2 (README §7.11, файлы вендора не правятся), панель видна всегда,
+// хоткеи §6.10 (кроме H), выгрузка PNG и ссылка в подвале панели, старт после шрифтов, шума и fpsNominal.
 (function () {
   'use strict';
-  const R = window.RELIEF;
+  var R = window.RELIEF;
 
   // ── DG.panel: build / setValue / getValues / setTheme / setMode / css ──
-  const PANEL = { root: null, built: [], state: null, opts: null };
+  var PANEL = { root: null, built: [], state: null, opts: null };
   function v2theme(t) { return t === 'night' || t === 'dark' ? 'dark' : 'light'; }
   function buildPanel(opts) {
     PANEL.opts = opts; PANEL.state = opts.values; PANEL.built = [];
-    const mount = opts.mount;
+    var mount = opts.mount;
     mount.textContent = '';
-    const root = document.createElement('div');
+    var root = document.createElement('div');
     root.className = 'pv2 pv2-root';
     root.setAttribute('data-theme', v2theme(opts.theme));
-    const head = document.createElement('div');
+    var head = document.createElement('div');
     head.className = 'pv2-head';
-    head.innerHTML = '<b></b><span></span>';
-    head.querySelector('b').textContent = opts.title || '';
-    head.querySelector('span').textContent = opts.sub || '';
-    root.appendChild(head);
-    (opts.groups || []).forEach(gr => {
-      const rows = gr.rows.filter(d => {
-        const tail = d[d.length - 1];
+    var b = document.createElement('b'); b.textContent = opts.title || '';
+    var s = document.createElement('span'); s.textContent = opts.sub || '';
+    head.appendChild(b); head.appendChild(s); root.appendChild(head);
+    if (opts.hint) { var h = document.createElement('p'); h.className = 'pv2-hint'; h.textContent = opts.hint; root.appendChild(h); }
+    (opts.groups || []).forEach(function (gr) {
+      var rows = gr.rows.filter(function (d) {
+        var tail = d[d.length - 1];
         return !(opts.mode === 'client' && tail && typeof tail === 'object' && !Array.isArray(tail) && tail.studio);
       });
       if (!rows.length) return;
-      const fs = document.createElement('fieldset');
-      const lg = document.createElement('legend'); lg.textContent = gr.name; fs.appendChild(lg);
+      var fs = document.createElement('fieldset');
+      var lg = document.createElement('legend'); lg.textContent = gr.name; fs.appendChild(lg);
       PANEL.built.push(window.Podacha.Panel.build(fs, rows, PANEL.state, function (k, v) { opts.onChange(k, v); }));
       root.appendChild(fs);
     });
     if (opts.actions) {
-      const ft = document.createElement('div'); ft.className = 'pv2-foot';
-      opts.actions.forEach(a => {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = a.label;
-        b.title = a.title || a.label; b.addEventListener('click', a.run); ft.appendChild(b);
+      var ft = document.createElement('div'); ft.className = 'pv2-foot';
+      opts.actions.forEach(function (a) {
+        var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'btn'; bt.textContent = a.label;
+        bt.title = a.title || a.label; bt.addEventListener('click', a.run); ft.appendChild(bt);
       });
       root.appendChild(ft);
     }
     mount.appendChild(root);
     PANEL.root = root;
   }
-  function paintAll() { PANEL.built.forEach(b => b.paint()); }
+  function paintAll() { PANEL.built.forEach(function (b) { b.paint(); }); }
   window.DG = window.DG || {};
   window.DG.panel = {
     build: function (opts) { buildPanel(Object.assign({}, APP.panelExtra || {}, opts)); },
@@ -54,148 +54,169 @@
     css: ''
   };
 
-  // ── значения по умолчанию из деклараций v2 ──────────────────────────────
+  // общие ряды §6.10 (грамматика v2)
+  var COMMON = {
+    light: [
+      ['light', 'Свет', ['soft', 'raking', 'lamp', 'canopy'], 'soft', ['Мягкий', 'Скользящий', 'Лампа', 'Листва']],
+      ['az', 'Азимут, °', 0, 360, 1, 135, 'Откуда свет: 135 = слева сверху'],
+      ['elev', 'Высота, °', 8, 80, 1, 42, 'Ниже солнце = длиннее тени'],
+      ['soft', 'Мягкость', 0, 1, 0.01, 0.28, 'Рост полутени на пиксель высоты'],
+      ['dens', 'Плотность тени', 0, 0.6, 0.01, 0.20],
+      ['amb', 'Рассеянный', 0.2, 0.95, 0.01, 0.72],
+      ['contact', 'Контакт', 0, 0.3, 0.01, 0.12, 'Тонкая тень у самой опоры'],
+      ['pool', 'Пятно лампы', 0, 1, 0.01, 0],
+      ['lampH', 'Высота лампы', 300, 2000, 10, 900],
+      ['canopy', 'Листва', 0, 0.6, 0.01, 0, 'Пятна света сквозь крону'],
+      ['temp', 'Температура', -1, 1, 0.01, 0.25, 'Тёплый свет, холодная тень']
+    ],
+    material: [
+      ['grain', 'Зерно, %', 0, 4, 0.1, 1.6],
+      ['uneven', 'Неровность, %', 0, 2, 0.1, 0.8],
+      ['rim', 'Кант', 0, 1, 0.01, 0.5],
+      ['radius', 'Радиус листа', 0, 8, 0.5, 6],
+      ['zscale', 'Шкала высот', 0, 2, 0.01, 1],
+      ['sag', 'Провис бумаги', 0, 1, 0.01, 0.5, 'Едва заметный прогиб листа под светом'],
+      ['accent', 'Акцент', ['terracotta', 'cobalt', 'olive'], 'terracotta', ['Терракота', 'Кобальт', 'Олива']]
+    ],
+    motion: [
+      ['float', 'Плавание', 0, 2, 0.01, 1],
+      ['period', 'Период, с', 12, 72, 1, 36],
+      ['sway', 'Качание, °', 0, 1.5, 0.05, 0.3],
+      ['bob', 'Дыхание тени', 0, 0.2, 0.01, 0.08],
+      ['settle', 'Оседание, с', 0.3, 2, 0.05, 0.9],
+      ['assemble', 'Сборка', 0, 1, 1, 1]
+    ],
+    organism: [
+      ['wind', 'Ветер', 0, 2, 0.01, 1, 'Размах колыхания организма'],
+      ['tilt', 'Наклон листов, °', 0, 10, 0.1, 6],
+      ['parallax', 'Параллакс', 0, 2, 0.01, 1, 'Выше лист — сильнее сдвиг за мышью'],
+      ['tension', 'Натяжение', 0, 1, 0.01, 0.5, 'Мягкость стеблей и нитей'],
+      ['spread', 'Раскрытие', 0.6, 1.4, 0.01, 1],
+      ['springs', 'Пружины', 0.2, 2, 0.01, 1, 'Как соседи едут за перетащенным узлом']
+    ],
+    export: [
+      ['format', 'Формат', ['screen', '16:9', '1:1', '4:5'], 'screen', ['Экран', '16:9', '1:1', '4:5']],
+      ['scale', 'Масштаб', 1, 3, 1, 2]
+    ]
+  };
+
   function defaultsOf(groups) {
-    const out = {};
-    groups.forEach(gr => gr.rows.forEach(d => {
+    var out = {};
+    groups.forEach(function (gr) { gr.rows.forEach(function (d) {
       out[d[0]] = (Array.isArray(d[2]) || d[2] === 'color' || d[2] === 'text') ? d[3] : d[5];
-    }));
+    }); });
     return out;
   }
 
-  // ── оболочка ────────────────────────────────────────────────────────────
-  const APP = {};
-  const FORMATS = { '16:9': [1920, 1080], '1:1': [1080, 1080], '4:5': [1080, 1350] };
+  var APP = {};
+  var FORMATS = { '16:9': [1920, 1080], '1:1': [1080, 1080], '4:5': [1080, 1350] };
 
-  function applyPreset(ctx, id, quiet) {
-    const pr = R.PRESETS[id]; if (!pr) return;
-    ['az', 'elev', 'soft', 'dens', 'amb', 'pool', 'canopy'].forEach(k => { if (pr[k] != null) ctx.P[k] = pr[k]; });
-    if (pr.lampH) ctx.P.lampH = pr.lampH;
-    if (!quiet) paintAll();
+  function applyPreset(ctx, id) {
+    var pr = R.light.PRESETS[id]; if (!pr) return;
+    Object.keys(pr).forEach(function (k) { if (k in ctx.P) ctx.P[k] = pr[k]; });
+    paintAll();
   }
-
   // кадр в офскрине того же сида и номера кадра (§7.10)
   function renderOffscreen(w, h, scale) {
-    const ctx = KIT.scene.ctx;
-    const save = { canvas: ctx.canvas, g: ctx.g, W: ctx.W, H: ctx.H, capture: ctx.capture };
-    const c = document.createElement('canvas');
+    var ctx = KIT.scene.ctx;
+    var save = { canvas: ctx.canvas, g: ctx.g, W: ctx.W, H: ctx.H, capture: ctx.capture };
+    var c = document.createElement('canvas');
     c.width = Math.round(w * scale); c.height = Math.round(h * scale);
-    const g = c.getContext('2d'); g.setTransform(scale, 0, 0, scale, 0, 0);
+    var g = c.getContext('2d'); g.setTransform(scale, 0, 0, scale, 0, 0);
     Object.assign(ctx, { canvas: c, g: g, W: w, H: h, capture: true });
-    try {
-      ctx.rand.reset(); ctx.randPal.reset(); ctx.randNoise.reset();
-      APP.scene.draw(ctx);
-    } finally { Object.assign(ctx, save); }
+    try { ctx.rand.reset(); ctx.randPal.reset(); ctx.randNoise.reset(); APP.scene.draw(ctx); }
+    finally { Object.assign(ctx, save); R._shade = null; }
     return c.toDataURL('image/png');
   }
   function download(url, name) {
-    const a = document.createElement('a'); a.href = url; a.download = name;
+    var a = document.createElement('a'); a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
   }
   function exportPng() {
-    const ctx = KIT.scene.ctx, P = ctx.P;
-    const f = FORMATS[P.format];
-    const w = f ? f[0] : ctx.W, h = f ? f[1] : ctx.H, sc = f ? 1 : Math.max(1, Math.round(P.scale));
-    const url = renderOffscreen(w, h, sc);
-    const d = new Date(0).toISOString ? '' : '';
-    download(url, 'relief_' + APP.scene.id + '-' + ctx.theme + '-' + Math.round(w * sc) + 'x' + Math.round(h * sc) + '_' + APP.variant + d + '.png');
-  }
-  function linkOf() {
-    const ctx = KIT.scene.ctx, q = new URLSearchParams(location.search);
-    q.set('seed', ctx.seed); q.set('theme', ctx.theme); q.set('preset', ctx.P.light);
-    return location.origin + location.pathname + '?' + q.toString();
+    var ctx = KIT.scene.ctx, P = ctx.P, f = FORMATS[P.format];
+    var w = f ? f[0] : ctx.W, h = f ? f[1] : ctx.H, sc = f ? 1 : Math.max(1, Math.round(P.scale));
+    download(renderOffscreen(w, h, sc), 'relief_' + APP.scene.id + '-' + ctx.theme + '-' + Math.round(w * sc) + 'x' + Math.round(h * sc) + '_' + APP.variant + '.png');
   }
   function copyLink(e) {
-    const s = linkOf(), b = e && e.currentTarget;
-    const done = () => { if (b) { const t = b.textContent; b.textContent = 'Copied'; setTimeout(() => { b.textContent = t; }, 1200); } };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(done, done);
-    else done();
+    var ctx = KIT.scene.ctx, q = new URLSearchParams(location.search), b = e && e.currentTarget;
+    q.set('seed', ctx.seed); q.set('theme', ctx.theme); q.set('preset', ctx.P.light);
+    var s = location.origin + location.pathname + '?' + q.toString();
+    var done = function () { if (b) { var t = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = t; }, 1200); } };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(done, done); else done();
   }
 
-  function setTheme(ctx, th) {
-    ctx.theme = th;
-    document.documentElement.classList.toggle('is-night', th === 'night');
-    ctx.tok = R.readTokens();
-    DG.panel.setTheme(th);
-  }
-
-  // вход варианта: scene = {id, title, blurb, groups, draw(ctx), init?, structural?, hotkeys?}
+  // вход варианта: scene = {id, title, blurb, rows:{scene, data}, draw(ctx), structural?, hotkeys?, hint}
   function run(scene, opt) {
     opt = opt || {};
     APP.scene = scene; APP.variant = opt.variant || 'v1';
-    const Q = new URLSearchParams(location.search);
-    const groups = [
+    var Q = new URLSearchParams(location.search);
+    var groups = [
       { name: 'Сцена', rows: scene.rows.scene || [] },
-      { name: 'Свет', rows: R.COMMON.light },
-      { name: 'Материал', rows: R.COMMON.material },
-      { name: 'Движение', rows: R.COMMON.motion },
-      { name: 'Ритм', rows: scene.rows.rhythm || [] },
+      { name: 'Организм', rows: COMMON.organism },
+      { name: 'Свет', rows: COMMON.light },
+      { name: 'Материал', rows: COMMON.material },
+      { name: 'Движение', rows: COMMON.motion },
       { name: 'Данные', rows: scene.rows.data || [] },
-      { name: 'Выгрузка', rows: R.COMMON.export }
-    ].filter(gr => gr.rows.length);
-    const values = defaultsOf(groups);
+      { name: 'Выгрузка', rows: COMMON.export }
+    ].filter(function (gr) { return gr.rows.length; });
+    var values = defaultsOf(groups);
+    Object.keys(opt.defaults || {}).forEach(function (k) { values[k] = opt.defaults[k]; });
     // свет по умолчанию: soft днём, lamp ночью; ?preset= главнее
-    const pre = Q.get('preset');
-    values.light = R.PRESETS[pre] ? pre : (Q.get('theme') === 'night' ? 'lamp' : 'soft');
-    const pr = R.PRESETS[values.light];
-    Object.keys(pr).forEach(k => { if (k in values) values[k] = pr[k]; });
+    var pre = Q.get('preset');
+    values.light = R.light.PRESETS[pre] ? pre : (Q.get('theme') === 'night' ? 'lamp' : 'soft');
+    var pr = R.light.PRESETS[values.light];
+    Object.keys(pr).forEach(function (k) { if (k in values) values[k] = pr[k]; });
     APP.panelExtra = {
-      title: scene.title, sub: opt.variant + ' · ' + (opt.name || ''),
-      actions: [
-        { label: 'PNG', title: 'Export PNG (E)', run: exportPng },
-        { label: 'Copy link', title: 'Link with seed and preset', run: copyLink }
-      ]
+      title: scene.title, sub: APP.variant + ' · ' + (opt.name || ''), hint: scene.hint,
+      actions: [{ label: 'PNG', title: 'Export PNG (E)', run: exportPng }, { label: 'Copy link', title: 'Link with seed and preset', run: copyLink }]
     };
-    const def = {
+    KIT.scene.register({
       id: scene.id, title: scene.title, blurb: scene.blurb, params: [],
-      init: function (ctx) {
-        ctx.tok = R.readTokens();
-        ctx.data = window.RELIEF_DATA;
-        if (scene.init) scene.init(ctx);
-      },
+      init: function (ctx) { ctx.data = window.RELIEF_DATA; if (scene.init) scene.init(ctx); },
       draw: function (ctx) { scene.draw(ctx); },
       structural: function (ctx, path) {
         if (path === 'light') applyPreset(ctx, ctx.P.light);
-        if (path === 'accent') ctx.tok = R.readTokens();
         if (scene.structural) scene.structural(ctx, path);
       }
-    };
-    KIT.scene.register(def);
-    R.measureFps();
-    KIT.scene.start({
-      canvas: document.getElementById('scene'),
-      panelMount: document.getElementById('panel'),
-      values: values, groups: groups, data: window.RELIEF_DATA
     });
-    const ctx = KIT.scene.ctx;
-    // перерисовать, когда доехали шрифты и шум (покой рисует один кадр)
-    const redraw = () => window.dispatchEvent(new Event('resize'));
-    R.loadGrain(window.RELIEF_NOISE, redraw);
-    if (document.fonts && document.fonts.load) {
-      Promise.all([document.fonts.load('500 16px Geist'), document.fonts.load('500 16px "Geist Mono"')]).then(redraw, redraw);
+    function go() {
+      if (APP.started) return; APP.started = true;
+      KIT.scene.start({ canvas: document.getElementById('scene'), panelMount: document.getElementById('panel'),
+        values: values, groups: groups, data: window.RELIEF_DATA });
+      var ctx = KIT.scene.ctx;
+      if (window.ResizeObserver) {
+        var last = '';
+        new ResizeObserver(function (en) {
+          var r = en[0].contentRect, k = Math.round(r.width) + 'x' + Math.round(r.height);
+          if (k !== last) { var first = !last; last = k; if (!first) window.dispatchEvent(new Event('resize')); }
+        }).observe(document.getElementById('stage'));
+      }
+      var paused = false;
+      window.addEventListener('keydown', function (e) {
+        if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        var k = e.key.toLowerCase();
+        if (k === 'i') { var u = new URL(location.href); u.searchParams.set('theme', ctx.theme === 'night' ? 'day' : 'night'); location.href = u.toString(); }
+        else if (k === 's') { ctx.mode = ctx.mode === 'studio' ? 'client' : 'studio'; DG.panel.setMode(ctx.mode); }
+        else if (k === 'r') { window.postMessage({ type: 'es:replay' }, '*'); }
+        else if (k === 'p') { paused = !paused; window.postMessage({ type: paused ? 'pause' : 'play' }, '*'); }
+        else if (k === 'e') exportPng();
+        else if (scene.hotkeys && scene.hotkeys[k]) scene.hotkeys[k](ctx);
+      });
+      if (scene.mount) scene.mount(ctx);
+      document.documentElement.setAttribute('data-ready', '1');
     }
-    if (window.ResizeObserver) {
-      let first = true;
-      new ResizeObserver(() => { if (first) { first = false; return; } redraw(); }).observe(document.getElementById('stage'));
-    }
-    // хоткеи §6.10 (H не вешается: панель видна всегда)
-    let paused = false;
-    window.addEventListener('keydown', function (e) {
-      if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const k = e.key.toLowerCase();
-      if (k === 'i') setTheme(ctx, ctx.theme === 'night' ? 'day' : 'night'), redraw();
-      else if (k === 's') { ctx.mode = ctx.mode === 'studio' ? 'client' : 'studio'; DG.panel.setMode(ctx.mode); }
-      else if (k === 'r') { window.__FRAMES = 0; }
-      else if (k === 'p') { paused = !paused; window.postMessage({ type: paused ? 'pause' : 'play' }, '*'); }
-      else if (k === 'e') exportPng();
-      else if (scene.hotkeys && scene.hotkeys[k]) { scene.hotkeys[k](ctx); redraw(); }
-    });
-    // ховер: сцена получает указатель в координатах канваса
-    const cv = document.getElementById('scene');
-    cv.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); ctx.pointer = { x: e.clientX - r.left, y: e.clientY - r.top, f: window.__FRAMES }; if (ctx.reduced) redraw(); });
-    cv.addEventListener('pointerleave', () => { ctx.pointer = null; if (ctx.reduced) redraw(); });
+    var ready = Promise.all([
+      document.fonts ? Promise.all([document.fonts.load('400 14px "Geist"'), document.fonts.load('500 14px "Geist"'),
+        document.fonts.load('600 14px "Geist"'), document.fonts.load('400 14px "Geist Mono"'), document.fonts.load('500 14px "Geist Mono"')]).catch(function () {}) : null,
+      R.material.loadNoise(), R.motion.measureFps(20)
+    ]);
+    ready.then(go, go);
+    setTimeout(go, 1500);
+    // стенды кинематики (канон §«Служебные входы»): точный кадр и перемотка
+    window.__freeze = function (t) { R.motion.clock.override = t; window.postMessage({ type: 'pause' }, '*'); window.dispatchEvent(new Event('resize')); };
+    window.__unfreeze = function () { R.motion.clock.override = null; window.postMessage({ type: 'play' }, '*'); };
   }
 
-  window.RELIEF_APP = { run, exportPng, renderOffscreen, linkOf, defaultsOf, paintAll };
+  window.RELIEF_APP = { run: run, exportPng: exportPng, renderOffscreen: renderOffscreen, paintAll: paintAll, COMMON: COMMON };
 })();

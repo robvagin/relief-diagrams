@@ -1,9 +1,9 @@
 {
   "id": "desk-v1",
-  "title": "Desk · split",
+  "title": "Desk · mobile",
   "blurb": "RELIEF lab variant: desk, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "81df0d7516aa6668d989145bdda5de472ca84d1e8f8a6266c661cce0055b243b",
+  "engineHash": "fdb81e8481b20b1d7903e8912dcce4b56032de334bf827c8c92fda178e4022e3",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -174,7 +174,7 @@
     },
     {
       "id": "radius",
-      "label": "Радиус плашки",
+      "label": "Радиус листа",
       "type": "number",
       "default": 6,
       "min": 0,
@@ -191,6 +191,15 @@
       "step": 0.01
     },
     {
+      "id": "sag",
+      "label": "Провис бумаги",
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
       "id": "accent",
       "label": "Акцент",
       "type": "select",
@@ -200,15 +209,6 @@
         "cobalt",
         "olive"
       ]
-    },
-    {
-      "id": "hand",
-      "label": "Рука",
-      "type": "boolean",
-      "default": 0,
-      "min": 0,
-      "max": 1,
-      "step": 1
     },
     {
       "id": "float",
@@ -265,6 +265,60 @@
       "step": 1
     },
     {
+      "id": "wind",
+      "label": "Ветер",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01
+    },
+    {
+      "id": "tilt",
+      "label": "Наклон листов, °",
+      "type": "number",
+      "default": 6,
+      "min": 0,
+      "max": 10,
+      "step": 0.1
+    },
+    {
+      "id": "parallax",
+      "label": "Параллакс",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01
+    },
+    {
+      "id": "tension",
+      "label": "Натяжение",
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "spread",
+      "label": "Раскрытие",
+      "type": "number",
+      "default": 1,
+      "min": 0.6,
+      "max": 1.4,
+      "step": 0.01
+    },
+    {
+      "id": "springs",
+      "label": "Пружины",
+      "type": "number",
+      "default": 1,
+      "min": 0.2,
+      "max": 2,
+      "step": 0.01
+    },
+    {
       "id": "format",
       "label": "Формат",
       "type": "select",
@@ -286,53 +340,15 @@
       "step": 1
     },
     {
-      "id": "hero",
-      "label": "Герой",
+      "id": "labelsL",
+      "label": "Подписи",
       "type": "select",
-      "default": "kpi",
+      "default": "key",
       "options": [
-        "kpi",
-        "gate",
-        "cascade"
+        "none",
+        "key",
+        "all"
       ]
-    },
-    {
-      "id": "layout",
-      "label": "Раскладка",
-      "type": "select",
-      "default": "split",
-      "options": [
-        "grid",
-        "split",
-        "drift"
-      ]
-    },
-    {
-      "id": "depth",
-      "label": "Глубина дробления",
-      "type": "number",
-      "default": 4,
-      "min": 2,
-      "max": 5,
-      "step": 1
-    },
-    {
-      "id": "air",
-      "label": "Воздух",
-      "type": "number",
-      "default": 0.45,
-      "min": 0.3,
-      "max": 0.65,
-      "step": 0.01
-    },
-    {
-      "id": "overlap",
-      "label": "Нахлёст",
-      "type": "number",
-      "default": 0.12,
-      "min": 0,
-      "max": 0.25,
-      "step": 0.01
     }
   ],
   "presets": [],

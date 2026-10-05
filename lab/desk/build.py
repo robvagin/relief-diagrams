@@ -18,11 +18,14 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 CORE = os.path.join(HERE, '_core')
 
 TARGETS = [
-    ('desk', 'v1', 'Desk · split'), ('desk', 'v2', 'Desk · hero column'), ('desk', 'v3', 'Desk · trays'),
-    ('ledger', 'v1', 'Ledger · one sheet'), ('ledger', 'v2', 'Ledger · five views'), ('ledger', 'v3', 'Ledger · orbit'),
+    ('desk', 'v1', 'Desk · mobile'), ('desk', 'v2', 'Desk · plant'), ('desk', 'v3', 'Desk · octopus'),
+    ('ledger', 'v1', 'Ledger · flower'), ('ledger', 'v2', 'Ledger · vine'), ('ledger', 'v3', 'Ledger · chandelier'),
 ]
-CORE_JS = {'desk': ['relief.js', 'ink.js', 'app.js', 'desk.js'],
-           'ledger': ['relief.js', 'ink.js', 'app.js', 'charts.js']}
+# рельс src/ (свет, тени по приёмникам, материал, движение — принято владельцем), verbatim из main
+RAIL = ['tokens.scene.js', 'light/light.js', 'light/sdf.js', 'light/shade.js', 'light/canopy.js',
+        'material/material.js', 'motion/motion.js', 'rail.js']
+CORE_JS = {'desk': ['ink.js', 'app.js', 'organism.js', 'widgets.js'],
+           'ledger': ['ink.js', 'app.js', 'organism.js', 'widgets.js', 'charts.js']}
 
 
 def rd(*p, mode='r'):
@@ -138,9 +141,11 @@ def build(scene, ver, title):
                'инлайн verbatim: vendor/panel-v2/panel.js'),
         script(pf, 'инлайн: vendor/libs/perfect-freehand.esm.js (MIT), ESM обёрнут в IIFE'),
         script('window.RELIEF_DATA=' + data_subset() + ';', 'выдержка data/portfolio.json (сид relief-01, выдумано)'),
-        script("window.RELIEF_NOISE='data:image/png;base64,%s';" % b64('vendor', 'noise', 'bluenoise-128.png'),
+        script('window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,%s";' % b64('vendor', 'noise', 'bluenoise-128.png'),
                'vendor/noise/bluenoise-128.png (CC0)'),
     ]
+    for fn in RAIL:
+        parts.append(script(rd('src', *fn.split('/')), 'инлайн verbatim рельса: src/' + fn))
     for fn in CORE_JS[scene]:
         parts.append(script(rd('lab', 'desk', '_core', fn), 'lab/desk/_core/' + fn))
     parts.append(script(rd('lab', scene, ver + '.scene.js'), 'lab/%s/%s.scene.js' % (scene, ver)))
@@ -186,7 +191,7 @@ def param_of(d):
 
 
 def passport(scene, ver, title, html, score):
-    rows = decls(('lab', 'desk', '_core', 'relief.js'), ('lab', 'desk', '_core', CORE_JS[scene][-1]))
+    rows = decls(('lab', 'desk', '_core', 'app.js'), ('lab', scene, ver + '.scene.js'), ('lab', 'desk', '_core', CORE_JS[scene][-1]))
     seen, params = set(), []
     for d in rows:
         if d[0] not in seen:
