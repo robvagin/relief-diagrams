@@ -144,7 +144,10 @@
     g.fillStyle = gr; g.fillRect(-w / 2, -h / 2, w, h);
     var x = -w / 2 + pad;
     I.text(g, F, step.role === 'request' ? 'REQUEST' : step.role.toUpperCase(), x, -h / 2 + pad + G.lh(F, G.ts(F, 0)) * 0.8, { s: G.ts(F, 0), mono: true, caps: true, tone: 'ink3', alpha: al });
-    I.text(g, F, G.title(null, step, tr), x, h / 2 - pad - G.lh(F, G.ts(F, 0)) - 2 * F.ui, { s: G.ts(F, 2), w: 500, alpha: al });
+    // заголовок в ширину листа: ступень вниз, пока не влезет (Geist ≈ 0,56 кегля на знак)
+    var ttl = G.title(null, step, tr), ts = G.ts(F, 2);
+    while (ts > 0 && ttl.length * R.ink.SIZES[ts] * F.ui * 0.56 > w - 2 * pad) ts--;
+    I.text(g, F, G.fit(ttl, w - 2 * pad, R.ink.SIZES[ts] * F.ui * 0.56), x, h / 2 - pad - G.lh(F, G.ts(F, 0)) - 2 * F.ui, { s: ts, w: 500, alpha: al });
     var sub = G.fit(G.sub(step, tr), w - 2 * pad, 7.6 * F.ui * (G.ts(F, 0) ? 1.2 : 1)), bad = tr.steps[step.i].st === 'fail';
     I.text(g, F, sub, x, h / 2 - pad, { s: G.ts(F, 0), mono: true, tone: bad ? 'ink' : 'ink3', alpha: al });
     g.restore();

@@ -2618,7 +2618,10 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     g.fillStyle = gr; g.fillRect(-w / 2, -h / 2, w, h);
     var x = -w / 2 + pad;
     I.text(g, F, step.role === 'request' ? 'REQUEST' : step.role.toUpperCase(), x, -h / 2 + pad + G.lh(F, G.ts(F, 0)) * 0.8, { s: G.ts(F, 0), mono: true, caps: true, tone: 'ink3', alpha: al });
-    I.text(g, F, G.title(null, step, tr), x, h / 2 - pad - G.lh(F, G.ts(F, 0)) - 2 * F.ui, { s: G.ts(F, 2), w: 500, alpha: al });
+    // заголовок в ширину листа: ступень вниз, пока не влезет (Geist ≈ 0,56 кегля на знак)
+    var ttl = G.title(null, step, tr), ts = G.ts(F, 2);
+    while (ts > 0 && ttl.length * R.ink.SIZES[ts] * F.ui * 0.56 > w - 2 * pad) ts--;
+    I.text(g, F, G.fit(ttl, w - 2 * pad, R.ink.SIZES[ts] * F.ui * 0.56), x, h / 2 - pad - G.lh(F, G.ts(F, 0)) - 2 * F.ui, { s: ts, w: 500, alpha: al });
     var sub = G.fit(G.sub(step, tr), w - 2 * pad, 7.6 * F.ui * (G.ts(F, 0) ? 1.2 : 1)), bad = tr.steps[step.i].st === 'fail';
     I.text(g, F, sub, x, h / 2 - pad, { s: G.ts(F, 0), mono: true, tone: bad ? 'ink' : 'ink3', alpha: al });
     g.restore();
@@ -2823,7 +2826,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
             if (e.kind === 'agent') {
               O.label(g, F, x, s.y - 2 * ui, e.ag.a.id + ' · ' + e.ag.a.name, GL.META[e.ag.state].label + (e.ag.state === 'work' ? ' · ' + (e.ag.verb || GL.verbAt(ctx.reduced ? 0 : F.tsec)) : '') + ' · ' + e.gs + ' px',
                 { align: right ? 'left' : 'right', s: G.ts(F, 1), ss: G.ts(F, 0), lh: G.lh(F, G.ts(F, 1)), alpha: al });
-            } else I.text(g, F, e.label, x, s.y + 4 * ui, { s: G.ts(F, 0), mono: true, tone: 'ink3', align: right ? 'left' : 'right', alpha: al });
+            }
           });
         },
         print: function (g, s, F) {
@@ -2838,6 +2841,12 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
           if (+P.sheet || e.ag.focus) GL.draw(g, F, s.x, s.y, { state: e.ag.state, size: e.gs, t: F.tsec, since: F.tsec, verb: e.ag.verb, reduced: ctx.reduced, alpha: V.dim(src.id) });
         },
         above: function (g, F) {
+          // подписи бусин поверх: соседняя бусина их не закрывает
+          plates.forEach(function (s) {
+            var e = s.el; if (!e || e.kind !== 'bead') return;
+            var right = s.x >= hp[0], x = s.x + (right ? 1 : -1) * (s.w / 2 + 7 * ui);
+            R.ink.text(g, F, e.label, x, s.y + 4 * ui, { s: G.ts(F, 0), mono: true, tone: 'ink2', align: right ? 'left' : 'right', alpha: V.dim(s.id) });
+          });
           F.plates.forEach(function (s) {
             if (V.focus === s.id) { g.save(); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.8); g.setLineDash([3 * ui, 3 * ui]);
               g.beginPath(); g.arc(s.x, s.y, s.w / 2 + 9 * ui, 0, TAU); g.stroke(); g.restore(); }

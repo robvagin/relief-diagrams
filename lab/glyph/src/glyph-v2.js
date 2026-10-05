@@ -82,7 +82,7 @@
             if (e.kind === 'agent') {
               O.label(g, F, x, s.y - 2 * ui, e.ag.a.id + ' · ' + e.ag.a.name, GL.META[e.ag.state].label + (e.ag.state === 'work' ? ' · ' + (e.ag.verb || GL.verbAt(ctx.reduced ? 0 : F.tsec)) : '') + ' · ' + e.gs + ' px',
                 { align: right ? 'left' : 'right', s: G.ts(F, 1), ss: G.ts(F, 0), lh: G.lh(F, G.ts(F, 1)), alpha: al });
-            } else I.text(g, F, e.label, x, s.y + 4 * ui, { s: G.ts(F, 0), mono: true, tone: 'ink3', align: right ? 'left' : 'right', alpha: al });
+            }
           });
         },
         print: function (g, s, F) {
@@ -97,6 +97,12 @@
           if (+P.sheet || e.ag.focus) GL.draw(g, F, s.x, s.y, { state: e.ag.state, size: e.gs, t: F.tsec, since: F.tsec, verb: e.ag.verb, reduced: ctx.reduced, alpha: V.dim(src.id) });
         },
         above: function (g, F) {
+          // подписи бусин поверх: соседняя бусина их не закрывает
+          plates.forEach(function (s) {
+            var e = s.el; if (!e || e.kind !== 'bead') return;
+            var right = s.x >= hp[0], x = s.x + (right ? 1 : -1) * (s.w / 2 + 7 * ui);
+            R.ink.text(g, F, e.label, x, s.y + 4 * ui, { s: G.ts(F, 0), mono: true, tone: 'ink2', align: right ? 'left' : 'right', alpha: V.dim(s.id) });
+          });
           F.plates.forEach(function (s) {
             if (V.focus === s.id) { g.save(); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.8); g.setLineDash([3 * ui, 3 * ui]);
               g.beginPath(); g.arc(s.x, s.y, s.w / 2 + 9 * ui, 0, TAU); g.stroke(); g.restore(); }
