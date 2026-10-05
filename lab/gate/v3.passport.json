@@ -1,0 +1,388 @@
+{
+  "id": "gate-v3",
+  "title": "Gate · v3 Octopus",
+  "blurb": "Check before action as a living organism of paper sheets and discs: a passed check lifts and settles, a blocked one lies flat on the floor.",
+  "version": "0.3.0",
+  "engineHash": "e5b64658f09eaad773683f42c0d30c7dd9c77d21058715e29d8c1bcbf1714507",
+  "kind": "engine",
+  "contract": {
+    "embed": {
+      "params": [
+        "embed",
+        "theme",
+        "p",
+        "seed",
+        "preset",
+        "mode",
+        "reduced"
+      ],
+      "aliases": [
+        "noui",
+        "panel=off"
+      ]
+    },
+    "postMessage": {
+      "out": [
+        "ready",
+        "frame"
+      ],
+      "in": [
+        "es:progress",
+        "es:replay",
+        "pause",
+        "play"
+      ],
+      "selfplay": true
+    },
+    "api": [
+      "Scene.set",
+      "Scene.get",
+      "Scene.export",
+      "KIT.scene.register",
+      "KIT.scene.start"
+    ]
+  },
+  "params": [
+    {
+      "id": "state",
+      "label": "Состояние",
+      "type": "select",
+      "default": "loop",
+      "options": [
+        "instruction",
+        "blocked",
+        "allowed",
+        "loop"
+      ]
+    },
+    {
+      "id": "plates",
+      "label": "Проверок",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 3,
+      "step": 1
+    },
+    {
+      "id": "gap",
+      "label": "Шаг ветки",
+      "type": "number",
+      "default": 22,
+      "min": 6,
+      "max": 60,
+      "step": 1
+    },
+    {
+      "id": "decision",
+      "label": "Решение",
+      "type": "select",
+      "default": "D-7781",
+      "options": [
+        "D-7781",
+        "D-7782",
+        "D-7790",
+        "D-7804"
+      ]
+    },
+    {
+      "id": "trace",
+      "label": "Протокол",
+      "type": "boolean",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    {
+      "id": "light",
+      "label": "Свет",
+      "type": "select",
+      "default": "soft",
+      "options": [
+        "soft",
+        "raking",
+        "lamp",
+        "canopy"
+      ]
+    },
+    {
+      "id": "az",
+      "label": "Азимут, °",
+      "type": "number",
+      "default": 135,
+      "min": 0,
+      "max": 360,
+      "step": 1
+    },
+    {
+      "id": "elev",
+      "label": "Высота, °",
+      "type": "number",
+      "default": 42,
+      "min": 8,
+      "max": 80,
+      "step": 1
+    },
+    {
+      "id": "soft",
+      "label": "Мягкость",
+      "type": "number",
+      "default": 0.28,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "dens",
+      "label": "Плотность тени",
+      "type": "number",
+      "default": 0.2,
+      "min": 0,
+      "max": 0.6,
+      "step": 0.01
+    },
+    {
+      "id": "amb",
+      "label": "Рассеянный",
+      "type": "number",
+      "default": 0.72,
+      "min": 0.2,
+      "max": 0.95,
+      "step": 0.01
+    },
+    {
+      "id": "contact",
+      "label": "Контакт",
+      "type": "number",
+      "default": 0.12,
+      "min": 0,
+      "max": 0.3,
+      "step": 0.01
+    },
+    {
+      "id": "pool",
+      "label": "Пятно лампы",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "lampH",
+      "label": "Высота лампы",
+      "type": "number",
+      "default": 900,
+      "min": 300,
+      "max": 2000,
+      "step": 10
+    },
+    {
+      "id": "canopy",
+      "label": "Листва",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 0.6,
+      "step": 0.01
+    },
+    {
+      "id": "temp",
+      "label": "Температура",
+      "type": "number",
+      "default": 0.25,
+      "min": -1,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "grain",
+      "label": "Зерно, %",
+      "type": "number",
+      "default": 1.6,
+      "min": 0,
+      "max": 4,
+      "step": 0.1
+    },
+    {
+      "id": "uneven",
+      "label": "Неровность, %",
+      "type": "number",
+      "default": 0.8,
+      "min": 0,
+      "max": 2,
+      "step": 0.1
+    },
+    {
+      "id": "rim",
+      "label": "Кант",
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "id": "radius",
+      "label": "Радиус плашки",
+      "type": "number",
+      "default": 6,
+      "min": 0,
+      "max": 8,
+      "step": 0.5
+    },
+    {
+      "id": "zscale",
+      "label": "Шкала высот",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01
+    },
+    {
+      "id": "accent",
+      "label": "Акцент",
+      "type": "select",
+      "default": "terracotta",
+      "options": [
+        "terracotta",
+        "cobalt",
+        "olive"
+      ]
+    },
+    {
+      "id": "hand",
+      "label": "Рука",
+      "type": "boolean",
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    {
+      "id": "float",
+      "label": "Плавание",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01
+    },
+    {
+      "id": "period",
+      "label": "Период, с",
+      "type": "number",
+      "default": 36,
+      "min": 12,
+      "max": 72,
+      "step": 1
+    },
+    {
+      "id": "sway",
+      "label": "Качание, °",
+      "type": "number",
+      "default": 0.3,
+      "min": 0,
+      "max": 1.5,
+      "step": 0.05
+    },
+    {
+      "id": "bob",
+      "label": "Дыхание тени",
+      "type": "number",
+      "default": 0.08,
+      "min": 0,
+      "max": 0.2,
+      "step": 0.01
+    },
+    {
+      "id": "settle",
+      "label": "Оседание, с",
+      "type": "number",
+      "default": 0.9,
+      "min": 0.3,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "id": "assemble",
+      "label": "Сборка",
+      "type": "boolean",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    {
+      "id": "format",
+      "label": "Формат",
+      "type": "select",
+      "default": "screen",
+      "options": [
+        "screen",
+        "16:9",
+        "1:1",
+        "4:5"
+      ]
+    },
+    {
+      "id": "scale",
+      "label": "Масштаб",
+      "type": "number",
+      "default": 2,
+      "min": 1,
+      "max": 3,
+      "step": 1
+    }
+  ],
+  "presets": [],
+  "frozen": [],
+  "aspect": "auto",
+  "minHeight": 240,
+  "hover": "node lifts with its neighbours, the rest dims by colour",
+  "click": "click = focus, drag = pull a node (neighbours follow on springs), wheel = zoom, drag on the floor = pan, double click or Esc = home",
+  "reducedMotion": "sway, growth and float removed, one final frame",
+  "narrow390": "panel becomes an open bottom sheet, the organism fits its box; no panel in embed",
+  "forbidden": [
+    "stretch unevenly",
+    "put on a coloured ground",
+    "edit the built file instead of lab/<scene>/src/"
+  ],
+  "export": {
+    "png": true,
+    "svg": false,
+    "pdf": false,
+    "zpl": false
+  },
+  "fonts": [
+    {
+      "family": "Geist",
+      "license": "OFL-1.1",
+      "embedded": "subset"
+    },
+    {
+      "family": "Geist Mono",
+      "license": "OFL-1.1",
+      "embedded": "subset"
+    }
+  ],
+  "tokensIn": [
+    "--r-ground",
+    "--r-plate",
+    "--r-ink",
+    "--r-ink2",
+    "--r-ink3",
+    "--r-shadow",
+    "--r-light",
+    "--r-acc-terracotta",
+    "--r-acc-cobalt",
+    "--r-acc-olive"
+  ],
+  "brandFree": true,
+  "gate": {
+    "date": "2026-10-05",
+    "score": "0/10"
+  }
+}
