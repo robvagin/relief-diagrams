@@ -18,7 +18,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 CORE = os.path.join(HERE, '_core')
 
 TARGETS = [
-    ('desk', 'v1', 'Desk · mobile'), ('desk', 'v2', 'Desk · plant'), ('desk', 'v3', 'Desk · octopus'),
+    ('desk', 'v1', 'Desk · mobile'), ('desk', 'v2', 'Desk · plant'), ('desk', 'v3', 'Desk · octopus'), ('desk', 'v4', 'Desk · Letter ensemble'),
     ('ledger', 'v1', 'Ledger · flower'), ('ledger', 'v2', 'Ledger · vine'), ('ledger', 'v3', 'Ledger · chandelier'),
 ]
 # рельс src/ (свет, тени по приёмникам, материал, движение — принято владельцем), verbatim из main

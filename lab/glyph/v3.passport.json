@@ -3,7 +3,7 @@
   "title": "Glyph · v3 Sprout",
   "blurb": "Agent state in 16–96 px as a living organism of discs: five states told apart by count, not by motion.",
   "version": "0.3.0",
-  "engineHash": "99903e43aab573d6fccd4f33bc83df6df4fc2433462be8b4da368ef375b9d173",
+  "engineHash": "a20908dde5b2b4ade7d0fe20995ed9ed3e47d86830e758f3fa82076553612f2e",
   "kind": "engine",
   "contract": {
     "embed": {

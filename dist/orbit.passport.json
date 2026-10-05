@@ -3,7 +3,7 @@
   "title": "Loan book orbit",
   "blurb": "Вся книга живым организмом: хаб, листы стадий, диски сегментов, займы.",
   "version": "0.1.0",
-  "engineHash": "81c4e728ab3d76da66ae330c149f3d04b2047997ce694eda277995475501db2c",
+  "engineHash": "a50ca3871fda223cb5492f42824b6989847627fd28aceaa06ccac544feba0c5e",
   "kind": "tool",
   "contract": {
     "embed": {

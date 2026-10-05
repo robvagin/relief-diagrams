@@ -3,7 +3,7 @@
   "title": "Rail calibration",
   "blurb": "Калибровка рельса RELIEF: свет, линия, плавание, зерно.",
   "version": "0.1.0",
-  "engineHash": "5afbbd41a1f77610c4e490f34e5be592246bdf37866fee951fc25a319a89fde7",
+  "engineHash": "a6dd30d9eefe4fe2a905786f8fdcd984dfe8d178eabcc0c12b570b3c13a36ba8",
   "kind": "tool",
   "contract": {
     "embed": {

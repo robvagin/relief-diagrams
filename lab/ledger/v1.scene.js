@@ -41,7 +41,7 @@
   function petal(i, len) {
     return function (g, F, I, w, h, n) { if (n.mark) K.dot(g, 0, -h / 2 + w * 0.5, Math.max(2.5, Math.min(w * 0.22, 4 * F.ui)), I.acc); };
   }
-  function bead(v) { return function (g, F, I, w) { var px = K.fit(g, F, v, w * 0.7, w * 0.3, { mono: true, weight: 500, min: 7 }); K.text(g, F, v, 0, px * 0.34, { px: px, mono: true, weight: 500, color: I.ink2, align: 'center' }); }; }
+  function bead(v) { return function (g, F, I, w) { var px = K.fit(g, F, v, w * 0.7, w * 0.3, { mono: true, weight: 500, min: 7 }); K.text(g, F, v, 0, px * 0.34, { px: px, mono: true, weight: 500, color: I.ink2, align: 'center' }); if (K.measure(g, F, 'recovered', {size:1,min:7}) < w * 0.8) K.text(g, F, 'recovered', 0, -px * 0.8, {size:1,min:7,color:I.ink3,align:'center'}); }; }
 
   var CACHE = { key: '', m: null };
   ORG.run({

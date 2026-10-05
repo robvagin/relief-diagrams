@@ -123,8 +123,9 @@
     var c = document.createElement('canvas');
     c.width = Math.round(w * scale); c.height = Math.round(h * scale);
     var g = c.getContext('2d'); g.setTransform(scale, 0, 0, scale, 0, 0);
+    if (w === ctx.W && h === ctx.H) { g.drawImage(ctx.canvas, 0, 0, w, h); return c.toDataURL('image/png'); }
     Object.assign(ctx, { canvas: c, g: g, W: w, H: h, capture: true });
-    try { ctx.rand.reset(); ctx.randPal.reset(); ctx.randNoise.reset(); APP.scene.draw(ctx); }
+    try { ctx.rand.reset(); ctx.randPal.reset(); ctx.randNoise.reset(); (APP.scene.capture || APP.scene.draw)(ctx); }
     finally { Object.assign(ctx, save); R._shade = null; }
     return c.toDataURL('image/png');
   }
@@ -134,15 +135,16 @@
   }
   function exportPng() {
     var ctx = KIT.scene.ctx, P = ctx.P, f = FORMATS[P.format];
-    var w = f ? f[0] : ctx.W, h = f ? f[1] : ctx.H, sc = f ? 1 : Math.max(1, Math.round(P.scale));
+    var w = f ? f[0] : ctx.W, h = f ? f[1] : ctx.H, sc = Math.max(1, Math.min(3, Math.round(P.scale) || 1));
     download(renderOffscreen(w, h, sc), 'relief_' + APP.scene.id + '-' + ctx.theme + '-' + Math.round(w * sc) + 'x' + Math.round(h * sc) + '_' + APP.variant + '.png');
   }
   function copyLink(e) {
     var ctx = KIT.scene.ctx, q = new URLSearchParams(location.search), b = e && e.currentTarget;
+    Object.keys(ctx.P).forEach(function (k) { q.set('set.' + k, ctx.P[k]); });
     q.set('seed', ctx.seed); q.set('theme', ctx.theme); q.set('preset', ctx.P.light);
     var s = location.origin + location.pathname + '?' + q.toString();
     var done = function () { if (b) { var t = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = t; }, 1200); } };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(done, done); else done();
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(done, function () { prompt('Copy link', s); }); else prompt('Copy link', s);
   }
 
   // вход варианта: scene = {id, title, blurb, rows:{scene, data}, draw(ctx), structural?, hotkeys?, hint}
@@ -166,15 +168,18 @@
     values.light = R.light.PRESETS[pre] ? pre : (Q.get('theme') === 'night' ? 'lamp' : 'soft');
     var pr = R.light.PRESETS[values.light];
     Object.keys(pr).forEach(function (k) { if (k in values) values[k] = pr[k]; });
+    Q.forEach(function (v, k) { var key = k.indexOf('set.') === 0 ? k.slice(4) : k; if (key in values) values[key] = typeof values[key] === 'number' ? +v : v; });
     APP.panelExtra = {
       title: scene.title, sub: APP.variant + ' · ' + (opt.name || ''), hint: scene.hint,
       actions: [{ label: 'PNG', title: 'Export PNG (E)', run: exportPng }, { label: 'Copy link', title: 'Link with seed and preset', run: copyLink }]
     };
     KIT.scene.register({
-      id: scene.id, title: scene.title, blurb: scene.blurb, params: [],
+      id: scene.id, title: scene.title, blurb: scene.blurb, params: groups.reduce(function (all, gr) { return all.concat(gr.rows); }, []),
+      groups: groups.reduce(function (all, gr) { all[gr.name] = gr.rows; return all; }, {}),
       init: function (ctx) { ctx.data = window.RELIEF_DATA; if (scene.init) scene.init(ctx); },
       draw: function (ctx) { scene.draw(ctx); },
       structural: function (ctx, path) {
+        R._shade = null;
         if (path === 'light') applyPreset(ctx, ctx.P.light);
         if (scene.structural) scene.structural(ctx, path);
       }

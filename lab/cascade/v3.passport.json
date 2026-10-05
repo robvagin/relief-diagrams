@@ -3,7 +3,7 @@
   "title": "Cascade · plant",
   "blurb": "Loan book as a living organism of matte discs and paper sheets: area is exposure, distance is share.",
   "version": "0.3.0",
-  "engineHash": "0070d5dccf781c8c397c1e1cba81f6263f0cd285b60245525a969af354713e06",
+  "engineHash": "9f91a37519db703199337737ac77e7c53290942b57aaa6f9635a0460eb54a5bb",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -332,7 +332,6 @@
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "10/10",
-    "report": "gate/acceptance.json"
+    "score": "0/10"
   }
 }

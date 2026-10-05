@@ -51,9 +51,14 @@ body{background:var(--pg-bg)}
   #list .it .tt{display:none}
   #list .none{display:none}
 }
+ #controls-toggle{display:none}
 @media (max-width:767px){
-  .pg{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) 44vh;grid-template-areas:"list" "frame" "side"}
-  #side{border-top:1px solid var(--hair)}
+  .pg{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"list" "frame" "side"}
+  #side{border-top:1px solid var(--hair);max-height:45dvh;padding:6px 12px}
+  #controls-toggle{display:block;min-height:44px;width:100%;text-align:left}
+  #controls-body{display:none}
+  .controls-open #controls-body{display:block}
+  .it,.acts .btn{min-height:44px}
 }
 @media (prefers-reduced-motion:reduce){.pg *{transition:none!important}}
 </style></head><body>
@@ -64,10 +69,11 @@ body{background:var(--pg-bg)}
     <div class="metaline"><span id="meta"></span><span id="meta2"></span></div>
   </main>
   <aside id="side" aria-label="Controls" data-panel>
-    <div id="top"></div>
+    <button class="btn" id="controls-toggle" type="button" aria-expanded="false" aria-controls="controls-body">Controls</button>
+    <div id="controls-body"><div id="top"></div>
     <div class="acts" id="acts"></div>
     <p class="pgnote" id="note" hidden></p>
-    <div id="knobs"></div>
+    <div id="knobs"></div></div>
   </aside>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </div>

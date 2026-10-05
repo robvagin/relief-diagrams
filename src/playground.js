@@ -34,6 +34,12 @@
   var $ = function (id) { return document.getElementById(id); };
   var pg = $('pg'), view = $('view'), knobs = $('knobs'), note = $('note');
 
+  $('controls-toggle').addEventListener('click', function () {
+    var open = pg.classList.toggle('controls-open');
+    this.setAttribute('aria-expanded', String(open));
+    this.textContent = open ? 'Hide controls' : 'Controls';
+  });
+
   function toast(t) { var e = $('toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(function () { e.classList.remove('on'); }, 1600); }
 
   /* ── список ─────────────────────────────────────────────────────────── */
@@ -120,6 +126,7 @@
     Object.keys(st.set).forEach(function (k) {
       if (k in ctx.P) cw.Scene.set(k, typeof ctx.P[k] === 'number' ? +st.set[k] : st.set[k]);
     });
+    cw.postMessage({ type: st.paused ? 'pause' : 'play' }, location.origin);
     buildKnobs(def, ctx, cw);
     meta2();
   }
@@ -206,10 +213,13 @@
   function png() {
     if (!st.cw) return toast('PNG needs a same-origin frame');
     var ctx = st.cw.KIT.scene.ctx, R = st.cw.RELIEF, url;
-    var fmt = ctx.P.format, sc = ctx.P.scale;
-    url = (R && R.export && fmt && fmt !== 'screen') ? R.export.png(fmt, sc) : st.cw.Scene.export('png');
+    var fmt = ctx.P.format, sc = Math.max(1, Math.min(3, Math.round(+ctx.P.scale || 1)));
+    var sz = {'16:9':[1920,1080], '1:1':[1080,1080], '4:5':[1080,1350]}[fmt] || [ctx.W,ctx.H];
+    try {
+      url = R && R.export ? R.export.png(fmt, sc) : st.cw.RELIEF_APP ? st.cw.RELIEF_APP.renderOffscreen(sz[0], sz[1], sc) : st.cw.Scene.export('png');
+    } catch (e) { return toast('Export failed: try a smaller scale'); }
     if (!url) return toast('Export failed');
-    var sz = R && R.export && R.export.FORMATS[fmt], w = sz ? sz[0] * sc : ctx.canvas.width, h = sz ? sz[1] * sc : ctx.canvas.height;
+    var w = sz[0] * sc, h = sz[1] * sc;
     var id = (st.cur.group === 'rail' ? 'lab' : st.cur.group) + (st.cur.group === 'rail' ? '' : '-' + st.cur.id);
     var d = new Date().toISOString().slice(0, 10);
     var a = document.createElement('a'); a.href = url; a.download = d + '_relief_' + id + '-' + st.theme + '-' + w + 'x' + h + '_v01.png';

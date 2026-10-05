@@ -120,7 +120,8 @@
       G = R.graph.create(gn, ge, {});
       // мир раскладки уже в координатах кадра: вписывание единичное, дом = центр кадра
       G.fit = { s: 1, cx: W / 2, cy: H / 2 }; G.home = { zoom: 1, x: W / 2, y: H / 2 }; G.view = { zoom: 1, x: W / 2, y: H / 2 }; G._viewed = true;
-      R.graph.bind(G, ctx.canvas, pick);
+      G.describe = function (i) { var tip = M.tip && M.tip(M.nodes[i]); return tip ? tip.lines : [M.nodes[i].id]; };
+      if (!ctx.capture) R.graph.bind(G, ctx.canvas, pick);
       key = k;
       return M;
     }
@@ -207,7 +208,7 @@
           }
           var n = N[s.id]; if (!n) return;
           if (n.kind !== 'disc') sag(g, s, F);
-          if (mod.print) mod.print(g, s, F, n, screen[s.id]);
+          if (mod.print) mod.print(g, s, Object.assign({}, F, {ui: F.ui * zoom}), n, screen[s.id]);
         },
         above: function (g, F) { if (mod.above) mod.above(g, F, screen, N); }
       };
@@ -217,7 +218,12 @@
     var def = {
       id: opts.id, title: opts.title, blurb: opts.blurb, groups: opts.groups,
       draw: draw,
-      structural: function () { M = null; },
+      structural: function (ctx, path) { if ((opts.layoutKeys || []).indexOf(path) >= 0) M = null; R._shade = null; },
+      capture: function (ctx) {
+        var save = [M, key, G, lastF, I.parX, I.parY];
+        M = null;
+        try { draw(ctx); } finally { M = save[0]; key = save[1]; G = save[2]; lastF = save[3]; I.parX = save[4]; I.parY = save[5]; }
+      },
       init: function () { }
     };
     def.zoom = function () { return G ? G.view.zoom : 1; };

@@ -3,7 +3,7 @@
   "title": "Cascade · satellites",
   "blurb": "Loan book as a living organism of matte discs and paper sheets: area is exposure, distance is share.",
   "version": "0.3.0",
-  "engineHash": "b3a02d4e96922b785ec88ad9e1a1da76a383035debafb679473bb36fdd1a0ba8",
+  "engineHash": "a55c7cbacdf1a0a2488e6c6dbd570978496fa59325bf432c9535d962faa31795",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -332,7 +332,6 @@
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "10/10",
-    "report": "gate/acceptance.json"
+    "score": "0/10"
   }
 }

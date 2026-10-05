@@ -28,24 +28,23 @@
     return -1;
   }
   function graphFor(ctx, pose, F0) {
-    var key = F0.W + 'x' + F0.H + '|' + pose.nodes.map(function (n) { return n.id; }).join(',') + '|' + (pose.key || '');
+    var key = F0.W + 'x' + F0.H + '|' + pose.nodes.map(function (n) { return n.id; }).join(',') + '|' + ctx.P.spread + '|' + (pose.key || '');
     if (S.G && S.key === key) return S.G;
     var idx = {};
     pose.nodes.forEach(function (n, i) { idx[n.id] = i; });
     var gn = pose.nodes.map(function (n) {
       var r = n.shape === 'disc' ? n.w / 2 : 0.32 * Math.min(n.w, n.h);
-      return { id: n.id, x: n.x, y: n.y, r: r, z: n.z, mass: clamp(n.w * n.h / 40000, 0.6, 1.6), drift: 0.35 };
+      return { id: n.id, x: n.x, y: n.y, r: r, z: n.z, fixed: !!n.fixed, mass: clamp(n.w * n.h / 40000, 0.6, 1.6), drift: 0.35 };
     });
     var ge = [];
     (pose.links || []).forEach(function (l) { if (idx[l.a] != null && idx[l.b] != null) ge.push({ a: idx[l.a], b: idx[l.b] }); });
-    var had = S.G;
     var G = R.graph.create(gn, ge, {});
     G.fit = { s: 1, cx: F0.W / 2, cy: F0.H / 2 };
     G.home = { zoom: 1, x: F0.W / 2, y: F0.H / 2 };
     G.view = Object.assign({}, G.home); G._viewed = true;
     S.G = G; S.key = key; S.idx = idx;
-    if (!had) R.graph.bind(G, ctx.canvas, pickAt, function () { if (ctx.reduced) window.dispatchEvent(new Event('resize')); });
-    else { had.nodes = G.nodes; Object.assign(had, G); S.G = had; }
+    G.describe = function (i) { return pose.nodes[i].info || [pose.nodes[i].id]; };
+    if (!ctx.capture) R.graph.bind(G, ctx.canvas, pickAt);
     return S.G;
   }
 
@@ -62,6 +61,24 @@
     g.fillStyle = gr; g.fillRect(-w / 2, -h / 2, w, h);
   }
 
+  // Small overview: readable summaries; focus reveals the original full card and text details.
+  function compact(g, F, n, zoom) {
+    var w = n.w * zoom, h = n.h * zoom, lines = n.info || [];
+    g.scale(1 / zoom, 1 / zoom); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = R.color.css(F.T.ink);
+    if (w < 40 || h < 24) { g.beginPath(); g.arc(0, 0, 1.5, 0, TAU); g.fill(); return; }
+    var max = Math.max(12, w - (n.shape === 'disc' ? 18 : 12));
+    function fitLine(s, y, px) {
+      s = String(s || ''); g.font = '400 ' + px + 'px Geist,system-ui'; g.letterSpacing = '0px';
+      if (g.measureText(s).width > max) { while (s.length && g.measureText(s + '…').width > max) s = s.slice(0, -1); s += '…'; }
+      g.fillText(s, 0, y);
+    }
+    if (n.shape === 'disc') { fitLine(lines[1] || lines[0], 0, 11); return; }
+    fitLine(lines[0], -Math.min(20, h / 4), 11);
+    fitLine(lines[1], 0, w > 120 ? 18 : 12);
+    if (h > 65 && lines[2]) fitLine(lines[2], 20, 11);
+  }
+
   // ── кадр ───────────────────────────────────────────────────────────────
   function draw(ctx, scene) {
     var P = ctx.P, W = ctx.W, H = ctx.H, ui = R.ui(W, H), t = R.motion.time(ctx);
@@ -70,7 +87,7 @@
     var nodes = pose.nodes, links = pose.links || [];
     var G = graphFor(ctx, pose, F0);
     // якорь узла = поза организма в этот кадр; граф кладёт сверху пружины, наведение и камеру
-    nodes.forEach(function (n, i) { G.nodes[i].x = n.x; G.nodes[i].y = n.y; });
+    nodes.forEach(function (n, i) { G.nodes[i].x = n.x; G.nodes[i].y = n.y; G.nodes[i].fixed = !!n.fixed; });
     G.sync(ctx, { drift: 0.35, amp: 2 * ui, period: +P.period, springK: 30 * (+P.springs || 1), repel: 0.6, gap: 0, damp: 9 });
     var z = G.view.zoom, hot = G.hover >= 0 ? G.hover : G.drag >= 0 ? G.drag : -1;
     var mx = 0, my = 0;
@@ -82,7 +99,7 @@
     var plates = [], scr = [];
     nodes.forEach(function (n, i) {
       var st = G.state(i), sp = G.toScreen(st.x, st.y);
-      var zl = R.zh(n.z, P, ui) * (n.zk || 1) + st.lift * R.zh(1, P, ui) * 1.6;
+      var zl = (n.height == null ? R.zh(n.z, P, ui) : n.height) * (n.zk || 1) + st.lift * R.zh(1, P, ui) * 1.6;
       sp[0] += mx * par * zl * 0.35; sp[1] += my * par * zl * 0.35;
       var sw = n.w * z, sh = n.h * z;
       var nn = { i: i, id: n.id, shape: n.shape, sx: sp[0], sy: sp[1], sw: sw, sh: sh, srot: n.rot || 0, hit: n.hit, node: n, dim: 1 - 0.68 * st.fade };
@@ -95,7 +112,7 @@
         fill: n.fill, _n: nn
       });
     });
-    S.last = scr.slice().sort(function (a, b) { return a.node.z - b.node.z; });
+    S.last = scr.slice().sort(function (a, b) { return (a.node.height == null ? a.node.z : a.node.height) - (b.node.height == null ? b.node.z : b.node.height); });
     var byScr = {}; scr.forEach(function (s) { byScr[s.id] = s; });
     var F = R.frame(ctx, {
       plates: plates,
@@ -114,6 +131,7 @@
         g.save();
         g.translate(s.x, s.y); g.rotate(s.rot || 0); g.scale(z, z);
         var n = nn.node;
+        if (n.w * z < 120 && z < 1.5 && n.info) { compact(g, Fr, n, z); g.restore(); return; }
         if (n.shape !== 'disc') sag(g, Fr, n.w, n.h, +P.sag, s.rot);
         g.globalAlpha = nn.dim;
         n.print(g, Fr, Fr.I || K.inks(Fr), n.w, n.h, n);
@@ -288,7 +306,12 @@
     RELIEF_APP.run({
       id: scene.id, title: scene.title, blurb: scene.blurb, hint: scene.hint, rows: scene.rows || {},
       hotkeys: scene.hotkeys,
-      draw: function (ctx) { draw(ctx, scene); }
+      draw: function (ctx) { draw(ctx, scene); },
+      capture: function (ctx) {
+        var keep = Object.assign({}, S), last = R.last;
+        S.G = null; S.key = '';
+        try { draw(ctx, scene); } finally { Object.assign(S, keep); R.last = last; R._shade = null; }
+      }
     }, opt);
   }
 

@@ -157,7 +157,7 @@
         if (n.rule) return { lines: [n.rule.id + ' · ' + n.rule.kind, n.rule.text.slice(0, 34) + (n.rule.text.length > 34 ? '…' : '')], w: 250 };
         if (n.cls) return { lines: [n.cls, 'ontology class'], w: 140 };
         if (n.data) return { lines: [n.data.label, 'source system, as received'], w: 200 };
-        if (n.dot) return { lines: ['20 loans', 'one dot = 20 loans'], w: 150 };
+        if (n.dot) return { lines: ['Loan records', 'Illustrative sample, not a count'], w: 150 };
         return null;
       },
       floorAfter: function (g, F, sc) {
@@ -223,7 +223,7 @@
   function title(g, F, Ly) {
     var m = 0.06 * Math.min(F.W, F.H), ui = F.ui;
     R.ink.text(g, F, 'Model of record: one company, four layers', m, m + 8 * ui, { s: 2, w: 500 });
-    R.ink.text(g, F, 'Higher = further verified · drag, hover, click to focus, scroll to zoom', m, m + 28 * ui, { s: 0, mono: true, tone: 'ink3' });
+    R.ink.text(g, F, 'Height = workflow layer, not approval · drag, hover, click to focus, scroll to zoom', m, m + 28 * ui, { s: 0, mono: true, tone: 'ink3' });
     var lines = ['How to read', 'Floor: data as received', 'Low plates: knowledge, what the data means', 'Raised sheets: rules that run before an action', 'Highest disc: the decision, with its reasons'];
     var y = F.H - m - (lines.length - 1) * 16 * ui;
     lines.forEach(function (s, i) { R.ink.text(g, F, s, m, y, { s: 0, mono: i > 0, caps: i === 0, w: i === 0 ? 500 : 400, tone: 'ink3' }); y += 16 * ui; });

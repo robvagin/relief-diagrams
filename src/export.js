@@ -16,16 +16,15 @@
     var ctx = KIT.scene.ctx, def = sceneDef();
     if (!ctx || !def) return null;
     format = format || ctx.P.format || 'screen';
-    if (format === 'screen' || !FORMATS[format]) return ctx.canvas.toDataURL('image/png');
-    var sz = FORMATS[format], k = Math.max(1, Math.min(3, Math.round(+scale || 1)));
+    var sz = FORMATS[format] || [ctx.W, ctx.H], k = Math.max(1, Math.min(3, Math.round(+scale || 1)));
     var W = sz[0], H = sz[1], c = document.createElement('canvas');
     c.width = W * k; c.height = H * k;
     var g = c.getContext('2d'); g.setTransform(k, 0, 0, k, 0, 0);
-    var x = Object.assign({}, ctx, { canvas: c, g: g, W: W, H: H });
+    if (!FORMATS[format]) { g.drawImage(ctx.canvas, 0, 0, W, H); return c.toDataURL('image/png'); }
+    var x = Object.assign({}, ctx, { canvas: c, g: g, W: W, H: H, capture: true });
     ctx.rand.reset(); ctx.randPal.reset(); ctx.randNoise.reset();
     var keep = R.last;
-    def.draw(x);
-    R.last = keep;
+    try { (def.capture || def.draw)(x); } finally { R.last = keep; R._shade = null; }
     return c.toDataURL('image/png');
   }
 

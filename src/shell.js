@@ -24,6 +24,7 @@
 
   function link() {
     var ctx = KIT.scene.ctx, u = new URL(location.href), q = u.searchParams;
+    Object.keys(ctx.P).forEach(function (k) { q.set('set.' + k, ctx.P[k]); });
     q.set('seed', ctx.seed); q.set('theme', ctx.theme); q.set('preset', ctx.P.light);
     return u.toString();
   }
@@ -51,6 +52,7 @@
 
     var userStructural = def.structural;
     def.structural = function (ctx, path) {
+      R._shade = null;
       if (path === 'light') {
         var p = presetValues(ctx.P.light);
         if (p) Object.keys(p).forEach(function (k) { if (k !== 'light') { ctx.P[k] = p[k]; DG.panel.setValue(k, p[k]); } });
@@ -73,7 +75,7 @@
 
     function exportPNG() {
       var ctx = KIT.scene.ctx, url = R.export.png(ctx.P.format, ctx.P.scale);
-      var f = R.export.FORMATS[ctx.P.format], w = f ? f[0] * ctx.P.scale : ctx.canvas.width, h = f ? f[1] * ctx.P.scale : ctx.canvas.height;
+      var f = R.export.FORMATS[ctx.P.format] || [ctx.W, ctx.H], k = Math.max(1, Math.min(3, Math.round(+ctx.P.scale || 1))), w = f[0] * k, h = f[1] * k;
       R.export.download(url, R.export.filename(def.id, ctx.theme, w, h, 'png'));
     }
 

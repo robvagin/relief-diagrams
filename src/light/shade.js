@@ -14,7 +14,7 @@
   function ensure(c, w, h) { if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); } }
 
   /* ── спрайты: покрытие из поля расстояний, один раз на ключ ─────────── */
-  var SPR = new Map(), LIMIT = 2400;
+  var SPR = new Map(), LIMIT = 2400, spriteBytes = 0, BYTE_LIMIT = 64 * 1024 * 1024;
   function sprite(c, sig, dens, tint) {
     var sq = Math.max(0.25, Math.round(sig * 4) / 4), dq = Math.round(dens * 200) / 200;
     if (dq <= 0) return null;
@@ -33,8 +33,11 @@
     }
     g.putImageData(im, 0, 0);
     s = { cv: cv, w: w, h: h };
-    SPR.set(key, s);
-    if (SPR.size > LIMIT) SPR.delete(SPR.keys().next().value);
+    SPR.set(key, s); spriteBytes += w * h * 4;
+    while (SPR.size > LIMIT || spriteBytes > BYTE_LIMIT) {
+      var oldest = SPR.keys().next().value, old = SPR.get(oldest);
+      spriteBytes -= old.w * old.h * 4; SPR.delete(oldest);
+    }
     return s;
   }
 
@@ -96,7 +99,10 @@
     var x = c.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'copy';
     USED.push(c); return c;
   }
-  function recycle() { POOL = POOL.concat(USED); USED = []; if (POOL.length > 600) POOL.length = 600; }
+  function recycle() {
+    POOL = POOL.concat(USED); USED = [];
+    var bytes = 0; POOL = POOL.filter(function (c) { bytes += c.width * c.height * 4; return bytes <= 32 * 1024 * 1024; }).slice(0, 600);
+  }
   function put(g, F) {
     if (!F) return;
     g.save(); g.globalCompositeOperation = 'multiply';

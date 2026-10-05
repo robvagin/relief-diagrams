@@ -843,7 +843,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
   function ensure(c, w, h) { if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); } }
 
   /* ── спрайты: покрытие из поля расстояний, один раз на ключ ─────────── */
-  var SPR = new Map(), LIMIT = 2400;
+  var SPR = new Map(), LIMIT = 2400, spriteBytes = 0, BYTE_LIMIT = 64 * 1024 * 1024;
   function sprite(c, sig, dens, tint) {
     var sq = Math.max(0.25, Math.round(sig * 4) / 4), dq = Math.round(dens * 200) / 200;
     if (dq <= 0) return null;
@@ -862,8 +862,11 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     }
     g.putImageData(im, 0, 0);
     s = { cv: cv, w: w, h: h };
-    SPR.set(key, s);
-    if (SPR.size > LIMIT) SPR.delete(SPR.keys().next().value);
+    SPR.set(key, s); spriteBytes += w * h * 4;
+    while (SPR.size > LIMIT || spriteBytes > BYTE_LIMIT) {
+      var oldest = SPR.keys().next().value, old = SPR.get(oldest);
+      spriteBytes -= old.w * old.h * 4; SPR.delete(oldest);
+    }
     return s;
   }
 
@@ -925,7 +928,10 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     var x = c.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'copy';
     USED.push(c); return c;
   }
-  function recycle() { POOL = POOL.concat(USED); USED = []; if (POOL.length > 600) POOL.length = 600; }
+  function recycle() {
+    POOL = POOL.concat(USED); USED = [];
+    var bytes = 0; POOL = POOL.filter(function (c) { bytes += c.width * c.height * 4; return bytes <= 32 * 1024 * 1024; }).slice(0, 600);
+  }
   function put(g, F) {
     if (!F) return;
     g.save(); g.globalCompositeOperation = 'multiply';
@@ -1461,12 +1467,21 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
       prm = Object.assign({ seed: ctx.seed }, prm || {});
       if (ctx.reduced) {                         // покой: мир осевший, без дыхания, кадр финальный
         if (G.t !== 'still') { reset(); prm.drift = 0; for (var s = 0; s < 360; s++) step(0, dt, prm); G.t = 'still'; }
-        return;
+        G.instant(); return;
       }
+      if (R.graph.paused) { G.instant(); return; }
       if (G.t === 'still' || target < G.t) reset();
       var guard = 0;
       while (G.t < target && guard++ < 600) { G.t++; step(G.t / fps, dt, prm); }
       if (G.t < target) G.t = target;            // догон после долгой паузы вкладки не молотит тысячи шагов
+    };
+
+    G.instant = function () {
+      if (G.viewT) Object.assign(G.view, G.viewT);
+      nodes.forEach(function (node, i) { if (node.fixed && i !== G.drag) { P[2*i] = node.x; P[2*i+1] = node.y; } });
+      if (G.drag >= 0 && G.dragW) { P[2 * G.drag] = G.dragW[0]; P[2 * G.drag + 1] = G.dragW[1]; }
+      var hot = G.hover >= 0 ? G.hover : G.focus, set = hot >= 0 ? hotSet(hot) : null;
+      for (var i = 0; i < n; i++) { lift[i] = set ? (i === hot ? 1 : set[i] ? 0.55 : 0) : 0; fade[i] = set && !set[i] ? 1 : 0; }
     };
 
     G.state = function (i) { return { x: P[2 * i], y: P[2 * i + 1], lift: lift[i], fade: Math.max(0, Math.min(1, fade[i])) }; };
@@ -1474,9 +1489,11 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     G.toWorld = function (sx, sy) { var f = G.fit, v = G.view; return [(sx - f.cx) / (f.s * v.zoom) + v.x, (sy - f.cy) / (f.s * v.zoom) + v.y]; };
     G.scale = function () { return G.fit.s * G.view.zoom; };
     /* вписать мир (bbox) в кадр с полями 6 % */
-    G.fitTo = function (W, H, bbox) {
-      var m = Math.min(W, H) * 0.06, s = Math.min((W - 2 * m) / (bbox[2] - bbox[0]), (H - 2 * m) / (bbox[3] - bbox[1]));
-      G.fit = { s: s, cx: W / 2, cy: H / 2 };
+    /* pad = {top, bottom, left, right} в px сверх полей 6 %: место под шапку и легенду сцены */
+    G.fitTo = function (W, H, bbox, pad) {
+      pad = pad || {}; var m = Math.min(W, H) * 0.06, t = m + (pad.top || 0), b = m + (pad.bottom || 0), l = m + (pad.left || 0), r = m + (pad.right || 0);
+      var s = Math.min((W - l - r) / (bbox[2] - bbox[0]), (H - t - b) / (bbox[3] - bbox[1]));
+      G.fit = { s: s, cx: l + (W - l - r) / 2, cy: t + (H - t - b) / 2 };
       G.home = { zoom: 1, x: (bbox[0] + bbox[2]) / 2, y: (bbox[1] + bbox[3]) / 2 };
       if (!G.viewT && !G._viewed) { G.view = Object.assign({}, G.home); G._viewed = true; }
     };
@@ -1490,59 +1507,102 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
 
   /* указатель: наведение, перетаскивание узла, панорама, колесо, клик-фокус, двойной клик и Esc = домой */
   function bind(G, canvas, pick, onChange) {
-    var down = null, ch = onChange || function () {};
-    function local(e) { var r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
-    canvas.style.touchAction = 'none';
-    canvas.addEventListener('pointermove', function (e) {
-      var p = local(e);
-      G.mouse = p;
-      if (down) {
-        var dx = p[0] - down.p[0], dy = p[1] - down.p[1];
-        if (!down.moved && Math.hypot(dx, dy) > 3) down.moved = true;
-        if (down.node >= 0 && down.moved) { G.drag = down.node; G.dragW = G.toWorld(p[0], p[1]); }
-        else if (down.node < 0 && down.moved) {
-          var s = G.scale(); G.viewT = null;
-          G.view.x = down.view.x - dx / s; G.view.y = down.view.y - dy / s;
-        }
-        ch(); return;
+    if (canvas._graphDispose) canvas._graphDispose();
+    var down = null, listeners = [], pointers = new Map(), pinch = null;
+    canvas.tabIndex = 0;
+    canvas.setAttribute('role', 'group');
+    canvas.setAttribute('aria-label', 'Interactive diagram. Arrow keys select nodes; Enter focuses; plus and minus zoom; Escape resets.');
+    var detail = document.createElement('div'), content = document.createElement('div'), close = document.createElement('button');
+    detail.className = 'graph-detail'; detail.hidden = true;
+    detail.setAttribute('role', 'status'); detail.setAttribute('aria-live', 'polite');
+    detail.style.cssText = 'position:absolute;bottom:12px;left:12px;right:12px;max-width:360px;max-height:40%;overflow:auto;padding:12px;background:Canvas;color:CanvasText;border-radius:4px;font:14px/1.5 Geist,system-ui;z-index:5;';
+    var context = window.KIT && KIT.scene.ctx;
+    if (context) { var tone = R.tokens(context.theme, context.P.accent); detail.style.background = R.color.css(tone.plate); detail.style.color = R.color.css(tone.ink); }
+    close.textContent = 'Close'; close.type = 'button'; close.style.cssText = 'min-height:44px;min-width:44px;margin-top:8px';
+    detail.append(content, close); canvas.parentNode.appendChild(detail);
+    function listen(target, type, fn, opts) { target.addEventListener(type, fn, opts); listeners.push(function () { target.removeEventListener(type, fn, opts); }); }
+    function redraw() {
+      R._shade = null;
+      var ctx = window.KIT && KIT.scene.ctx;
+      if (ctx && (ctx.reduced || R.graph.paused)) {
+        ctx.rand.reset(); ctx.randPal.reset(); ctx.randNoise.reset();
+        KIT.scene.list()[0].draw(ctx);
       }
-      var h = pick(p[0], p[1]);
-      if (h !== G.hover) { G.hover = h; canvas.style.cursor = h >= 0 ? 'grab' : 'default'; ch(); }
-    });
-    canvas.addEventListener('pointerleave', function () { if (!down) { G.hover = -1; G.mouse = null; ch(); } });
-    canvas.addEventListener('pointerdown', function (e) {
+      if (onChange) onChange();
+      var lines = G.focus >= 0 && G.describe ? G.describe(G.focus) : null;
+      detail.hidden = !lines;
+      if (lines) content.textContent = lines.join(' · ');
+    }
+    function local(e) { var r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) * (canvas.clientWidth / r.width), (e.clientY - r.top) * (canvas.clientHeight / r.height)]; }
+    function zoom(k) { G.viewT = null; G.view.zoom = Math.max(0.5, Math.min(4, G.view.zoom * k)); }
+    canvas.style.touchAction = 'none';
+    listen(close, 'click', function () { G.goHome(); redraw(); canvas.focus(); });
+    listen(canvas, 'pointerdown', function (e) {
       if (e.button > 0) return;
-      var p = local(e);
-      try { canvas.setPointerCapture(e.pointerId); } catch (er) { }
-      down = { p: p, node: pick(p[0], p[1]), moved: false, view: Object.assign({}, G.view) };
-      if (down.node >= 0) canvas.style.cursor = 'grabbing';
+      canvas.focus({preventScroll:true});
+      var p = local(e); pointers.set(e.pointerId, p);
+      try { canvas.setPointerCapture(e.pointerId); } catch (er) {}
+      if (pointers.size === 2) {
+        var ps = Array.from(pointers.values());
+        pinch = {distance: Math.hypot(ps[0][0]-ps[1][0], ps[0][1]-ps[1][1]), zoom:G.view.zoom};
+        down = null; G.drag = -1; G.dragW = null; return;
+      }
+      down = {p:p, node:pick(p[0],p[1]), moved:false, view:Object.assign({},G.view)};
+    });
+    listen(canvas, 'pointermove', function (e) {
+      var p = local(e); G.mouse = p;
+      if (pointers.has(e.pointerId)) pointers.set(e.pointerId,p);
+      if (pinch && pointers.size >= 2) {
+        var ps = Array.from(pointers.values()); G.viewT = null;
+        G.view.zoom = Math.max(0.5, Math.min(4, pinch.zoom * Math.hypot(ps[0][0]-ps[1][0],ps[0][1]-ps[1][1]) / Math.max(1,pinch.distance)));
+        redraw(); return;
+      }
+      if (down) {
+        var dx=p[0]-down.p[0], dy=p[1]-down.p[1];
+        if (Math.hypot(dx,dy)>3) down.moved=true;
+        if (down.moved && down.node>=0) { G.drag=down.node; G.dragW=G.toWorld(p[0],p[1]); }
+        else if (down.moved) { G.viewT=null; G.view.x=down.view.x-dx/G.scale(); G.view.y=down.view.y-dy/G.scale(); }
+        redraw(); return;
+      }
+      var h=pick(p[0],p[1]);
+      if (h!==G.hover) { G.hover=h; canvas.style.cursor=h>=0?'grab':'default'; redraw(); }
     });
     function up(e) {
-      if (!down) return;
-      var d = down; down = null;
-      G.drag = -1; G.dragW = null;
-      canvas.style.cursor = G.hover >= 0 ? 'grab' : 'default';
-      if (!d.moved) { if (d.node >= 0) G.goFocus(d.node); }
-      ch();
+      pointers.delete(e.pointerId);
+      if (pinch) { if (pointers.size<2) pinch=null; down=null; }
+      if (down && !down.moved && e.type !== 'pointercancel' && down.node>=0) G.goFocus(down.node);
+      down=null; G.drag=-1; G.dragW=null; redraw();
     }
-    canvas.addEventListener('pointerup', up);
-    canvas.addEventListener('pointercancel', up);
-    canvas.addEventListener('dblclick', function (e) { var p = local(e); if (pick(p[0], p[1]) < 0) { G.goHome(); ch(); } });
-    canvas.addEventListener('wheel', function (e) {
-      e.preventDefault();
-      var p = local(e), before = G.toWorld(p[0], p[1]);
-      var z = Math.max(0.5, Math.min(4, (G.viewT ? G.viewT.zoom : G.view.zoom) * Math.exp(-e.deltaY * 0.0015)));
-      G.viewT = null; G.view.zoom = z;
-      var after = G.toWorld(p[0], p[1]);                     // зум к курсору: точка под курсором стоит
-      G.view.x += before[0] - after[0]; G.view.y += before[1] - after[1];
-      ch();
-    }, { passive: false });
-    window.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { G.goHome(); ch(); }
+    listen(canvas,'pointerup',up); listen(canvas,'pointercancel',up);
+    listen(canvas,'pointerleave',function () { if (!down) { G.hover=-1; G.mouse=null; redraw(); } });
+    listen(canvas,'dblclick',function (e) { var p=local(e); if(pick(p[0],p[1])<0) { G.goHome(); redraw(); } });
+    listen(canvas,'wheel',function (e) {
+      e.preventDefault(); var p=local(e), before=G.toWorld(p[0],p[1]);
+      zoom(Math.exp(-e.deltaY*0.0015)); var after=G.toWorld(p[0],p[1]);
+      G.view.x+=before[0]-after[0]; G.view.y+=before[1]-after[1]; redraw();
+    },{passive:false});
+    listen(canvas,'keydown',function (e) {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.key==='Escape' || e.key==='Home') { G.hover=-1; G.goHome(); }
+      else if (e.key==='+' || e.key==='=') zoom(1.2);
+      else if (e.key==='-') zoom(1/1.2);
+      else if (/^Arrow/.test(e.key)) { G.hover=-1; var back=/Left|Up/.test(e.key), current=G.focus<0?(back?0:-1):G.focus; G.focus=(current+(back?-1:1)+G.n)%G.n; }
+      else if (e.key==='Enter' && G.focus>=0) G.goFocus(G.focus);
+      else return;
+      e.preventDefault(); redraw();
     });
+    canvas._graph = G;
+    canvas._graphDispose = function () { listeners.forEach(function (off) { off(); }); detail.remove(); };
+    return canvas._graphDispose;
   }
 
-  R.graph = { create: create, bind: bind };
+  R.graph = { create: create, bind: bind, paused: false };
+  window.addEventListener('message', function (e) {
+    if (e.source !== window && e.source !== window.parent) return;
+    var type = e.data && e.data.type;
+    if (type === 'pause' || type === 'es:pause') R.graph.paused = true;
+    if (type === 'play' || type === 'es:play') R.graph.paused = false;
+  });
 })();
 </script>
 <script>
@@ -1897,8 +1957,9 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     var c = document.createElement('canvas');
     c.width = Math.round(w * scale); c.height = Math.round(h * scale);
     var g = c.getContext('2d'); g.setTransform(scale, 0, 0, scale, 0, 0);
+    if (w === ctx.W && h === ctx.H) { g.drawImage(ctx.canvas, 0, 0, w, h); return c.toDataURL('image/png'); }
     Object.assign(ctx, { canvas: c, g: g, W: w, H: h, capture: true });
-    try { ctx.rand.reset(); ctx.randPal.reset(); ctx.randNoise.reset(); APP.scene.draw(ctx); }
+    try { ctx.rand.reset(); ctx.randPal.reset(); ctx.randNoise.reset(); (APP.scene.capture || APP.scene.draw)(ctx); }
     finally { Object.assign(ctx, save); R._shade = null; }
     return c.toDataURL('image/png');
   }
@@ -1908,15 +1969,16 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
   }
   function exportPng() {
     var ctx = KIT.scene.ctx, P = ctx.P, f = FORMATS[P.format];
-    var w = f ? f[0] : ctx.W, h = f ? f[1] : ctx.H, sc = f ? 1 : Math.max(1, Math.round(P.scale));
+    var w = f ? f[0] : ctx.W, h = f ? f[1] : ctx.H, sc = Math.max(1, Math.min(3, Math.round(P.scale) || 1));
     download(renderOffscreen(w, h, sc), 'relief_' + APP.scene.id + '-' + ctx.theme + '-' + Math.round(w * sc) + 'x' + Math.round(h * sc) + '_' + APP.variant + '.png');
   }
   function copyLink(e) {
     var ctx = KIT.scene.ctx, q = new URLSearchParams(location.search), b = e && e.currentTarget;
+    Object.keys(ctx.P).forEach(function (k) { q.set('set.' + k, ctx.P[k]); });
     q.set('seed', ctx.seed); q.set('theme', ctx.theme); q.set('preset', ctx.P.light);
     var s = location.origin + location.pathname + '?' + q.toString();
     var done = function () { if (b) { var t = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = t; }, 1200); } };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(done, done); else done();
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(done, function () { prompt('Copy link', s); }); else prompt('Copy link', s);
   }
 
   // вход варианта: scene = {id, title, blurb, rows:{scene, data}, draw(ctx), structural?, hotkeys?, hint}
@@ -1940,15 +2002,18 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     values.light = R.light.PRESETS[pre] ? pre : (Q.get('theme') === 'night' ? 'lamp' : 'soft');
     var pr = R.light.PRESETS[values.light];
     Object.keys(pr).forEach(function (k) { if (k in values) values[k] = pr[k]; });
+    Q.forEach(function (v, k) { var key = k.indexOf('set.') === 0 ? k.slice(4) : k; if (key in values) values[key] = typeof values[key] === 'number' ? +v : v; });
     APP.panelExtra = {
       title: scene.title, sub: APP.variant + ' · ' + (opt.name || ''), hint: scene.hint,
       actions: [{ label: 'PNG', title: 'Export PNG (E)', run: exportPng }, { label: 'Copy link', title: 'Link with seed and preset', run: copyLink }]
     };
     KIT.scene.register({
-      id: scene.id, title: scene.title, blurb: scene.blurb, params: [],
+      id: scene.id, title: scene.title, blurb: scene.blurb, params: groups.reduce(function (all, gr) { return all.concat(gr.rows); }, []),
+      groups: groups.reduce(function (all, gr) { all[gr.name] = gr.rows; return all; }, {}),
       init: function (ctx) { ctx.data = window.RELIEF_DATA; if (scene.init) scene.init(ctx); },
       draw: function (ctx) { scene.draw(ctx); },
       structural: function (ctx, path) {
+        R._shade = null;
         if (path === 'light') applyPreset(ctx, ctx.P.light);
         if (scene.structural) scene.structural(ctx, path);
       }
@@ -2027,24 +2092,23 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     return -1;
   }
   function graphFor(ctx, pose, F0) {
-    var key = F0.W + 'x' + F0.H + '|' + pose.nodes.map(function (n) { return n.id; }).join(',') + '|' + (pose.key || '');
+    var key = F0.W + 'x' + F0.H + '|' + pose.nodes.map(function (n) { return n.id; }).join(',') + '|' + ctx.P.spread + '|' + (pose.key || '');
     if (S.G && S.key === key) return S.G;
     var idx = {};
     pose.nodes.forEach(function (n, i) { idx[n.id] = i; });
     var gn = pose.nodes.map(function (n) {
       var r = n.shape === 'disc' ? n.w / 2 : 0.32 * Math.min(n.w, n.h);
-      return { id: n.id, x: n.x, y: n.y, r: r, z: n.z, mass: clamp(n.w * n.h / 40000, 0.6, 1.6), drift: 0.35 };
+      return { id: n.id, x: n.x, y: n.y, r: r, z: n.z, fixed: !!n.fixed, mass: clamp(n.w * n.h / 40000, 0.6, 1.6), drift: 0.35 };
     });
     var ge = [];
     (pose.links || []).forEach(function (l) { if (idx[l.a] != null && idx[l.b] != null) ge.push({ a: idx[l.a], b: idx[l.b] }); });
-    var had = S.G;
     var G = R.graph.create(gn, ge, {});
     G.fit = { s: 1, cx: F0.W / 2, cy: F0.H / 2 };
     G.home = { zoom: 1, x: F0.W / 2, y: F0.H / 2 };
     G.view = Object.assign({}, G.home); G._viewed = true;
     S.G = G; S.key = key; S.idx = idx;
-    if (!had) R.graph.bind(G, ctx.canvas, pickAt, function () { if (ctx.reduced) window.dispatchEvent(new Event('resize')); });
-    else { had.nodes = G.nodes; Object.assign(had, G); S.G = had; }
+    G.describe = function (i) { return pose.nodes[i].info || [pose.nodes[i].id]; };
+    if (!ctx.capture) R.graph.bind(G, ctx.canvas, pickAt);
     return S.G;
   }
 
@@ -2061,6 +2125,24 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     g.fillStyle = gr; g.fillRect(-w / 2, -h / 2, w, h);
   }
 
+  // Small overview: readable summaries; focus reveals the original full card and text details.
+  function compact(g, F, n, zoom) {
+    var w = n.w * zoom, h = n.h * zoom, lines = n.info || [];
+    g.scale(1 / zoom, 1 / zoom); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = R.color.css(F.T.ink);
+    if (w < 40 || h < 24) { g.beginPath(); g.arc(0, 0, 1.5, 0, TAU); g.fill(); return; }
+    var max = Math.max(12, w - (n.shape === 'disc' ? 18 : 12));
+    function fitLine(s, y, px) {
+      s = String(s || ''); g.font = '400 ' + px + 'px Geist,system-ui'; g.letterSpacing = '0px';
+      if (g.measureText(s).width > max) { while (s.length && g.measureText(s + '…').width > max) s = s.slice(0, -1); s += '…'; }
+      g.fillText(s, 0, y);
+    }
+    if (n.shape === 'disc') { fitLine(lines[1] || lines[0], 0, 11); return; }
+    fitLine(lines[0], -Math.min(20, h / 4), 11);
+    fitLine(lines[1], 0, w > 120 ? 18 : 12);
+    if (h > 65 && lines[2]) fitLine(lines[2], 20, 11);
+  }
+
   // ── кадр ───────────────────────────────────────────────────────────────
   function draw(ctx, scene) {
     var P = ctx.P, W = ctx.W, H = ctx.H, ui = R.ui(W, H), t = R.motion.time(ctx);
@@ -2069,7 +2151,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     var nodes = pose.nodes, links = pose.links || [];
     var G = graphFor(ctx, pose, F0);
     // якорь узла = поза организма в этот кадр; граф кладёт сверху пружины, наведение и камеру
-    nodes.forEach(function (n, i) { G.nodes[i].x = n.x; G.nodes[i].y = n.y; });
+    nodes.forEach(function (n, i) { G.nodes[i].x = n.x; G.nodes[i].y = n.y; G.nodes[i].fixed = !!n.fixed; });
     G.sync(ctx, { drift: 0.35, amp: 2 * ui, period: +P.period, springK: 30 * (+P.springs || 1), repel: 0.6, gap: 0, damp: 9 });
     var z = G.view.zoom, hot = G.hover >= 0 ? G.hover : G.drag >= 0 ? G.drag : -1;
     var mx = 0, my = 0;
@@ -2081,7 +2163,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     var plates = [], scr = [];
     nodes.forEach(function (n, i) {
       var st = G.state(i), sp = G.toScreen(st.x, st.y);
-      var zl = R.zh(n.z, P, ui) * (n.zk || 1) + st.lift * R.zh(1, P, ui) * 1.6;
+      var zl = (n.height == null ? R.zh(n.z, P, ui) : n.height) * (n.zk || 1) + st.lift * R.zh(1, P, ui) * 1.6;
       sp[0] += mx * par * zl * 0.35; sp[1] += my * par * zl * 0.35;
       var sw = n.w * z, sh = n.h * z;
       var nn = { i: i, id: n.id, shape: n.shape, sx: sp[0], sy: sp[1], sw: sw, sh: sh, srot: n.rot || 0, hit: n.hit, node: n, dim: 1 - 0.68 * st.fade };
@@ -2094,7 +2176,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
         fill: n.fill, _n: nn
       });
     });
-    S.last = scr.slice().sort(function (a, b) { return a.node.z - b.node.z; });
+    S.last = scr.slice().sort(function (a, b) { return (a.node.height == null ? a.node.z : a.node.height) - (b.node.height == null ? b.node.z : b.node.height); });
     var byScr = {}; scr.forEach(function (s) { byScr[s.id] = s; });
     var F = R.frame(ctx, {
       plates: plates,
@@ -2113,6 +2195,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
         g.save();
         g.translate(s.x, s.y); g.rotate(s.rot || 0); g.scale(z, z);
         var n = nn.node;
+        if (n.w * z < 120 && z < 1.5 && n.info) { compact(g, Fr, n, z); g.restore(); return; }
         if (n.shape !== 'disc') sag(g, Fr, n.w, n.h, +P.sag, s.rot);
         g.globalAlpha = nn.dim;
         n.print(g, Fr, Fr.I || K.inks(Fr), n.w, n.h, n);
@@ -2287,7 +2370,12 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     RELIEF_APP.run({
       id: scene.id, title: scene.title, blurb: scene.blurb, hint: scene.hint, rows: scene.rows || {},
       hotkeys: scene.hotkeys,
-      draw: function (ctx) { draw(ctx, scene); }
+      draw: function (ctx) { draw(ctx, scene); },
+      capture: function (ctx) {
+        var keep = Object.assign({}, S), last = R.last;
+        S.G = null; S.key = '';
+        try { draw(ctx, scene); } finally { Object.assign(S, keep); R.last = last; R._shade = null; }
+      }
     }, opt);
   }
 
@@ -2306,13 +2394,21 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
   var D = function () { return window.RELIEF_DATA; };
   function pad(F, w, h) { return Math.max(6, Math.min(16 * F.ui, Math.min(w, h) * 0.09)); }
   function head(g, F, I, w, h, title, sub) {
-    var p = pad(F, w, h), y = -h / 2 + p + 9 * F.ui;
-    K.text(g, F, title, -w / 2 + p, y, { size: 1, caps: true, weight: 500, color: I.ink3, min: 7 });
-    if (sub && w > 150 * F.ui) K.text(g, F, sub, w / 2 - p, y, { size: 1, mono: true, color: I.ink3, align: 'right', min: 7 });
+    var p = pad(F, w, h), width = w - 2 * p;
+    var o = {size: 1, caps: true, weight: 500, color: I.ink3, min: 7};
+    var px = K.font(g, F, o), lh = px * 1.4, y = -h / 2 + p + px;
+    var lines = wrap(g, F, title, width, o);
+    lines.forEach(function (line, i) { K.text(g, F, line, -w / 2 + p, y + i * lh, o); });
+    y += (lines.length - 1) * lh;
+    if (sub) {
+      var so = {size: 1, mono: true, color: I.ink3, align: 'right', min: 7};
+      if (lines.length > 1 || K.measure(g, F, title, o) + K.measure(g, F, sub, so) + px > width) y += lh;
+      K.text(g, F, sub, w / 2 - p, y, so);
+    }
     return y;
   }
   function wrap(g, F, s, maxW, o) {
-    var words = String(s).split(' '), out = [], cur = '';
+    var words = (o.caps ? String(s).toUpperCase() : String(s)).split(' '), out = [], cur = '';
     K.font(g, F, o);
     words.forEach(function (wd) { var t = cur ? cur + ' ' + wd : wd; if (g.measureText(t).width > maxW && cur) { out.push(cur); cur = wd; } else cur = t; });
     if (cur) out.push(cur);
@@ -2334,23 +2430,36 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
       var by = -h / 2 + h * 0.52;
       K.text(g, F, num, -w / 2 + p, by, { px: px, mono: true, weight: 500, color: I.ink });
       var d = s.exposure[11] / s.exposure[0] - 1;
-      K.text(g, F, '+' + K.pct(d) + ' in 12 months · ' + k.loans + ' loans', -w / 2 + p, by + Math.max(px * 0.36, 14 * F.ui), { size: 2, mono: true, color: I.ink2, min: 7 });
-      var sh = Math.min(h * 0.18, 44 * F.ui);
+      var meta = {size: 2, mono: true, color: I.ink2, min: 7};
+      var mp = K.font(g, F, meta), my = by + Math.max(px * 0.36, mp * 1.4);
+      var trend = '+' + K.pct(d) + ' in 12 months', count = k.loans + ' loans';
+      var ml = K.measure(g, F, trend + ' · ' + count, meta) <= w - 2 * p ? [trend + ' · ' + count] : [trend, count];
+      ml.forEach(function (line, i) { K.text(g, F, line, -w / 2 + p, my + i * mp * 1.4, meta); });
+      var sh = Math.min(h * 0.18, 44 * F.ui, h / 2 - p - my - (ml.length - 1) * mp * 1.4 - mp);
       if (sh > 8) spark(g, F, I, s.exposure, -w / 2 + p, h / 2 - p, w - 2 * p, sh, true);
     },
     gate: function (g, F, I, w, h) {
-      var d = D().decisions[0], p = pad(F, w, h);
-      var y = head(g, F, I, w, h, 'Check before action', d.id) + 22 * F.ui;
-      K.text(g, F, d.action, -w / 2 + p, y, { size: 3, weight: 500, color: I.ink, min: 8 });
-      var lh = Math.min((h / 2 - p - 18 * F.ui - y) / d.checks.length, 26 * F.ui);
+      // The card's typography follows its actual fitted geometry, not the viewport alone.
+      F = Object.assign({}, F, {ui: Math.min(F.ui, w / 240, h / 200)});
+      var d = D().decisions[0], p = pad(F, w, h), width = w - 2 * p;
+      var y = head(g, F, I, w, h, 'Check before action', d.id);
+      var action = {size: 3, weight: 500, color: I.ink, min: 7};
+      var ap = K.font(g, F, action), al = wrap(g, F, d.action, width, action);
+      y += ap * 1.5;
+      al.forEach(function (line) { K.text(g, F, line, -w / 2 + p, y, action); y += ap * 1.3; });
+      var foot = {size: 1, mono: true, caps: true, weight: 500, color: I.ink, min: 7};
+      var fp = K.font(g, F, foot), fl = wrap(g, F, 'Blocked · director approval', width, foot);
+      var fy = h / 2 - p - (fl.length - 1) * fp * 1.4;
+      fl.forEach(function (line, i) { K.text(g, F, line, -w / 2 + p, fy + i * fp * 1.4, foot); });
+      var lh = (fy - fp * 1.5 - y) / d.checks.length;
       d.checks.forEach(function (c, i) {
-        var yy = y + (i + 1) * lh + 4 * F.ui;
-        K.text(g, F, c.ref, -w / 2 + p, yy, { size: 2, color: I.ink2, min: 7 });
-        if (c.result === 'pass') K.text(g, F, '✓', w / 2 - p, yy, { size: 2, color: I.ink, align: 'right', min: 7 });
-        else if (c.result === 'missing') { K.dot(g, w / 2 - p - 4 * F.ui, yy - 4 * F.ui, Math.max(2.5, 3.5 * F.ui), I.acc); K.text(g, F, 'missing', w / 2 - p - 14 * F.ui, yy, { size: 1, mono: true, color: I.ink2, align: 'right', min: 7 }); }
-        else K.text(g, F, c.result, w / 2 - p, yy, { size: 1, mono: true, color: I.ink3, align: 'right', min: 7 });
+        var yy = y + (i + 0.5) * lh;
+        K.text(g, F, c.ref, -w / 2 + p, yy, {size: 2, color: I.ink2, min: 7});
+        var result = c.result === 'pass' ? '✓' : c.result;
+        var mark = c.result === 'missing' ? 10 * F.ui : 0;
+        K.text(g, F, result, w / 2 - p - mark, yy, {size: 1, mono: true, color: I.ink2, align: 'right', min: 7});
+        if (mark) K.dot(g, w / 2 - p - 2 * F.ui, yy - 3 * F.ui, 2.5 * F.ui, I.acc);
       });
-      K.text(g, F, 'Blocked · director approval', -w / 2 + p, h / 2 - p, { size: 1, mono: true, caps: true, weight: 500, color: I.ink, min: 7 });
     },
     // столбцы 12 месяцев: печатные пилюли целиком скруглённые, сетка под ними рельефом
     bars: function (g, F, I, w, h) {
@@ -2371,9 +2480,9 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     },
     npl: function (g, F, I, w, h) {
       var v = D().series.nplShareByCount, p = pad(F, w, h);
-      head(g, F, I, w, h, 'NPL share', 'by count');
+      var hy = head(g, F, I, w, h, 'NPL share', 'by count');
       var px = K.fit(g, F, K.pct(v[11]), (w - 2 * p) * 0.7, h * 0.24, { mono: true, weight: 500, min: 10 });
-      var y = -h / 2 + p + 22 * F.ui + px * 0.85;
+      var y = hy + 12 * F.ui + px;
       K.text(g, F, K.pct(v[11]), -w / 2 + p, y, { px: px, mono: true, weight: 500, color: I.ink });
       var sh = h / 2 - p - y - 10 * F.ui;
       if (sh > 10) spark(g, F, I, v, -w / 2 + p, h / 2 - p, w - 2 * p, sh, false);
@@ -2431,6 +2540,17 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
       };
     }
   };
+
+  // One logical paper width keeps typography and geometry on the same scale at every zoom.
+  ['hero', 'gate', 'bars', 'npl', 'rule', 'counts'].forEach(function (id) {
+    var draw = W[id];
+    W[id] = function (g, F, I, w, h) {
+      var scale = w / 240;
+      g.save(); g.scale(scale, scale);
+      draw(g, Object.assign({}, F, {ui: 1}), I, 240, h / scale);
+      g.restore();
+    };
+  });
 
   // каталог виджетов-листов desk: вес (площадь), пропорция w/h
   var SHEETS = [
@@ -2551,7 +2671,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
   function petal(i, len) {
     return function (g, F, I, w, h, n) { if (n.mark) K.dot(g, 0, -h / 2 + w * 0.5, Math.max(2.5, Math.min(w * 0.22, 4 * F.ui)), I.acc); };
   }
-  function bead(v) { return function (g, F, I, w) { var px = K.fit(g, F, v, w * 0.7, w * 0.3, { mono: true, weight: 500, min: 7 }); K.text(g, F, v, 0, px * 0.34, { px: px, mono: true, weight: 500, color: I.ink2, align: 'center' }); }; }
+  function bead(v) { return function (g, F, I, w) { var px = K.fit(g, F, v, w * 0.7, w * 0.3, { mono: true, weight: 500, min: 7 }); K.text(g, F, v, 0, px * 0.34, { px: px, mono: true, weight: 500, color: I.ink2, align: 'center' }); if (K.measure(g, F, 'recovered', {size:1,min:7}) < w * 0.8) K.text(g, F, 'recovered', 0, -px * 0.8, {size:1,min:7,color:I.ink3,align:'center'}); }; }
 
   var CACHE = { key: '', m: null };
   ORG.run({

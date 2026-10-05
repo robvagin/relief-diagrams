@@ -357,7 +357,7 @@
     R.ink.text(g, F, 'Loan book, ' + (P.metric === 'count' ? 'loans' : 'exposure') + ' by stage, segment and country', m, m + 8 * ui, { s: 2, w: 500 });
     R.ink.text(g, F, 'As of ' + D.meta.asOf + ' · drag a node, hover to lift, click to focus, scroll to zoom', m, m + 28 * ui, { s: 0, mono: true, tone: 'ink3' });
     var lines = ['How to read',
-      'Area = ' + (P.metric === 'count' ? 'number of loans' : 'exposure, EUR') + ' (discs and sheets alike)',
+      'Area = ' + (P.metric === 'count' ? 'number of loans' : 'exposure, EUR') + ' (root fixed; small nodes enlarged)' ,
       V === 'v3' ? 'Stem height = share of the book' : V === 'v2' ? 'Arm length = share of its stage' : 'Distance to the parent = share of the parent',
       P.ticks ? 'Tick = 10 % of the parent' : 'Ticks off',
       'Height above the floor = level: book, stage, segment, country'];

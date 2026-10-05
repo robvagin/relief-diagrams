@@ -8,13 +8,21 @@
   var D = function () { return window.RELIEF_DATA; };
   function pad(F, w, h) { return Math.max(6, Math.min(16 * F.ui, Math.min(w, h) * 0.09)); }
   function head(g, F, I, w, h, title, sub) {
-    var p = pad(F, w, h), y = -h / 2 + p + 9 * F.ui;
-    K.text(g, F, title, -w / 2 + p, y, { size: 1, caps: true, weight: 500, color: I.ink3, min: 7 });
-    if (sub && w > 150 * F.ui) K.text(g, F, sub, w / 2 - p, y, { size: 1, mono: true, color: I.ink3, align: 'right', min: 7 });
+    var p = pad(F, w, h), width = w - 2 * p;
+    var o = {size: 1, caps: true, weight: 500, color: I.ink3, min: 7};
+    var px = K.font(g, F, o), lh = px * 1.4, y = -h / 2 + p + px;
+    var lines = wrap(g, F, title, width, o);
+    lines.forEach(function (line, i) { K.text(g, F, line, -w / 2 + p, y + i * lh, o); });
+    y += (lines.length - 1) * lh;
+    if (sub) {
+      var so = {size: 1, mono: true, color: I.ink3, align: 'right', min: 7};
+      if (lines.length > 1 || K.measure(g, F, title, o) + K.measure(g, F, sub, so) + px > width) y += lh;
+      K.text(g, F, sub, w / 2 - p, y, so);
+    }
     return y;
   }
   function wrap(g, F, s, maxW, o) {
-    var words = String(s).split(' '), out = [], cur = '';
+    var words = (o.caps ? String(s).toUpperCase() : String(s)).split(' '), out = [], cur = '';
     K.font(g, F, o);
     words.forEach(function (wd) { var t = cur ? cur + ' ' + wd : wd; if (g.measureText(t).width > maxW && cur) { out.push(cur); cur = wd; } else cur = t; });
     if (cur) out.push(cur);
@@ -36,23 +44,36 @@
       var by = -h / 2 + h * 0.52;
       K.text(g, F, num, -w / 2 + p, by, { px: px, mono: true, weight: 500, color: I.ink });
       var d = s.exposure[11] / s.exposure[0] - 1;
-      K.text(g, F, '+' + K.pct(d) + ' in 12 months · ' + k.loans + ' loans', -w / 2 + p, by + Math.max(px * 0.36, 14 * F.ui), { size: 2, mono: true, color: I.ink2, min: 7 });
-      var sh = Math.min(h * 0.18, 44 * F.ui);
+      var meta = {size: 2, mono: true, color: I.ink2, min: 7};
+      var mp = K.font(g, F, meta), my = by + Math.max(px * 0.36, mp * 1.4);
+      var trend = '+' + K.pct(d) + ' in 12 months', count = k.loans + ' loans';
+      var ml = K.measure(g, F, trend + ' · ' + count, meta) <= w - 2 * p ? [trend + ' · ' + count] : [trend, count];
+      ml.forEach(function (line, i) { K.text(g, F, line, -w / 2 + p, my + i * mp * 1.4, meta); });
+      var sh = Math.min(h * 0.18, 44 * F.ui, h / 2 - p - my - (ml.length - 1) * mp * 1.4 - mp);
       if (sh > 8) spark(g, F, I, s.exposure, -w / 2 + p, h / 2 - p, w - 2 * p, sh, true);
     },
     gate: function (g, F, I, w, h) {
-      var d = D().decisions[0], p = pad(F, w, h);
-      var y = head(g, F, I, w, h, 'Check before action', d.id) + 22 * F.ui;
-      K.text(g, F, d.action, -w / 2 + p, y, { size: 3, weight: 500, color: I.ink, min: 8 });
-      var lh = Math.min((h / 2 - p - 18 * F.ui - y) / d.checks.length, 26 * F.ui);
+      // The card's typography follows its actual fitted geometry, not the viewport alone.
+      F = Object.assign({}, F, {ui: Math.min(F.ui, w / 240, h / 200)});
+      var d = D().decisions[0], p = pad(F, w, h), width = w - 2 * p;
+      var y = head(g, F, I, w, h, 'Check before action', d.id);
+      var action = {size: 3, weight: 500, color: I.ink, min: 7};
+      var ap = K.font(g, F, action), al = wrap(g, F, d.action, width, action);
+      y += ap * 1.5;
+      al.forEach(function (line) { K.text(g, F, line, -w / 2 + p, y, action); y += ap * 1.3; });
+      var foot = {size: 1, mono: true, caps: true, weight: 500, color: I.ink, min: 7};
+      var fp = K.font(g, F, foot), fl = wrap(g, F, 'Blocked · director approval', width, foot);
+      var fy = h / 2 - p - (fl.length - 1) * fp * 1.4;
+      fl.forEach(function (line, i) { K.text(g, F, line, -w / 2 + p, fy + i * fp * 1.4, foot); });
+      var lh = (fy - fp * 1.5 - y) / d.checks.length;
       d.checks.forEach(function (c, i) {
-        var yy = y + (i + 1) * lh + 4 * F.ui;
-        K.text(g, F, c.ref, -w / 2 + p, yy, { size: 2, color: I.ink2, min: 7 });
-        if (c.result === 'pass') K.text(g, F, '✓', w / 2 - p, yy, { size: 2, color: I.ink, align: 'right', min: 7 });
-        else if (c.result === 'missing') { K.dot(g, w / 2 - p - 4 * F.ui, yy - 4 * F.ui, Math.max(2.5, 3.5 * F.ui), I.acc); K.text(g, F, 'missing', w / 2 - p - 14 * F.ui, yy, { size: 1, mono: true, color: I.ink2, align: 'right', min: 7 }); }
-        else K.text(g, F, c.result, w / 2 - p, yy, { size: 1, mono: true, color: I.ink3, align: 'right', min: 7 });
+        var yy = y + (i + 0.5) * lh;
+        K.text(g, F, c.ref, -w / 2 + p, yy, {size: 2, color: I.ink2, min: 7});
+        var result = c.result === 'pass' ? '✓' : c.result;
+        var mark = c.result === 'missing' ? 10 * F.ui : 0;
+        K.text(g, F, result, w / 2 - p - mark, yy, {size: 1, mono: true, color: I.ink2, align: 'right', min: 7});
+        if (mark) K.dot(g, w / 2 - p - 2 * F.ui, yy - 3 * F.ui, 2.5 * F.ui, I.acc);
       });
-      K.text(g, F, 'Blocked · director approval', -w / 2 + p, h / 2 - p, { size: 1, mono: true, caps: true, weight: 500, color: I.ink, min: 7 });
     },
     // столбцы 12 месяцев: печатные пилюли целиком скруглённые, сетка под ними рельефом
     bars: function (g, F, I, w, h) {
@@ -73,9 +94,9 @@
     },
     npl: function (g, F, I, w, h) {
       var v = D().series.nplShareByCount, p = pad(F, w, h);
-      head(g, F, I, w, h, 'NPL share', 'by count');
+      var hy = head(g, F, I, w, h, 'NPL share', 'by count');
       var px = K.fit(g, F, K.pct(v[11]), (w - 2 * p) * 0.7, h * 0.24, { mono: true, weight: 500, min: 10 });
-      var y = -h / 2 + p + 22 * F.ui + px * 0.85;
+      var y = hy + 12 * F.ui + px;
       K.text(g, F, K.pct(v[11]), -w / 2 + p, y, { px: px, mono: true, weight: 500, color: I.ink });
       var sh = h / 2 - p - y - 10 * F.ui;
       if (sh > 10) spark(g, F, I, v, -w / 2 + p, h / 2 - p, w - 2 * p, sh, false);
@@ -133,6 +154,17 @@
       };
     }
   };
+
+  // One logical paper width keeps typography and geometry on the same scale at every zoom.
+  ['hero', 'gate', 'bars', 'npl', 'rule', 'counts'].forEach(function (id) {
+    var draw = W[id];
+    W[id] = function (g, F, I, w, h) {
+      var scale = w / 240;
+      g.save(); g.scale(scale, scale);
+      draw(g, Object.assign({}, F, {ui: 1}), I, 240, h / scale);
+      g.restore();
+    };
+  });
 
   // каталог виджетов-листов desk: вес (площадь), пропорция w/h
   var SHEETS = [

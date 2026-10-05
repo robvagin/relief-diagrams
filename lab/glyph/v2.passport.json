@@ -3,7 +3,7 @@
   "title": "Glyph · v2 Octopus",
   "blurb": "Agent state in 16–96 px as a living organism of discs: five states told apart by count, not by motion.",
   "version": "0.3.0",
-  "engineHash": "0870294ec9ca3e23d8db11242bc1da40f0ee4a5e950a11d5c9ea94c4e0e4c7f4",
+  "engineHash": "c7f54d6b09506e2d720a440bc1b121ded3e9489102005bd312ffab239dfb219d",
   "kind": "engine",
   "contract": {
     "embed": {

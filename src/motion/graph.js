@@ -121,12 +121,21 @@
       prm = Object.assign({ seed: ctx.seed }, prm || {});
       if (ctx.reduced) {                         // покой: мир осевший, без дыхания, кадр финальный
         if (G.t !== 'still') { reset(); prm.drift = 0; for (var s = 0; s < 360; s++) step(0, dt, prm); G.t = 'still'; }
-        return;
+        G.instant(); return;
       }
+      if (R.graph.paused) { G.instant(); return; }
       if (G.t === 'still' || target < G.t) reset();
       var guard = 0;
       while (G.t < target && guard++ < 600) { G.t++; step(G.t / fps, dt, prm); }
       if (G.t < target) G.t = target;            // догон после долгой паузы вкладки не молотит тысячи шагов
+    };
+
+    G.instant = function () {
+      if (G.viewT) Object.assign(G.view, G.viewT);
+      nodes.forEach(function (node, i) { if (node.fixed && i !== G.drag) { P[2*i] = node.x; P[2*i+1] = node.y; } });
+      if (G.drag >= 0 && G.dragW) { P[2 * G.drag] = G.dragW[0]; P[2 * G.drag + 1] = G.dragW[1]; }
+      var hot = G.hover >= 0 ? G.hover : G.focus, set = hot >= 0 ? hotSet(hot) : null;
+      for (var i = 0; i < n; i++) { lift[i] = set ? (i === hot ? 1 : set[i] ? 0.55 : 0) : 0; fade[i] = set && !set[i] ? 1 : 0; }
     };
 
     G.state = function (i) { return { x: P[2 * i], y: P[2 * i + 1], lift: lift[i], fade: Math.max(0, Math.min(1, fade[i])) }; };
@@ -152,57 +161,100 @@
 
   /* указатель: наведение, перетаскивание узла, панорама, колесо, клик-фокус, двойной клик и Esc = домой */
   function bind(G, canvas, pick, onChange) {
-    var down = null, ch = onChange || function () {};
-    function local(e) { var r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
-    canvas.style.touchAction = 'none';
-    canvas.addEventListener('pointermove', function (e) {
-      var p = local(e);
-      G.mouse = p;
-      if (down) {
-        var dx = p[0] - down.p[0], dy = p[1] - down.p[1];
-        if (!down.moved && Math.hypot(dx, dy) > 3) down.moved = true;
-        if (down.node >= 0 && down.moved) { G.drag = down.node; G.dragW = G.toWorld(p[0], p[1]); }
-        else if (down.node < 0 && down.moved) {
-          var s = G.scale(); G.viewT = null;
-          G.view.x = down.view.x - dx / s; G.view.y = down.view.y - dy / s;
-        }
-        ch(); return;
+    if (canvas._graphDispose) canvas._graphDispose();
+    var down = null, listeners = [], pointers = new Map(), pinch = null;
+    canvas.tabIndex = 0;
+    canvas.setAttribute('role', 'group');
+    canvas.setAttribute('aria-label', 'Interactive diagram. Arrow keys select nodes; Enter focuses; plus and minus zoom; Escape resets.');
+    var detail = document.createElement('div'), content = document.createElement('div'), close = document.createElement('button');
+    detail.className = 'graph-detail'; detail.hidden = true;
+    detail.setAttribute('role', 'status'); detail.setAttribute('aria-live', 'polite');
+    detail.style.cssText = 'position:absolute;bottom:12px;left:12px;right:12px;max-width:360px;max-height:40%;overflow:auto;padding:12px;background:Canvas;color:CanvasText;border-radius:4px;font:14px/1.5 Geist,system-ui;z-index:5;';
+    var context = window.KIT && KIT.scene.ctx;
+    if (context) { var tone = R.tokens(context.theme, context.P.accent); detail.style.background = R.color.css(tone.plate); detail.style.color = R.color.css(tone.ink); }
+    close.textContent = 'Close'; close.type = 'button'; close.style.cssText = 'min-height:44px;min-width:44px;margin-top:8px';
+    detail.append(content, close); canvas.parentNode.appendChild(detail);
+    function listen(target, type, fn, opts) { target.addEventListener(type, fn, opts); listeners.push(function () { target.removeEventListener(type, fn, opts); }); }
+    function redraw() {
+      R._shade = null;
+      var ctx = window.KIT && KIT.scene.ctx;
+      if (ctx && (ctx.reduced || R.graph.paused)) {
+        ctx.rand.reset(); ctx.randPal.reset(); ctx.randNoise.reset();
+        KIT.scene.list()[0].draw(ctx);
       }
-      var h = pick(p[0], p[1]);
-      if (h !== G.hover) { G.hover = h; canvas.style.cursor = h >= 0 ? 'grab' : 'default'; ch(); }
-    });
-    canvas.addEventListener('pointerleave', function () { if (!down) { G.hover = -1; G.mouse = null; ch(); } });
-    canvas.addEventListener('pointerdown', function (e) {
+      if (onChange) onChange();
+      var lines = G.focus >= 0 && G.describe ? G.describe(G.focus) : null;
+      detail.hidden = !lines;
+      if (lines) content.textContent = lines.join(' · ');
+    }
+    function local(e) { var r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) * (canvas.clientWidth / r.width), (e.clientY - r.top) * (canvas.clientHeight / r.height)]; }
+    function zoom(k) { G.viewT = null; G.view.zoom = Math.max(0.5, Math.min(4, G.view.zoom * k)); }
+    canvas.style.touchAction = 'none';
+    listen(close, 'click', function () { G.goHome(); redraw(); canvas.focus(); });
+    listen(canvas, 'pointerdown', function (e) {
       if (e.button > 0) return;
-      var p = local(e);
-      try { canvas.setPointerCapture(e.pointerId); } catch (er) { }
-      down = { p: p, node: pick(p[0], p[1]), moved: false, view: Object.assign({}, G.view) };
-      if (down.node >= 0) canvas.style.cursor = 'grabbing';
+      canvas.focus({preventScroll:true});
+      var p = local(e); pointers.set(e.pointerId, p);
+      try { canvas.setPointerCapture(e.pointerId); } catch (er) {}
+      if (pointers.size === 2) {
+        var ps = Array.from(pointers.values());
+        pinch = {distance: Math.hypot(ps[0][0]-ps[1][0], ps[0][1]-ps[1][1]), zoom:G.view.zoom};
+        down = null; G.drag = -1; G.dragW = null; return;
+      }
+      down = {p:p, node:pick(p[0],p[1]), moved:false, view:Object.assign({},G.view)};
+    });
+    listen(canvas, 'pointermove', function (e) {
+      var p = local(e); G.mouse = p;
+      if (pointers.has(e.pointerId)) pointers.set(e.pointerId,p);
+      if (pinch && pointers.size >= 2) {
+        var ps = Array.from(pointers.values()); G.viewT = null;
+        G.view.zoom = Math.max(0.5, Math.min(4, pinch.zoom * Math.hypot(ps[0][0]-ps[1][0],ps[0][1]-ps[1][1]) / Math.max(1,pinch.distance)));
+        redraw(); return;
+      }
+      if (down) {
+        var dx=p[0]-down.p[0], dy=p[1]-down.p[1];
+        if (Math.hypot(dx,dy)>3) down.moved=true;
+        if (down.moved && down.node>=0) { G.drag=down.node; G.dragW=G.toWorld(p[0],p[1]); }
+        else if (down.moved) { G.viewT=null; G.view.x=down.view.x-dx/G.scale(); G.view.y=down.view.y-dy/G.scale(); }
+        redraw(); return;
+      }
+      var h=pick(p[0],p[1]);
+      if (h!==G.hover) { G.hover=h; canvas.style.cursor=h>=0?'grab':'default'; redraw(); }
     });
     function up(e) {
-      if (!down) return;
-      var d = down; down = null;
-      G.drag = -1; G.dragW = null;
-      canvas.style.cursor = G.hover >= 0 ? 'grab' : 'default';
-      if (!d.moved) { if (d.node >= 0) G.goFocus(d.node); }
-      ch();
+      pointers.delete(e.pointerId);
+      if (pinch) { if (pointers.size<2) pinch=null; down=null; }
+      if (down && !down.moved && e.type !== 'pointercancel' && down.node>=0) G.goFocus(down.node);
+      down=null; G.drag=-1; G.dragW=null; redraw();
     }
-    canvas.addEventListener('pointerup', up);
-    canvas.addEventListener('pointercancel', up);
-    canvas.addEventListener('dblclick', function (e) { var p = local(e); if (pick(p[0], p[1]) < 0) { G.goHome(); ch(); } });
-    canvas.addEventListener('wheel', function (e) {
-      e.preventDefault();
-      var p = local(e), before = G.toWorld(p[0], p[1]);
-      var z = Math.max(0.5, Math.min(4, (G.viewT ? G.viewT.zoom : G.view.zoom) * Math.exp(-e.deltaY * 0.0015)));
-      G.viewT = null; G.view.zoom = z;
-      var after = G.toWorld(p[0], p[1]);                     // зум к курсору: точка под курсором стоит
-      G.view.x += before[0] - after[0]; G.view.y += before[1] - after[1];
-      ch();
-    }, { passive: false });
-    window.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { G.goHome(); ch(); }
+    listen(canvas,'pointerup',up); listen(canvas,'pointercancel',up);
+    listen(canvas,'pointerleave',function () { if (!down) { G.hover=-1; G.mouse=null; redraw(); } });
+    listen(canvas,'dblclick',function (e) { var p=local(e); if(pick(p[0],p[1])<0) { G.goHome(); redraw(); } });
+    listen(canvas,'wheel',function (e) {
+      e.preventDefault(); var p=local(e), before=G.toWorld(p[0],p[1]);
+      zoom(Math.exp(-e.deltaY*0.0015)); var after=G.toWorld(p[0],p[1]);
+      G.view.x+=before[0]-after[0]; G.view.y+=before[1]-after[1]; redraw();
+    },{passive:false});
+    listen(canvas,'keydown',function (e) {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.key==='Escape' || e.key==='Home') { G.hover=-1; G.goHome(); }
+      else if (e.key==='+' || e.key==='=') zoom(1.2);
+      else if (e.key==='-') zoom(1/1.2);
+      else if (/^Arrow/.test(e.key)) { G.hover=-1; var back=/Left|Up/.test(e.key), current=G.focus<0?(back?0:-1):G.focus; G.focus=(current+(back?-1:1)+G.n)%G.n; }
+      else if (e.key==='Enter' && G.focus>=0) G.goFocus(G.focus);
+      else return;
+      e.preventDefault(); redraw();
     });
+    canvas._graph = G;
+    canvas._graphDispose = function () { listeners.forEach(function (off) { off(); }); detail.remove(); };
+    return canvas._graphDispose;
   }
 
-  R.graph = { create: create, bind: bind };
+  R.graph = { create: create, bind: bind, paused: false };
+  window.addEventListener('message', function (e) {
+    if (e.source !== window && e.source !== window.parent) return;
+    var type = e.data && e.data.type;
+    if (type === 'pause' || type === 'es:pause') R.graph.paused = true;
+    if (type === 'play' || type === 'es:play') R.graph.paused = false;
+  });
 })();

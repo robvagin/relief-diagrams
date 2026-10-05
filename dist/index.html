@@ -118,9 +118,14 @@ body{background:var(--pg-bg)}
   #list .it .tt{display:none}
   #list .none{display:none}
 }
+ #controls-toggle{display:none}
 @media (max-width:767px){
-  .pg{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) 44vh;grid-template-areas:"list" "frame" "side"}
-  #side{border-top:1px solid var(--hair)}
+  .pg{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"list" "frame" "side"}
+  #side{border-top:1px solid var(--hair);max-height:45dvh;padding:6px 12px}
+  #controls-toggle{display:block;min-height:44px;width:100%;text-align:left}
+  #controls-body{display:none}
+  .controls-open #controls-body{display:block}
+  .it,.acts .btn{min-height:44px}
 }
 @media (prefers-reduced-motion:reduce){.pg *{transition:none!important}}
 </style></head><body>
@@ -131,10 +136,11 @@ body{background:var(--pg-bg)}
     <div class="metaline"><span id="meta"></span><span id="meta2"></span></div>
   </main>
   <aside id="side" aria-label="Controls" data-panel>
-    <div id="top"></div>
+    <button class="btn" id="controls-toggle" type="button" aria-expanded="false" aria-controls="controls-body">Controls</button>
+    <div id="controls-body"><div id="top"></div>
     <div class="acts" id="acts"></div>
     <p class="pgnote" id="note" hidden></p>
-    <div id="knobs"></div>
+    <div id="knobs"></div></div>
   </aside>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </div>
@@ -370,6 +376,7 @@ body{background:var(--pg-bg)}
       S.root.className = 'pv2 pv2-panel';
       mount.appendChild(S.root);
     }
+    if (S.root.parentNode !== mount) mount.appendChild(S.root);
     S.root.setAttribute('data-theme', opts.theme === 'night' || opts.theme === 'dark' ? 'dark' : 'light');
     S.root.textContent = '';
     S.built = []; S.chips = {};
@@ -447,6 +454,12 @@ body{background:var(--pg-bg)}
 
   var $ = function (id) { return document.getElementById(id); };
   var pg = $('pg'), view = $('view'), knobs = $('knobs'), note = $('note');
+
+  $('controls-toggle').addEventListener('click', function () {
+    var open = pg.classList.toggle('controls-open');
+    this.setAttribute('aria-expanded', String(open));
+    this.textContent = open ? 'Hide controls' : 'Controls';
+  });
 
   function toast(t) { var e = $('toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(function () { e.classList.remove('on'); }, 1600); }
 
@@ -534,6 +547,7 @@ body{background:var(--pg-bg)}
     Object.keys(st.set).forEach(function (k) {
       if (k in ctx.P) cw.Scene.set(k, typeof ctx.P[k] === 'number' ? +st.set[k] : st.set[k]);
     });
+    cw.postMessage({ type: st.paused ? 'pause' : 'play' }, location.origin);
     buildKnobs(def, ctx, cw);
     meta2();
   }
@@ -620,10 +634,13 @@ body{background:var(--pg-bg)}
   function png() {
     if (!st.cw) return toast('PNG needs a same-origin frame');
     var ctx = st.cw.KIT.scene.ctx, R = st.cw.RELIEF, url;
-    var fmt = ctx.P.format, sc = ctx.P.scale;
-    url = (R && R.export && fmt && fmt !== 'screen') ? R.export.png(fmt, sc) : st.cw.Scene.export('png');
+    var fmt = ctx.P.format, sc = Math.max(1, Math.min(3, Math.round(+ctx.P.scale || 1)));
+    var sz = {'16:9':[1920,1080], '1:1':[1080,1080], '4:5':[1080,1350]}[fmt] || [ctx.W,ctx.H];
+    try {
+      url = R && R.export ? R.export.png(fmt, sc) : st.cw.RELIEF_APP ? st.cw.RELIEF_APP.renderOffscreen(sz[0], sz[1], sc) : st.cw.Scene.export('png');
+    } catch (e) { return toast('Export failed: try a smaller scale'); }
     if (!url) return toast('Export failed');
-    var sz = R && R.export && R.export.FORMATS[fmt], w = sz ? sz[0] * sc : ctx.canvas.width, h = sz ? sz[1] * sc : ctx.canvas.height;
+    var w = sz[0] * sc, h = sz[1] * sc;
     var id = (st.cur.group === 'rail' ? 'lab' : st.cur.group) + (st.cur.group === 'rail' ? '' : '-' + st.cur.id);
     var d = new Date().toISOString().slice(0, 10);
     var a = document.createElement('a'); a.href = url; a.download = d + '_relief_' + id + '-' + st.theme + '-' + w + 'x' + h + '_v01.png';

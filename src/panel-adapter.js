@@ -52,6 +52,7 @@
       S.root.className = 'pv2 pv2-panel';
       mount.appendChild(S.root);
     }
+    if (S.root.parentNode !== mount) mount.appendChild(S.root);
     S.root.setAttribute('data-theme', opts.theme === 'night' || opts.theme === 'dark' ? 'dark' : 'light');
     S.root.textContent = '';
     S.built = []; S.chips = {};
