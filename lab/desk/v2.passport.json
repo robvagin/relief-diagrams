@@ -1,9 +1,9 @@
 {
-  "id": "desk-v1",
-  "title": "Desk · mobile",
+  "id": "desk-v2",
+  "title": "Desk · plant",
   "blurb": "RELIEF lab variant: desk, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "7f91721fc4f69a5907fd088da3dfd18293ccedaa3c6a58d7aa2c2c9f410c9bed",
+  "engineHash": "78593afd4cc715ecb6e2a805b9e684a84c6c24805409c2f5c304829e66736b76",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -338,17 +338,6 @@
       "min": 1,
       "max": 3,
       "step": 1
-    },
-    {
-      "id": "labelsL",
-      "label": "Подписи",
-      "type": "select",
-      "default": "key",
-      "options": [
-        "none",
-        "key",
-        "all"
-      ]
     }
   ],
   "presets": [],

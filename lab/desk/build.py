@@ -23,7 +23,7 @@ TARGETS = [
 ]
 # рельс src/ (свет, тени по приёмникам, материал, движение — принято владельцем), verbatim из main
 RAIL = ['tokens.scene.js', 'light/light.js', 'light/sdf.js', 'light/shade.js', 'light/canopy.js',
-        'material/material.js', 'motion/motion.js', 'rail.js']
+        'material/material.js', 'motion/motion.js', 'motion/graph.js', 'rail.js']
 CORE_JS = {'desk': ['ink.js', 'app.js', 'organism.js', 'widgets.js'],
            'ledger': ['ink.js', 'app.js', 'organism.js', 'widgets.js', 'charts.js']}
 
