@@ -16,11 +16,7 @@
   const ELEVATION = { root: 'z2', stage: 'z2', segment: 'z1', country: 'z1', branch: 'z0', label: 'z0' };
   window.RELIEF_ELEVATION = ELEVATION;
 
-  const VARIANTS = {
-    v1: { title: 'Cascade · radial', sub: 'Book in the centre, stages around it: area = exposure, distance = share', values: { spread: 320, rmax: 118, mode: 'share' } },
-    v2: { title: 'Cascade · fan', sub: 'Book at the edge, one fan to the right: branches read like a ruler', values: { spread: 150, rmax: 96, mode: 'share' } },
-    v3: { title: 'Cascade · mobile', sub: 'Book hangs from the top, levels hang in tiers: arms balance by weight', values: { spread: 300, rmax: 84, mode: 'balance' } }
-  };
+  const SP = window.RELIEF_PARAMS.scene, VARIANTS = SP.variants;
   const VC = VARIANTS[V] || VARIANTS.v1;
 
   const fmtEUR = (v) => v >= 1e9 ? '€' + (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? '€' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '€' + Math.round(v / 1e3) + 'K' : '€' + Math.round(v);
@@ -415,7 +411,7 @@
   function chrome(g, L, ctx, T, S) {
     const m = 0.06 * Math.min(ctx.W, ctx.H), P = ctx.P;
     const t1 = Math.max(11.67, 11.67 * Math.min(1.2, S * 1.2)), t3 = Math.max(14, 16.8 * Math.min(1.2, S * 1.2));
-    RL.text(g, 'Loan book, ' + (P.metric === 'count' ? 'loans' : 'exposure') + ' by stage, segment and country', m, m + t3 * 0.4, { size: t3, weight: 500, color: css(L.T.ink) });
+    RL.text(g, RL.fit(g, 'Loan book, ' + (P.metric === 'count' ? 'loans' : 'exposure') + ' by stage, segment and country', { size: t3, weight: 500 }, ctx.W - 2 * m), m, m + t3 * 0.4, { size: t3, weight: 500, color: css(L.T.ink) });
     RL.text(g, 'As of ' + D.meta.asOf + ' · ' + fmtVal(T.root, P.metric) + ' · ' + T.root.count + ' loans', m, m + t3 * 0.4 + t1 * 1.6, { size: t1, mono: true, color: css(L.T.ink3) });
     const lines = [
       'HOW TO READ',
@@ -426,7 +422,9 @@
     ];
     let y = ctx.H - m - (lines.length - 1) * t1 * 1.35;
     lines.forEach((s, i) => { RL.text(g, s, m, y, { size: t1, mono: i > 0, caps: i === 0, weight: i === 0 ? 500 : 400, color: css(L.T.ink3) }); y += t1 * 1.35; });
-    RL.text(g, 'Fictional data', ctx.W - m, ctx.H - m, { size: t1, mono: true, align: 'right', color: css(L.T.ink3) });
+    // узкий кадр: строка о данных уходит под заголовок, чтобы не встретиться с легендой
+    if (ctx.W < 600) RL.text(g, 'Fictional data', m, m + t3 * 0.4 + t1 * 3.1, { size: t1, mono: true, color: css(L.T.ink3) });
+    else RL.text(g, 'Fictional data', ctx.W - m, ctx.H - m, { size: t1, mono: true, align: 'right', color: css(L.T.ink3) });
   }
 
   RL.boot({
@@ -436,28 +434,10 @@
     scene: {
       id: 'cascade',
       title: 'Cascade · ' + V,
-      blurb: 'Loan book as a radial tree of matte discs: area is exposure, distance is share, height is level.',
+      blurb: SP.blurb,
       draw,
       structural: function () { CACHE = null; }
     },
-    groups: [
-      { name: 'Сцена', rows: [
-        ['mode', 'Кодирование', ['share', 'balance'], 'share', ['Доля', 'Равновесие']],
-        ['levels', 'Уровней', 1, 3, 1, 3]
-      ] },
-      { name: 'Свет', rows: RL.COMMON.light },
-      { name: 'Материал', rows: RL.COMMON.material },
-      { name: 'Движение', rows: RL.COMMON.motion },
-      { name: 'Ритм', rows: [
-        ['spread', 'Раскрытие, °', 90, 360, 1, 320],
-        ['ticks', 'Засечки', 0, 1, 1, 1],
-        ['phyllo', 'Филлотаксис', 0, 1, 1, 0],
-        ['rmax', 'Крупнейший, px', 40, 200, 1, 118]
-      ] },
-      { name: 'Данные', rows: [
-        ['metric', 'Мера', ['value', 'count'], 'value', ['Объём', 'Число']]
-      ] },
-      { name: 'Выгрузка', rows: RL.COMMON.export }
-    ]
+    groups: SP.groups
   });
 })();

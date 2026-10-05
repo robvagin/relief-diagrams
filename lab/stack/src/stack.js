@@ -17,11 +17,7 @@
   const ELEVATION = { data: 'z1', knowledge: 'z1', rules: 'z2', decision: 'z3', callouts: 'z0' };
   window.RELIEF_ELEVATION = ELEVATION;
 
-  const VARIANTS = {
-    v1: { title: 'Stack · exploded', sub: 'Equal layers lifted apart: data, knowledge, rules, decision', values: { explode: 0.55, tilt: 38 } },
-    v2: { title: 'Stack · terrace', sub: 'Each layer steps up and to the right: a staircase of checks', values: { explode: 0.42, tilt: 30 } },
-    v3: { title: 'Stack · ziggurat', sub: 'Layers narrow towards the decision: wide data, one verdict', values: { explode: 0.50, tilt: 46 } }
-  };
+  const SP = window.RELIEF_PARAMS.scene, VARIANTS = SP.variants;
   const VC = VARIANTS[V] || VARIANTS.v1;
 
   const dec = D.decisions.filter((d) => d.id === D.focus.decision)[0] || D.decisions[0];
@@ -101,14 +97,14 @@
         RL.relief(g, L, (ox, oy) => { g.beginPath(); g.moveTo(a[0] + ox, a[1] + oy); g.quadraticCurveTo((a[0] + b[0]) / 2 + (ax + aw / 2 - (a[0] + b[0]) / 2) * 0.35 + ox, (a[1] + b[1]) / 2 + (ay + ah / 2 - (a[1] + b[1]) / 2) * 0.35 + oy, b[0] + ox, b[1] + oy); });
       });
       cl.forEach((c) => { const q = pos[c]; g.fillStyle = css(ink.ink2); g.beginPath(); g.arc(q[0], q[1], Math.max(2, 3 * S), 0, TAU); g.fill(); });
-      ['Loan', 'Borrower', 'Rule'].forEach((c) => { const q = pos[c]; if (q) RL.text(g, c, q[0] + 6 * S, q[1] - 5 * S, { size: t1, color: css(ink.ink2) }); });
+      if (aw > 220) ['Loan', 'Borrower', 'Rule'].forEach((c) => { const q = pos[c]; if (q) RL.text(g, c, q[0] + 6 * S, q[1] - 5 * S, { size: t1, color: css(ink.ink2) }); });
       p.anchors.push({ x: ax + aw, y: ay + ah * 0.45, text: p.head, sub: p.sub, main: true });
     } else if (p.key === 'rules') {
       const rows = D.rules, rh = ah / rows.length;
       rows.forEach((r, i) => {
         const yy = ay + rh * (i + 0.62);
-        RL.text(g, r.id, ax, yy, { size: t1, mono: true, weight: 500, color: css(ink.ink) });
-        const bx = ax + 64 * S, bw = Math.max(10, aw - 70 * S);
+        if (rh >= t1 * 1.2) RL.text(g, r.id, ax, yy, { size: t1, mono: true, weight: 500, color: css(ink.ink) });
+        const bx = rh >= t1 * 1.2 ? ax + 64 * S : ax, bw = Math.max(10, aw - (bx - ax) - 6 * S);
         RL.relief(g, L, (ox, oy) => { g.beginPath(); g.moveTo(bx + ox, yy - t1 * 0.32 + oy); g.lineTo(bx + bw * (0.45 + 0.1 * i) + ox, yy - t1 * 0.32 + oy); });
         p.anchors.push({ x: ax + aw, y: yy - t1 * 0.3, text: r.id, sub: r.text, main: false, rule: r.id });
       });
@@ -167,7 +163,8 @@
         arr.forEach((a) => { a.ly -= sh; });
       }
       // переполнение: что не поместилось в коридор, честно «+N»
-      const keep = arr.filter((a) => a.ly >= yTop - 1 && a.ly + a.h <= yBot + 1);
+      // узкий кадр: вторичные выноски (строки правил) уходят в «+N», главные остаются
+      const keep = arr.filter((a) => a.ly >= yTop - 1 && a.ly + a.h <= yBot + 1 && (a.main || ctx.W >= 600));
       over = arr.length - keep.length;
       if (!ctx.P.callouts) return;
       keep.forEach((a) => {
@@ -243,10 +240,12 @@
   function chrome(g, L, ctx, Lay) {
     const m = Lay.m, S = Lay.S;
     const t1 = Math.max(11.67, 11.67 * Math.min(1.2, S * 1.2)), t3 = Math.max(14, 16.8 * Math.min(1.2, S * 1.2));
-    RL.text(g, 'Model of record: one company, four layers', m, m + t3 * 0.4, { size: t3, weight: 500, color: css(L.T.ink) });
-    RL.text(g, 'Data is lifted into meaning, meaning into rules, rules into one decision', m, m + t3 * 0.4 + t1 * 1.6, { size: t1, mono: true, color: css(L.T.ink3) });
+    RL.text(g, RL.fit(g, 'Model of record: one company, four layers', { size: t3, weight: 500 }, ctx.W - 2 * m), m, m + t3 * 0.4, { size: t3, weight: 500, color: css(L.T.ink) });
+    RL.text(g, RL.fit(g, 'Data is lifted into meaning, meaning into rules, rules into one decision', { size: t1, mono: true }, ctx.W - 2 * m), m, m + t3 * 0.4 + t1 * 1.6, { size: t1, mono: true, color: css(L.T.ink3) });
     RL.text(g, 'Height = how far a layer is verified', m, ctx.H - m, { size: t1, mono: true, color: css(L.T.ink3) });
-    RL.text(g, 'Fictional data', ctx.W - m, ctx.H - m, { size: t1, mono: true, align: 'right', color: css(L.T.ink3) });
+    // узкий кадр: строка о данных уходит под заголовок, чтобы не встретиться с легендой
+    if (ctx.W < 600) RL.text(g, 'Fictional data', m, m + t3 * 0.4 + t1 * 3.1, { size: t1, mono: true, color: css(L.T.ink3) });
+    else RL.text(g, 'Fictional data', ctx.W - m, ctx.H - m, { size: t1, mono: true, align: 'right', color: css(L.T.ink3) });
   }
 
   RL.boot({
@@ -256,23 +255,10 @@
     scene: {
       id: 'stack',
       title: 'Stack · ' + V,
-      blurb: 'Model of record as matte layers lifted apart under one light, with callouts.',
+      blurb: SP.blurb,
       draw,
       structural: function () { CACHE = null; }
     },
-    groups: [
-      { name: 'Сцена', rows: [
-        ['explode', 'Разнос', 0, 1, 0.01, 0.55],
-        ['tilt', 'Наклон камеры, °', 0, 60, 1, 38]
-      ] },
-      { name: 'Свет', rows: RL.COMMON.light },
-      { name: 'Материал', rows: RL.COMMON.material },
-      { name: 'Движение', rows: RL.COMMON.motion },
-      { name: 'Данные', rows: [
-        ['layers', 'Слоёв', 3, 4, 1, 4],
-        ['callouts', 'Выноски', 0, 1, 1, 1]
-      ] },
-      { name: 'Выгрузка', rows: RL.COMMON.export }
-    ]
+    groups: SP.groups
   });
 })();

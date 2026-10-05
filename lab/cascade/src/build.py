@@ -13,10 +13,13 @@ build.py — сборка вариантов cascade и stack в single-file (к
   /*@DATA@*/          выборка data/portfolio.json (ключи сцены), JSON вклеен строкой
   /*@NOISE@*/         синий шум 128 px (CC0) как серые байты base64: зерно без асинхронной загрузки
   /*@FREEHAND@*/      perfect-freehand (MIT) из ESM в IIFE: слой «рука» §6.9
+  /*@PARAMS@*/        ручки §6.10 и варианты: common.params.json + <сцена>.params.json (один источник с паспортом)
+
+Рядом с каждым вариантом пишется паспорт v<N>.passport.json (схема vendor/passport.schema.json, engineHash = sha256 файла).
 
 Собранный файл руками не правится: правится источник в lab/<сцена>/src/.
 """
-import base64, importlib.util, io, json, os, re, struct, sys, zlib
+import base64, hashlib, importlib.util, io, json, os, re, struct, sys, zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 spec = importlib.util.spec_from_file_location('inline', os.path.join(ROOT, 'vendor', 'kit', 'inline.py'))
@@ -140,7 +143,8 @@ def png_gray(path):
                 line[x] = (line[x] + pr) & 255
         out += bytes(line[0::ch])
         prev = line
-    return w, base64.b64encode(bytes(out)).decode()
+    # hex, а не base64: в base64 знаки + и / режут строку на «слова», и проверка чистоты ловит случайные совпадения
+    return w, bytes(out).hex()
 
 
 def freehand_iife():
@@ -152,10 +156,62 @@ def freehand_iife():
     return '(function(){' + src.strip() + '\n})();'
 
 
+def params_js(scene):
+    common, sp = params_of(scene)
+    return 'window.RELIEF_PARAMS=' + json.dumps({'common': common, 'scene': sp}, ensure_ascii=False, separators=(',', ':')) + ';'
+
+
 def data_js(scene):
     d = json.loads(rd('data/portfolio.json'))
     sub = {k: d[k] for k in SCENES[scene]}
     return 'window.RELIEF_DATA=' + json.dumps(sub, ensure_ascii=False, separators=(',', ':')) + ';'
+
+
+def params_of(scene):
+    common = json.loads(rd('lab/cascade/src/common.params.json'))
+    sp = json.loads(rd('lab/%s/src/%s.params.json' % (scene, scene)))
+    return common, sp
+
+
+def obj_param(d, group):
+    if isinstance(d[2], list):
+        return {'id': d[0], 'label': d[1], 'type': 'select', 'options': d[2], 'default': d[3], 'group': group}
+    t = 'boolean' if (d[2], d[3], d[4]) == (0, 1, 1) else 'number'
+    return {'id': d[0], 'label': d[1], 'type': t, 'default': d[5], 'min': d[2], 'max': d[3], 'step': d[4], 'group': group}
+
+
+def passport(scene, n, html):
+    common, sp = params_of(scene)
+    v = sp['variants']['v%d' % n]
+    params = []
+    for gr in sp['groups']:
+        rows = common[gr['common']] if 'common' in gr else gr['rows']
+        for d in rows:
+            p = obj_param(d, gr['name'])
+            if d[0] in v.get('values', {}):
+                p['default'] = v['values'][d[0]]
+            params.append(p)
+    return {
+        'id': '%s-v%d' % (scene, n), 'title': v['title'],
+        'blurb': 'RELIEF lab variant. ' + v['sub'] + '. Own light §7.2–7.4 until the rail lands.',
+        'version': '0.1.0', 'engineHash': hashlib.sha256(html.encode('utf-8')).hexdigest(), 'kind': 'engine',
+        'contract': {
+            'embed': {'params': ['embed', 'theme', 'p', 'seed', 'preset', 'mode', 'reduced'], 'aliases': ['noui', 'panel=off']},
+            'postMessage': {'out': ['ready', 'frame'], 'in': ['es:progress', 'es:replay', 'pause', 'play'], 'selfplay': True},
+            'api': ['Scene.set', 'Scene.get', 'Scene.export', 'KIT.scene.register', 'KIT.scene.start']},
+        'params': params, 'presets': [], 'frozen': [],
+        'aspect': 'auto', 'minHeight': 240,
+        'hover': 'nothing',
+        'click': 'click on a scrub without drag opens number input; R replay, P pause, E PNG, I theme',
+        'reducedMotion': 'float and assembly removed, one final frame',
+        'narrow390': 'panel becomes an open bottom sheet, the scene fits its box; no panel in embed',
+        'forbidden': ['stretch unevenly', 'put on a coloured ground', 'edit the built v%d.html instead of src/' % n],
+        'export': {'png': True, 'svg': False, 'pdf': False, 'zpl': False},
+        'fonts': [{'family': 'Geist', 'license': 'OFL-1.1', 'embedded': 'local'},
+                  {'family': 'Geist Mono', 'license': 'OFL-1.1', 'embedded': 'local'}],
+        'tokensIn': [], 'brandFree': True,
+        'gate': {'date': '2026-10-05', 'score': '0/10'},
+    }
 
 
 def build_one(scene, n):
@@ -170,8 +226,9 @@ def build_one(scene, n):
         '/*@PANEL-CSS@*/': panel_css(),
         '/*@FONTS@*/': fonts_css(),
         '/*@DATA@*/': data_js(scene),
-        '/*@NOISE@*/': 'window.RELIEF_NOISE={size:%d,b64:"%s"};' % (nw, nb),
+        '/*@NOISE@*/': 'window.RELIEF_NOISE={size:%d,hex:"%s"};' % (nw, nb),
         '/*@FREEHAND@*/': freehand_iife(),
+        '/*@PARAMS@*/': params_js(scene),
     }
     for k, v in rep.items():
         if k not in text:
@@ -190,16 +247,29 @@ def main():
             out = os.path.join(ROOT, 'lab', scene, 'v%d.html' % n)
             text = build_one(scene, n)
             rel = os.path.relpath(out, ROOT)
+            pp = os.path.join(ROOT, 'lab', scene, 'v%d.passport.json' % n)
+            ptxt = json.dumps(passport(scene, n, text), ensure_ascii=False, indent=2) + '\n'
+            if os.path.exists(pp):
+                # счёт гейта вписывает gate.py --stamp: сборка его не затирает
+                try:
+                    old_g = json.loads(io.open(pp, encoding='utf-8').read()).get('gate')
+                    if old_g:
+                        pj = json.loads(ptxt); pj['gate'] = old_g; ptxt = json.dumps(pj, ensure_ascii=False, indent=2) + '\n'
+                except ValueError:
+                    pass
             if check:
                 old = io.open(out, encoding='utf-8').read() if os.path.exists(out) else ''
-                if old != text:
+                oldp = io.open(pp, encoding='utf-8').read() if os.path.exists(pp) else ''
+                if old != text or oldp != ptxt:
                     print('🔴 %s разошёлся с источником' % rel); bad = 1
                 else:
                     print('%s сходится с источником' % rel)
             else:
                 with io.open(out, 'w', encoding='utf-8') as f:
                     f.write(text)
-                print('собран %s · %d КБ' % (rel, len(text.encode('utf-8')) // 1024))
+                with io.open(pp, 'w', encoding='utf-8') as f:
+                    f.write(ptxt)
+                print('собран %s · %d КБ + паспорт' % (rel, len(text.encode('utf-8')) // 1024))
     return bad
 
 

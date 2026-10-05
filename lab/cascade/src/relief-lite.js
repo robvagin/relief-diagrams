@@ -35,43 +35,8 @@
     canopy: { az: 140, elev: 48, soft: 0.30, dens: 0.20, amb: 0.72, pool: 0,    canopy: 0.22 }
   };
 
-  // ── общие ручки §6.10 (грамматика панели v2) ─────────────────────────
-  const COMMON = {
-    light: [
-      ['light', 'Свет', ['soft', 'raking', 'lamp', 'canopy'], 'soft', ['Мягкий', 'Скользящий', 'Лампа', 'Листва']],
-      ['az', 'Азимут, °', 0, 360, 1, 135, 'Откуда свет: 135 = слева сверху'],
-      ['elev', 'Высота, °', 8, 80, 1, 42, 'Ниже солнце = длиннее тени'],
-      ['soft', 'Мягкость', 0, 1, 0.01, 0.28, 'Рост полутени на пиксель высоты'],
-      ['dens', 'Плотность тени', 0, 0.6, 0.01, 0.20],
-      ['amb', 'Рассеянный', 0.2, 0.95, 0.01, 0.72],
-      ['contact', 'Контакт', 0, 0.3, 0.01, 0.12, 'Тонкая тень у самой опоры'],
-      ['pool', 'Пятно лампы', 0, 1, 0.01, 0],
-      ['lampH', 'Высота лампы', 300, 2000, 10, 900],
-      ['canopy', 'Листва', 0, 0.6, 0.01, 0, 'Пятна света сквозь крону'],
-      ['temp', 'Температура', -1, 1, 0.01, 0.25, 'Тёплый свет, холодная тень']
-    ],
-    material: [
-      ['grain', 'Зерно, %', 0, 4, 0.1, 1.6],
-      ['uneven', 'Неровность, %', 0, 2, 0.1, 0.8],
-      ['rim', 'Кант', 0, 1, 0.01, 0.5],
-      ['radius', 'Радиус плашки', 0, 8, 0.5, 6],
-      ['zscale', 'Шкала высот', 0, 2, 0.01, 1],
-      ['accent', 'Акцент', ['terracotta', 'cobalt', 'olive'], 'terracotta', ['Терракота', 'Кобальт', 'Олива']],
-      ['hand', 'Рука', 0, 1, 1, 0]
-    ],
-    motion: [
-      ['float', 'Плавание', 0, 2, 0.01, 1],
-      ['period', 'Период, с', 12, 72, 1, 36],
-      ['sway', 'Качание, °', 0, 1.5, 0.05, 0.3],
-      ['bob', 'Дыхание тени', 0, 0.2, 0.01, 0.08],
-      ['settle', 'Оседание, с', 0.3, 2, 0.05, 0.9],
-      ['assemble', 'Сборка', 0, 1, 1, 1]
-    ],
-    export: [
-      ['format', 'Формат', ['screen', '16:9', '1:1', '4:5'], 'screen', ['Экран', '16:9', '1:1', '4:5']],
-      ['scale', 'Масштаб', 1, 3, 1, 2]
-    ]
-  };
+  // ── общие ручки §6.10 (грамматика панели v2): один источник с паспортом, common.params.json ─
+  const COMMON = window.RELIEF_PARAMS.common;
   const FORMATS = { '16:9': [1920, 1080], '1:1': [1080, 1080], '4:5': [1080, 1350] };
 
   // декларация v2 → плоская форма kit (шесть элементов): дефолты и паспорт читает kit-scene
@@ -88,7 +53,7 @@
   // ── цвета: токены сцены из CSS (хексы только в page.css) ─────────────
   const probe = document.createElement('canvas').getContext('2d');
   function rgb(css) {
-    probe.fillStyle = '#000'; probe.fillStyle = css;
+    probe.fillStyle = 'black'; probe.fillStyle = css;
     const s = probe.fillStyle;
     if (s[0] === '#') return [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
     const m = s.match(/[\d.]+/g); return [+m[0], +m[1], +m[2]];
@@ -134,10 +99,10 @@
   function noiseTiles(g, amt) {
     const key = amt.toFixed(3);
     if (NOISE.key === key) return NOISE;
-    const N = window.RELIEF_NOISE, s = N.size, bin = atob(N.b64);
+    const N = window.RELIEF_NOISE, s = N.size, hx = N.hex;
     const p = canvas(s, s), m = canvas(s, s), pi = p.getContext('2d').createImageData(s, s), mi = m.getContext('2d').createImageData(s, s);
     for (let i = 0; i < s * s; i++) {
-      const n = bin.charCodeAt(i) / 255 - 0.5;
+      const n = parseInt(hx.substr(i * 2, 2), 16) / 255 - 0.5;
       const up = Math.max(0, n) * 2 * amt * 255, dn = 255 * (1 - Math.max(0, -n) * 2 * amt);
       pi.data[i * 4] = pi.data[i * 4 + 1] = pi.data[i * 4 + 2] = up; pi.data[i * 4 + 3] = 255;
       mi.data[i * 4] = mi.data[i * 4 + 1] = mi.data[i * 4 + 2] = dn; mi.data[i * 4 + 3] = 255;
@@ -278,7 +243,7 @@
     m.setTransform(1, 0, 0, 1, 0, 0);
     m.globalCompositeOperation = 'source-over';
     m.filter = 'none';
-    m.fillStyle = '#fff';
+    m.fillStyle = 'white';
     m.fillRect(0, 0, M.c.width, M.c.height);
     m.setTransform(1, 0, 0, 1, -rect[0], -rect[1]);
     const hr = recv ? recv.h : 0;
@@ -419,7 +384,7 @@
     const kmax = Math.floor(0.5 * Pd);
     const Etop = L.amb + (1 - L.amb) * L.sin, dark = L.amb / Etop;
     m.setTransform(1, 0, 0, 1, 0, 0); m.filter = 'none'; m.globalCompositeOperation = 'source-over';
-    m.fillStyle = '#fff'; m.fillRect(0, 0, w, h);
+    m.fillStyle = 'white'; m.fillRect(0, 0, w, h);
     m.filter = 'blur(' + (0.035 * 600 * L.S / 4).toFixed(2) + 'px)';
     const v = Math.round(255 * dark), a = clamp(L.canopy / 0.6, 0, 1);
     m.fillStyle = css([v, v, v], a);
@@ -434,7 +399,7 @@
       m.beginPath(); m.ellipse(x + ox, y + ox * 0.4, rx, ry, rot, 0, TAU); m.fill();
     }
     m.filter = 'blur(' + (2 * L.S / 4).toFixed(2) + 'px)';
-    m.fillStyle = '#fff';
+    m.fillStyle = 'white';
     for (let i = 0; i < 12; i++) { const x = r() * w, y = r() * h, rr = (3 + r() * 5) * L.S / 4; m.beginPath(); m.arc(x, y, rr, 0, TAU); m.fill(); }
     m.filter = 'none';
     g.save(); g.globalCompositeOperation = 'multiply'; g.imageSmoothingEnabled = true; g.drawImage(CAN.c, 0, 0, L.W, L.H); g.restore();
@@ -451,7 +416,7 @@
     const u = unevenTiles(ctx, P.uneven / 100), sx = Math.floor(ctx.randNoise() * 128), sy = Math.floor(ctx.randNoise() * 128);
     if (TEX.key !== key) {
       const mk = (fill) => { const c = canvas(cw, ch), x = c.getContext('2d'); x.fillStyle = fill; x.fillRect(0, 0, cw, ch); return c; };
-      const plus = mk('#000'), minus = mk('#fff'), gp = plus.getContext('2d'), gm = minus.getContext('2d');
+      const plus = mk('black'), minus = mk('white'), gp = plus.getContext('2d'), gm = minus.getContext('2d');
       const kx = cw / ctx.W, ky = ch / ctx.H;
       if (P.uneven > 0) {
         [gp, gm].forEach((x, i) => { x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.globalCompositeOperation = i ? 'multiply' : 'lighter'; x.drawImage(i ? u.minus : u.plus, -cw / 12, -ch / 12, cw * 7 / 6, ch * 7 / 6); });
@@ -608,7 +573,7 @@
   function boot(cfg) {
     const Q = new URLSearchParams(location.search);
     const night = Q.get('theme') === 'night';
-    const groups = cfg.groups;
+    const groups = cfg.groups.map((gr) => (gr.common ? { name: gr.name, rows: COMMON[gr.common] } : gr));
     const def = Object.assign({}, cfg.scene);
     def.params = [];
     groups.forEach((gr) => gr.rows.forEach((d) => def.params.push(toKit(d))));

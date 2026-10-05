@@ -1,0 +1,132 @@
+{
+ "id": "cascade",
+ "blurb": "Loan book as a radial tree of matte discs: area is exposure, distance is share, height is level.",
+ "groups": [
+  {
+   "name": "Сцена",
+   "rows": [
+    [
+     "mode",
+     "Кодирование",
+     [
+      "share",
+      "balance"
+     ],
+     "share",
+     [
+      "Доля",
+      "Равновесие"
+     ]
+    ],
+    [
+     "levels",
+     "Уровней",
+     1,
+     3,
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "name": "Свет",
+   "common": "light"
+  },
+  {
+   "name": "Материал",
+   "common": "material"
+  },
+  {
+   "name": "Движение",
+   "common": "motion"
+  },
+  {
+   "name": "Ритм",
+   "rows": [
+    [
+     "spread",
+     "Раскрытие, °",
+     90,
+     360,
+     1,
+     320
+    ],
+    [
+     "ticks",
+     "Засечки",
+     0,
+     1,
+     1,
+     1
+    ],
+    [
+     "phyllo",
+     "Филлотаксис",
+     0,
+     1,
+     1,
+     0
+    ],
+    [
+     "rmax",
+     "Крупнейший, px",
+     40,
+     200,
+     1,
+     118
+    ]
+   ]
+  },
+  {
+   "name": "Данные",
+   "rows": [
+    [
+     "metric",
+     "Мера",
+     [
+      "value",
+      "count"
+     ],
+     "value",
+     [
+      "Объём",
+      "Число"
+     ]
+    ]
+   ]
+  },
+  {
+   "name": "Выгрузка",
+   "common": "export"
+  }
+ ],
+ "variants": {
+  "v1": {
+   "title": "Cascade · radial",
+   "sub": "Book in the centre, stages around it: area = exposure, distance = share",
+   "values": {
+    "spread": 320,
+    "rmax": 118,
+    "mode": "share"
+   }
+  },
+  "v2": {
+   "title": "Cascade · fan",
+   "sub": "Book at the edge, one fan to the right: branches read like a ruler",
+   "values": {
+    "spread": 150,
+    "rmax": 96,
+    "mode": "share"
+   }
+  },
+  "v3": {
+   "title": "Cascade · mobile",
+   "sub": "Book hangs from the top, levels hang in tiers: arms balance by weight",
+   "values": {
+    "spread": 300,
+    "rmax": 84,
+    "mode": "balance"
+   }
+  }
+ }
+}

@@ -37,3 +37,4 @@ html.is-embed #side{display:none}
 }
 @media (prefers-reduced-motion:reduce){.pv2 *{transition:none!important}}
 .pv2,.pv2 *,.pv2 *::before,.pv2 *::after{box-sizing:border-box}
+.pv2 .scrub .sval{-webkit-appearance:none;-moz-appearance:textfield;appearance:none}

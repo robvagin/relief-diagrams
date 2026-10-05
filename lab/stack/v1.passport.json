@@ -1,0 +1,393 @@
+{
+  "id": "stack-v1",
+  "title": "Stack · exploded",
+  "blurb": "RELIEF lab variant. Equal layers lifted apart: data, knowledge, rules, decision. Own light §7.2–7.4 until the rail lands.",
+  "version": "0.1.0",
+  "engineHash": "ed01fbb5c6584a540978e7390eaaf250e9a750a2cd3424690dfd3fe1d9ec8668",
+  "kind": "engine",
+  "contract": {
+    "embed": {
+      "params": [
+        "embed",
+        "theme",
+        "p",
+        "seed",
+        "preset",
+        "mode",
+        "reduced"
+      ],
+      "aliases": [
+        "noui",
+        "panel=off"
+      ]
+    },
+    "postMessage": {
+      "out": [
+        "ready",
+        "frame"
+      ],
+      "in": [
+        "es:progress",
+        "es:replay",
+        "pause",
+        "play"
+      ],
+      "selfplay": true
+    },
+    "api": [
+      "Scene.set",
+      "Scene.get",
+      "Scene.export",
+      "KIT.scene.register",
+      "KIT.scene.start"
+    ]
+  },
+  "params": [
+    {
+      "id": "explode",
+      "label": "Разнос",
+      "type": "number",
+      "default": 0.55,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "group": "Сцена"
+    },
+    {
+      "id": "tilt",
+      "label": "Наклон камеры, °",
+      "type": "number",
+      "default": 38,
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "group": "Сцена"
+    },
+    {
+      "id": "light",
+      "label": "Свет",
+      "type": "select",
+      "options": [
+        "soft",
+        "raking",
+        "lamp",
+        "canopy"
+      ],
+      "default": "soft",
+      "group": "Свет"
+    },
+    {
+      "id": "az",
+      "label": "Азимут, °",
+      "type": "number",
+      "default": 135,
+      "min": 0,
+      "max": 360,
+      "step": 1,
+      "group": "Свет"
+    },
+    {
+      "id": "elev",
+      "label": "Высота, °",
+      "type": "number",
+      "default": 42,
+      "min": 8,
+      "max": 80,
+      "step": 1,
+      "group": "Свет"
+    },
+    {
+      "id": "soft",
+      "label": "Мягкость",
+      "type": "number",
+      "default": 0.28,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "group": "Свет"
+    },
+    {
+      "id": "dens",
+      "label": "Плотность тени",
+      "type": "number",
+      "default": 0.2,
+      "min": 0,
+      "max": 0.6,
+      "step": 0.01,
+      "group": "Свет"
+    },
+    {
+      "id": "amb",
+      "label": "Рассеянный",
+      "type": "number",
+      "default": 0.72,
+      "min": 0.2,
+      "max": 0.95,
+      "step": 0.01,
+      "group": "Свет"
+    },
+    {
+      "id": "contact",
+      "label": "Контакт",
+      "type": "number",
+      "default": 0.12,
+      "min": 0,
+      "max": 0.3,
+      "step": 0.01,
+      "group": "Свет"
+    },
+    {
+      "id": "pool",
+      "label": "Пятно лампы",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "group": "Свет"
+    },
+    {
+      "id": "lampH",
+      "label": "Высота лампы",
+      "type": "number",
+      "default": 900,
+      "min": 300,
+      "max": 2000,
+      "step": 10,
+      "group": "Свет"
+    },
+    {
+      "id": "canopy",
+      "label": "Листва",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 0.6,
+      "step": 0.01,
+      "group": "Свет"
+    },
+    {
+      "id": "temp",
+      "label": "Температура",
+      "type": "number",
+      "default": 0.25,
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "group": "Свет"
+    },
+    {
+      "id": "grain",
+      "label": "Зерно, %",
+      "type": "number",
+      "default": 1.6,
+      "min": 0,
+      "max": 4,
+      "step": 0.1,
+      "group": "Материал"
+    },
+    {
+      "id": "uneven",
+      "label": "Неровность, %",
+      "type": "number",
+      "default": 0.8,
+      "min": 0,
+      "max": 2,
+      "step": 0.1,
+      "group": "Материал"
+    },
+    {
+      "id": "rim",
+      "label": "Кант",
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "group": "Материал"
+    },
+    {
+      "id": "radius",
+      "label": "Радиус плашки",
+      "type": "number",
+      "default": 6,
+      "min": 0,
+      "max": 8,
+      "step": 0.5,
+      "group": "Материал"
+    },
+    {
+      "id": "zscale",
+      "label": "Шкала высот",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "group": "Материал"
+    },
+    {
+      "id": "accent",
+      "label": "Акцент",
+      "type": "select",
+      "options": [
+        "terracotta",
+        "cobalt",
+        "olive"
+      ],
+      "default": "terracotta",
+      "group": "Материал"
+    },
+    {
+      "id": "hand",
+      "label": "Рука",
+      "type": "boolean",
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "step": 1,
+      "group": "Материал"
+    },
+    {
+      "id": "float",
+      "label": "Плавание",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "group": "Движение"
+    },
+    {
+      "id": "period",
+      "label": "Период, с",
+      "type": "number",
+      "default": 36,
+      "min": 12,
+      "max": 72,
+      "step": 1,
+      "group": "Движение"
+    },
+    {
+      "id": "sway",
+      "label": "Качание, °",
+      "type": "number",
+      "default": 0.3,
+      "min": 0,
+      "max": 1.5,
+      "step": 0.05,
+      "group": "Движение"
+    },
+    {
+      "id": "bob",
+      "label": "Дыхание тени",
+      "type": "number",
+      "default": 0.08,
+      "min": 0,
+      "max": 0.2,
+      "step": 0.01,
+      "group": "Движение"
+    },
+    {
+      "id": "settle",
+      "label": "Оседание, с",
+      "type": "number",
+      "default": 0.9,
+      "min": 0.3,
+      "max": 2,
+      "step": 0.05,
+      "group": "Движение"
+    },
+    {
+      "id": "assemble",
+      "label": "Сборка",
+      "type": "boolean",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1,
+      "group": "Движение"
+    },
+    {
+      "id": "layers",
+      "label": "Слоёв",
+      "type": "number",
+      "default": 4,
+      "min": 3,
+      "max": 4,
+      "step": 1,
+      "group": "Данные"
+    },
+    {
+      "id": "callouts",
+      "label": "Выноски",
+      "type": "boolean",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1,
+      "group": "Данные"
+    },
+    {
+      "id": "format",
+      "label": "Формат",
+      "type": "select",
+      "options": [
+        "screen",
+        "16:9",
+        "1:1",
+        "4:5"
+      ],
+      "default": "screen",
+      "group": "Выгрузка"
+    },
+    {
+      "id": "scale",
+      "label": "Масштаб",
+      "type": "number",
+      "default": 2,
+      "min": 1,
+      "max": 3,
+      "step": 1,
+      "group": "Выгрузка"
+    }
+  ],
+  "presets": [],
+  "frozen": [],
+  "aspect": "auto",
+  "minHeight": 240,
+  "hover": "nothing",
+  "click": "click on a scrub without drag opens number input; R replay, P pause, E PNG, I theme",
+  "reducedMotion": "float and assembly removed, one final frame",
+  "narrow390": "panel becomes an open bottom sheet, the scene fits its box; no panel in embed",
+  "forbidden": [
+    "stretch unevenly",
+    "put on a coloured ground",
+    "edit the built v1.html instead of src/"
+  ],
+  "export": {
+    "png": true,
+    "svg": false,
+    "pdf": false,
+    "zpl": false
+  },
+  "fonts": [
+    {
+      "family": "Geist",
+      "license": "OFL-1.1",
+      "embedded": "local"
+    },
+    {
+      "family": "Geist Mono",
+      "license": "OFL-1.1",
+      "embedded": "local"
+    }
+  ],
+  "tokensIn": [],
+  "brandFree": true,
+  "gate": {
+    "date": "2026-10-05",
+    "score": "10/10",
+    "report": "gate/acceptance.json"
+  }
+}
