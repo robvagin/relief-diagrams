@@ -101,7 +101,7 @@
       var x=dx*c+dz*sn,z0=-dx*sn+dz*c,z=z0*Math.cos(DRAG.pitch)+dy*Math.sin(DRAG.pitch),py=dy*Math.cos(DRAG.pitch)-z0*Math.sin(DRAG.pitch),scale=1+.045*depth*(z-dz)/radius;
       return Object.assign({},n,{x:M.cx+x,y:M.cy+py+(z-dz)*.20*depth,w:n.w*scale,h:n.h*scale,
         height:(150+32*z/radius)*ui,rot:n.shape==='sheet'?(n.rot0||0)*(+P.tilt)*Math.PI/180:0,
-        fixed:true,depth:z/radius,volume:[dx/radius,dy/radius,dz/radius]});
+        baseW:n.w,fixed:true,depth:z/radius,volume:[dx/radius,dy/radius,dz/radius]});
     });
     // A constant full-orbit fit prevents side-on views from leaving the viewport.
     var fit=1;
@@ -171,15 +171,16 @@
   }
   var DISCS=new Map();
   function discTexture(n,F){
-    var key=[n.id,F.ctx.theme,F.P.accent,F.P.temp].join('|');if(DISCS.has(key))return DISCS.get(key);
+    var caption=(n.baseW||n.w)>=64;
+    var key=[n.id,caption,F.ctx.theme,F.P.accent,F.P.temp].join('|');if(DISCS.has(key))return DISCS.get(key);
     var cv=document.createElement('canvas');cv.width=cv.height=256;var g=cv.getContext('2d');g.translate(128,128);g.scale(2.56,2.56);
     var I=K.inks(F);g.fillStyle=R.color.css(F.tn.plate);g.beginPath();g.arc(0,0,50,0,TAU);g.fill();
     function text(s,y,px,color,weight){K.font(g,F,{px:px,min:1,weight:weight||400});var width=g.measureText(s).width;
       K.text(g,F,s,0,y,{px:Math.min(px,px*78/Math.max(1,width)),min:1,weight:weight||400,align:'center',color:color||I.ink});}
     if(n.id==='hub'){text('Loan book',-5,11.5,I.ink2);text('240',23,26,I.ink,500);}
-    else if(n.id==='stages'||n.id==='agents'){text(n.id,-8,15,I.ink3);text(n.id==='stages'?'3':'5',23,28,I.ink,500);}
+    else if(n.id==='stages'||n.id==='agents'){if(caption)text(n.id,-8,15,I.ink3);text(n.id==='stages'?'3':'5',caption?23:10,28,I.ink,500);}
     else if(n.id.indexOf('st')===0){
-      text(n.data.label==='non-performing'?'NPL':n.data.label,-11,12,I.ink3);text(K.eur(n.data.value),13,20,I.ink,500);
+      if(caption)text(n.data.label==='non-performing'?'NPL':n.data.label,-11,12,I.ink3);text(K.eur(n.data.value),caption?13:7,20,I.ink,500);
       if(n.data.label==='non-performing')K.dot(g,0,29,3,I.acc);
     }else{
       if(n.state==='wait'){g.strokeStyle=I.ink;g.lineWidth=2;g.beginPath();g.arc(0,-12,11,0,TAU);g.stroke();}
@@ -213,7 +214,7 @@
   }
   function paper(g,n,F) {
     g.save();g.translate(n.x,n.y);g.rotate(n.rot);
-    if(n.kind==='circle')g.drawImage(discTexture(n,F),-n.w/2,-n.h/2,n.w,n.h);
+    if(n.kind==='circle'){g.imageSmoothingQuality='high';g.drawImage(discTexture(n,F),-n.w/2,-n.h/2,n.w,n.h);}
     else {
       var cv=texture(n,F),r=n.refresh;
       if(!r)g.drawImage(cv,-n.w/2,-n.h/2,n.w,n.h);
