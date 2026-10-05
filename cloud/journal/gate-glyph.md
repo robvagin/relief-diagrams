@@ -1,6 +1,20 @@
+Skills applied: acceptance-harness, adaptive-typography, ai-presence-canon, autonomous-build-loop, canvas-frame-budget, canvas-scene-covers, design-tokens-oklch, gates-that-prove, generative-fragment-handoff, gfonts-canon, motion-kinematics-canon, naryad-crafting, panel-canon, release-scrub, responsive-canon, single-file-delivery-canon, solid-viz-builder, web-ui-canon, vendor/panel-v2/PANEL_V2.md
+
 # Журнал · cloud/var-gate-glyph
 
-Skills applied: vendor/panel-v2/PANEL_V2.md, panel-canon (§1–4), ai-presence-canon, motion-kinematics-canon (конспект читающего субагента), canvas-frame-budget (конспект), single-file-delivery-canon (конспект)
+Ответственный: Claude Code (облако), сессия https://claude.ai/code/session_01LbqsMbfwbpj8Am7HhCm7hp
+
+## Волна 3 · приказ владельца «всё не то, старайся лучше»
+
+Основа: принятый рельс `src/` (свет, мягкая тень, объём, панель v2) через `src/shell.src.html`; сборка `python3 lab/gate/src/build.py` вызывает `tools/build.py` импортом. Живой организм: `lab/gate/src/org.js` (наведение с соседями, перетаскивание на пружинах, клик = фокус, колесо = зум, панорама, параллакс по высоте); переедет на `src/motion/graph.js`, когда тот появится в main. Окон, дырок и вырезов в плашках нет; старые варианты с окнами, сетками и ортогональными осями удалены.
+
+| время (UTC) | пункт | что сделано | чем проверено | хеш |
+|---|---|---|---|---|
+| 2026-10-05T14:01:07Z | gate v1 | `lab/gate/v1.html` «Мобиль»: проверка как мобиль Калдера, коромысла-дуги и нити одной кривой, узлы подвеса кольцами, плечи уравновешены по площади, каждое коромысло качается гармониками одного периода; пройденная проверка поднимается и оседает, блок ложится на пол плоско, нить провисает; габарит в покое вписывает мобиль в кадр | Chromium 1440×900 день и ночь, 390×844; цикл и блок глазами; `__ERROR` пуст | см. git log |
+
+## Волна 2 (история, варианты удалены)
+
+Skills applied (волна 2): vendor/panel-v2/PANEL_V2.md, panel-canon (§1–4), ai-presence-canon, motion-kinematics-canon (конспект читающего субагента), canvas-frame-budget (конспект), single-file-delivery-canon (конспект)
 
 Ответственный: Claude Code (облако), сессия https://claude.ai/code/session_01LbqsMbfwbpj8Am7HhCm7hp
 
