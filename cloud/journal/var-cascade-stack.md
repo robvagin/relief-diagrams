@@ -1,6 +1,6 @@
 # Журнал · cloud/var-cascade-stack
 
-Skills applied: autonomous-build-loop, panel-canon, motion-kinematics-canon, solid-viz-builder, canvas-frame-budget, single-file-delivery-canon, vendor/panel-v2/PANEL_V2.md
+Skills applied: acceptance-harness, adaptive-typography, ai-presence-canon, autonomous-build-loop, canvas-frame-budget, canvas-scene-covers, design-tokens-oklch, gates-that-prove, generative-fragment-handoff, gfonts-canon, motion-kinematics-canon, naryad-crafting, panel-canon, release-scrub, responsive-canon, single-file-delivery-canon, solid-viz-builder (+ references/pseudo-3d-layers.md), web-ui-canon, vendor/panel-v2/PANEL_V2.md
 
 Ответственный: Claude Code (облако), сессия https://claude.ai/code/session_01QXqAnC167MADjU6coxjQ5Y
 
@@ -34,3 +34,11 @@ https://robvagin.github.io/relief-diagrams/lab/stack/v1.html · v2.html · v3.ht
 - Geist вклеен целиком (variable woff2, ≈ 140 КБ), без сабсета; SVG-выгрузки нет (`Scene.export('svg')` = null)
 - после слияния рельса `src/light/` варианты переезжают на общий свет (сейчас свой `lab/cascade/src/relief-lite.js`, им пользуются обе сцены)
 - 390 px: stack мелкий, вторичные выноски уходят в «+N»; на панели нет хоткея H (панель видна всегда по приказу)
+
+## Волна 3 · приказ владельца «всё не то, старайся лучше» (2026-10-05)
+
+Принято владельцем: свет, мягкая тень и объём рельса `src/light`. Варианты волны 2 сняты целиком (коромысла, стопки-слои с выносками-изломами). Новые строятся на общем рельсе (`src/shell.src.html` + `RELIEF.frame`), организм — `lab/cascade/src/organism.js` (качание гармониками одного периода с волной по глубине, физика узлов только после касания, перетаскивание, наведение, фокус, зум, панорама, параллакс). `src/motion/graph.js` в main пока нет: формат узла совместим, переезд после его появления
+
+| время (UTC) | пункт | что сделано | чем проверено | хеш |
+|---|---|---|---|---|
+| 2026-10-05T14:01:04Z | cascade v1–v3 | три организма: v1 satellites (хаб-лист, лучи стадий веером с засечками, листы-сегменты, веер дисков-стран), v2 octopus (голова-диск, щупальца по сегментам сплайном, бусины-страны волной), v3 plant (горшок-лист, стебли стадий вверх, листья-сегменты, плоды-страны); площадь круга и листа = значение, перпендикуляров нет | headless: 0 ошибок, наведение поднимает узел и показывает карточку z3, перетаскивание тянет соседей, колесо зумит; глазом по кадрам 1440 | 9cd698a |
