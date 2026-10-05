@@ -31,3 +31,11 @@ Skills applied: vendor/panel-v2/PANEL_V2.md (канон панели v2), README
 - d3-hypertree (MIT) взят как образец устройства, код не копировался; строку лицензии в `vendor/README.md` не вписал (файл не мой): нужен владелец или сессия playground
 - после слияния рельса свет переезжает с `lab/horizon/src/rail.js` на `src/light/`
 - на глаз владельца: размер узлов horizon (ρ ≤ 18 по §7.7 выходит мелко), клин корня в v3, морф agents (P/5 на вид), лестница высот прочтений в agents v3 (z2 → z3)
+
+## Волна 3 · приказ владельца «всё не то, старайся лучше»
+
+Skills applied: skills/acceptance-harness, adaptive-typography, ai-presence-canon, autonomous-build-loop, canvas-frame-budget, canvas-scene-covers, design-tokens-oklch, gates-that-prove, generative-fragment-handoff, gfonts-canon, motion-kinematics-canon, naryad-crafting, panel-canon, release-scrub, responsive-canon, single-file-delivery-canon, solid-viz-builder, web-ui-canon (все 18) + vendor/panel-v2/PANEL_V2.md
+
+| время (UTC) | пункт | что сделано | чем проверено | хеш |
+|---|---|---|---|---|
+| 2026-10-05T14:01:20Z | horizon × 3 организма | варианты переехали на рельс `src/` (свет, тени кешем, материал, плавание, панель v2); `organism.js`: узлы на пружинах по номеру кадра, тяга узла тянет соседей, наведение поднимает с соседями и притушает остальное, колесо = зум, параллакс по высоте; v1 «Flower» (лепестки-листы и диски, прямые лучи веером с засечками), v2 «Octopus» (щупальца Catmull-Rom, бегущая волна), v3 «Plant» (стебли-дуги от корня у земли, ветер качает ветки); клик = ход Мёбиуса, фон = непрерывный Мёбиус; ни дырок, ни прямых углов | сборка `python3 lab/horizon/src/build.py`, headless-кадры трёх вариантов, клик по D-7781 переводит фокус, тяга узла, зум без ошибок | см. git log |

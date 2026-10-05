@@ -1,9 +1,55 @@
-/* RELIEF lab · horizon: онтология в фокусе (README §6.1 №05, механика §7.7).
-   Общая часть трёх вариантов: граф, дерево, раскладка, навигация, плашки, подписи.
-   Вариант задаёт только ВИД (как диск ложится в кадр) и свою печать: HORIZON.make({view}). */
+/* horizon.js · онтология в фокусе как живой организм (README §6.1 №05, §7.7; приказ волны 3).
+   Общая часть трёх организмов: граф онтологии из data/portfolio.json, дерево от фокуса, раскладка
+   Лэмпинга в диске Пуанкаре, ход фокуса Мёбиусом (клик), протяжка фона = непрерывный Мёбиус,
+   узлы на пружинах (тянешь — соседи едут), наведение поднимает узел с соседями, колесо = зум.
+   Вариант задаёт организм: как диск ложится в кадр (map), ветер (wind) и чем рисуются связи (links).
+   Бумага и диски вперемешку: объекты-документы — листы, субъекты и решения — диски. Дырок нет. */
 (function () {
   'use strict';
-  var R = window.RELIEF, H = window.HYPER, Cx = H.C, TAU = Math.PI * 2;
+  var R = window.RELIEF, H = window.HYPER, O = R.org, C = H.C, TAU = Math.PI * 2;
+  var PAPER = { Loan: 1, Rule: 1, Covenant: 1, Collateral: 1, Evidence: 1 };
+  var REL = { owes: 'owes', secured_by: 'secured by', governed_by: 'governed by', applies_to: 'applies to', watches: 'watches',
+    checks: 'checks', maps: 'maps', services: 'services', recovers: 'recovers', proposes: 'proposes', about: 'about',
+    checked_by: 'checked by', approved_by: 'approved by', evidenced_by: 'evidenced by', more: 'more' };
+  var WORD = { Loan: 'Loan', Borrower: 'Borrower', Collateral: 'Collateral', Covenant: 'Covenant', Rule: 'Rule', Decision: 'Decision',
+    Agent: 'Agent', Approval: 'Approval', Evidence: 'Evidence', More: 'More' };
+
+  var TW = {};
+  function textW(g, str, px, w, mono) {   // ширина строки шрифтом сцены (кеш по строке и кеглю)
+    var k = str + '|' + px.toFixed(1) + '|' + w + mono;
+    if (TW[k] == null) {
+      g.save(); g.font = w + ' ' + px.toFixed(2) + 'px ' + (mono ? '"Geist Mono"' : '"Geist"');
+      try { g.letterSpacing = (px < 13 ? 0.02 * px : px > 20.2 ? -0.01 * px : 0).toFixed(2) + 'px'; } catch (e) {}
+      TW[k] = g.measureText(str).width; g.restore();
+    }
+    return TW[k];
+  }
+  function money(v) { return v >= 1e6 ? '€' + (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? '€' + Math.round(v / 1e3) + 'k' : '€' + Math.round(v); }
+  function name1(t) {
+    var n = t.n;
+    if (n.type === 'More') return n.label;
+    if (n.type === 'Agent') return n.id + ' ' + n.label;
+    if (n.type === 'Approval' || n.type === 'Evidence') return n.label;
+    return n.id;
+  }
+  function sub1(t) {
+    var n = t.n;
+    if (n.type === 'Loan') return n.label + ' · ' + money(n.value);
+    if (n.type === 'Collateral') return money(n.value) + ' · ' + n.months + ' mo';
+    if (n.type === 'Decision') return n.status;
+    if (n.type === 'Borrower') return n.label;
+    if (n.type === 'Agent') return n.label;
+    return WORD[n.type];
+  }
+  function focusLine(t) {
+    var n = t.n;
+    if (n.type === 'Loan') return n.label + ' · ' + money(n.value) + ' · ' + n.stage;
+    if (n.type === 'Borrower') return n.label + ' · ' + n.segment + ' · ' + n.country;
+    if (n.type === 'Rule' || n.type === 'Covenant') return n.label.length > 46 ? n.label.slice(0, 45) + '…' : n.label;
+    if (n.type === 'Agent') return n.job;
+    if (n.type === 'Decision') return n.label + ' · ' + n.status;
+    return WORD[n.type];
+  }
 
   var GROUPS = {
     'Сцена': [
@@ -16,297 +62,222 @@
       ['depthH', 'Глубина', 1, 4, 1, 3]
     ]
   };
-  var TYPE_WORD = { Loan: 'Loan', Borrower: 'Borrower', Collateral: 'Collateral', Covenant: 'Covenant', Rule: 'Rule',
-    Decision: 'Decision', Agent: 'Agent', Approval: 'Approval', Evidence: 'Evidence', More: 'More' };
-  var REL = { owes: 'owes', secured_by: 'secured by', governed_by: 'governed by', applies_to: 'applies to', watches: 'watches',
-    checks: 'checks', maps: 'maps', services: 'services', recovers: 'recovers', proposes: 'proposes', about: 'about',
-    checked_by: 'checked by', approved_by: 'approved by', evidenced_by: 'evidenced by', more: 'more' };
-
-  function money(v) {
-    if (v >= 1e6) return '€' + (v / 1e6).toFixed(2) + 'M';
-    if (v >= 1e3) return '€' + Math.round(v / 1e3) + 'k';
-    return '€' + Math.round(v);
-  }
-  function moneyFull(v) { return '€' + Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
-  function name1(t) {
-    var n = t.n;
-    if (n.type === 'More') return n.label;
-    if (n.type === 'Agent') return n.id + ' ' + n.label;
-    if (n.type === 'Approval' || n.type === 'Evidence') return n.label;
-    return n.id;
-  }
-  function num2(t) {
-    var n = t.n;
-    if (n.type === 'More') return n.label;
-    if (n.value) return money(n.value);
-    var m = String(n.id).match(/\d+/);
-    return m ? m[0] : '';
-  }
-  function focusLine(t) {
-    var n = t.n;
-    if (n.type === 'Loan') return n.label + ' · ' + moneyFull(n.value) + ' · ' + n.stage;
-    if (n.type === 'Borrower') return n.label + ' · ' + n.segment + ' · ' + n.country;
-    if (n.type === 'Collateral') return n.label + ' · ' + moneyFull(n.value) + ' · appraised ' + n.months + ' mo ago';
-    if (n.type === 'Agent') return n.job;
-    if (n.type === 'Decision') return n.label + ' · ' + n.status;
-    return n.label;
-  }
 
   function make(V) {
-    var S = { G: null, tree: null, nav: H.Nav(), nodes: [], drag: null, beta: 0 };
+    var S = { G: null, tree: null, nav: H.Nav(), sim: new O.Sim(), view: O.View(), st: { hover: null }, shown: [], rot: 0 };
 
-    function rebuild(ctx, keepNav) {
+    function rebuild(ctx) {
       if (!S.G) S.G = H.buildGraph(ctx.data);
       S.tree = H.buildTree(S.G, ctx.P.focus, Math.round(+ctx.P.depthH));
       H.layout(S.tree, +ctx.P.link, V.wedge ? V.wedge[0] : undefined, V.wedge ? V.wedge[1] : undefined);
-      if (!keepNav) { S.nav = H.Nav(); S.nav.center = S.tree.root.id; S.settledAt = -10; }
-      if (V.prepare) V.prepare(S, ctx);
+      S.nav = H.Nav(); S.nav.center = S.tree.root.id; S.sim = new O.Sim(); S.settledAt = -10;
     }
-    function nodeById(id) { return S.tree.all.filter(function (t) { return t.id === id; })[0]; }
 
     function draw(ctx) {
-      var U = R.units(ctx), ts = R.tsec(ctx), P = ctx.P;
       if (!S.tree) rebuild(ctx);
-      var k = H.navStep(S.nav, ts, ctx.reduced ? function () { return 1; } : R.EASE);
+      var P = ctx.P, ts = R.motion.time(ctx), ui = R.ui(ctx.W, ctx.H);
+      var k = H.navStep(S.nav, ts, ctx.reduced ? function () { return 1; } : R.motion.ease);
       if (!S.nav.anim && S.wasAnim) { S.settledAt = ts; S.wasAnim = false; }
       if (S.nav.anim) S.wasAnim = true;
-      var center = S.nav.center || S.tree.root.id;
-      var dNew = H.distFrom(S.tree, S.nav.anim ? S.nav.anim.target : center);
-      var dOld = H.distFrom(S.tree, S.nav.anim ? (S.nav.anim.prevCenter || center) : center);
-      V.frame(S, ctx, U);
-      var zl = [U.z(3), U.z(2), U.z(1), 0];
+      var center = S.nav.anim ? S.nav.anim.target : (S.nav.center || S.tree.root.id);
+      var dNew = H.distFrom(S.tree, center), dOld = H.distFrom(S.tree, S.nav.anim ? (S.nav.anim.prevCenter || center) : center);
+      var G = V.frame(S, ctx, ui);
+      var per = Math.max(1, +P.period || 36), ws = TAU * ((ts % per) / per), wind = ctx.reduced ? 0 : +P.float;
+      var zs = [R.zh(3, P, ui), R.zh(2, P, ui), R.zh(1, P, ui), 0];
+
+      // узлы: диск → якорь кадра (+ ветер организма), роль по кольцу, форма по типу
       var nodes = S.tree.all.map(function (t) {
-        var w = H.apply(S.nav.m, t.z), xy = V.map(w), dn = dNew.get(t), dO = dOld.get(t);
-        var zz = R.mix(zl[Math.min(3, dO)], zl[Math.min(3, dn)], k);
-        var ring = k < 0.5 ? dO : dn;
-        var rho = R.clamp(18 * V.size(w), 1.5, 18) * U.ui;
-        if (t.more) rho = Math.min(rho, 4 * U.ui);
-        return { t: t, w: w, x: xy[0], y: xy[1], rho: rho, z: t.more ? 0 : zz, ring: ring, vis: xy[2] !== false };
+        var w = H.apply(S.nav.m, t.z), base = V.map(S, ctx, w, ui), dn = dNew.get(t), dO = dOld.get(t);
+        var ring = k < 0.5 ? dO : dn, sz = O.clamp(Math.sqrt(Math.max(0, V.size ? V.size(w) : 1 - C.abs2(w))), 0.3, 1);
+        var off = V.wind ? V.wind(S, t, w, base, ws, wind, ui) : [0, 0];
+        return { t: t, w: w, ax: base[0] + off[0], ay: base[1] + off[1], ring: ring, sz: sz, vis: base[2] !== false,
+          z: t.more ? 0 : zs[Math.min(3, dO)] + (zs[Math.min(3, dn)] - zs[Math.min(3, dO)]) * k, paper: !!PAPER[t.n.type] };
       });
-      S.nodes = nodes;
-      var plates = [];
-      nodes.forEach(function (nd) {
-        if (!nd.vis || nd.z <= 0.3 || nd.rho < 1.6 * U.ui) return;
-        var settled = nd.ring === 0 && !S.nav.anim;
-        plates.push({
-          id: nd.t.id, kind: 'disc', x: nd.x, y: nd.y, r: nd.rho, z: nd.z,
-          env: settled ? R.settleEnv(ts, S.settledAt, +P.settle) : 1,
-          print: function (g, T, U2, p) { mark(g, T, U2, nd, p); }
-        });
-        nd.plate = plates[plates.length - 1];
-      });
-      if (V.plates) V.plates(S, ctx, U, plates);
-      var out = R.render(ctx, {
-        plates: plates,
-        floor: function (g, T, U2) { floor(g, T, U2, ctx, nodes); },
-        overlay: function (g, T, U2) { overlay(g, T, U2, ctx, nodes); }
-      });
-      void out;
-    }
-
-    // печать на полу: горизонт, геодезические рёбра, точки z0, подписи
-    function floor(g, T, U, ctx, nodes) {
-      var P = ctx.P;
-      if (+P.horizon) V.horizon(g, T, U, ctx, S);
-      var byT = new Map(nodes.map(function (n) { return [n.t, n]; }));
-      g.lineWidth = U.lineW; g.lineCap = 'round';
-      nodes.forEach(function (b) {
-        var a = b.t.parent && byT.get(b.t.parent);
-        if (!a || !a.vis && !b.vis) return;
-        var depth = Math.max(a.ring, b.ring);
-        var alpha = depth <= 1 ? 0.55 : depth === 2 ? 0.35 : 0.2;
-        var pts = H.geodesic(a.w, b.w, 28).map(function (w) { return V.map(w); });
-        trimDraw(g, pts, a, b, U, R.rgba(T.ink, alpha));
-      });
-      if (V.floorExtra) V.floorExtra(g, T, U, ctx, S, nodes);
-      // z0: печатные точки без тени; «+N» полым кольцом
+      // физика: якоря, связи родитель—ребёнок на текущей длине, диски расталкиваются
+      var sim = S.sim; sim.begin();
       nodes.forEach(function (n) {
-        if (!n.vis) return;
-        if (n.t.more) {
-          g.beginPath(); g.arc(n.x, n.y, Math.max(1.5 * U.ui, n.rho), 0, TAU);
-          g.strokeStyle = R.rgba(T.ink2, 0.55); g.lineWidth = U.lineW; g.stroke(); return;
+        var r = n.ring <= 2 && !n.t.more ? (n.ring === 0 ? 40 : n.ring === 1 ? 26 : 9) * ui * n.sz : 0;
+        var q = sim.node(n.t.id, { x: n.ax, y: n.ay, r: r, ka: n.ring === 0 ? 60 : 22 });
+        q.ax = n.ax; q.ay = n.ay; q.r = r; n.q = q;
+      });
+      var byT = new Map(nodes.map(function (n) { return [n.t, n]; }));
+      nodes.forEach(function (n) {   // связь держит длину, какую ей дал якорь: тянешь узел — ветка едет
+        var pa = n.t.parent && byT.get(n.t.parent); if (pa) sim.link(pa.t.id, n.t.id, Math.hypot(n.ax - pa.ax, n.ay - pa.ay), 10);
+      });
+      sim.end(); sim.advance(ctx); O.viewStep(S.view, ctx);
+      O.hoverStep(sim, S.st, ctx);
+
+      // экран: зум и параллакс по высоте
+      nodes.forEach(function (n) {
+        var lift = n.q.lift * 10 * ui, z = n.z + lift, s = O.toScreen(S.view, ctx, n.q.x, n.q.y, z);
+        n.x = s[0]; n.y = s[1]; n.zz = z; n.zoom = S.view.zoom;
+      });
+      S.shown = nodes;
+      var plates = [];
+      nodes.forEach(function (n, i) {
+        if (!n.vis || n.t.more || n.ring >= 3) return;
+        var zoom = S.view.zoom, sz = n.sz * zoom, env = n.ring === 0 && !S.nav.anim ? R.motion.settle(ts, S.settledAt, +P.settle) : 1;
+        var tilt = (O.hash01(ctx.seed + n.t.id) - 0.5) * 2 * (4 + 4 * O.hash01(n.t.id + 't')) * Math.PI / 180;
+        var p = { id: n.t.id, z: n.zz, env: env, assembleIndex: i, x: n.x, y: n.y, node: n };
+        if (n.paper) {
+          // ширина листа по тексту, который на нём напечатан (лист не режет подпись)
+          var tw = n.ring === 0 ? Math.max(textW(ctx.g, name1(n.t), 24.19 * ui, 500, false), textW(ctx.g, focusLine(n.t), 11.67 * ui, 400, true)) + 24 * ui
+            : n.ring === 1 ? Math.max(textW(ctx.g, name1(n.t), 14 * ui, 500, false), textW(ctx.g, (REL[n.t.rel] || '') + ' · ' + sub1(n.t), 11.67 * ui, 400, true)) + 22 * ui : 30 * ui * sz;
+          var hh = n.ring === 0 ? 88 * ui : n.ring === 1 ? 46 * ui : 20 * ui * sz;
+          p.kind = 'rect'; p.w = tw * (n.ring <= 1 ? zoom : 1); p.h = hh * (n.ring <= 1 ? zoom : 1); p.r = Math.min(6 * ui, p.h / 3); p.rot = n.ring === 0 ? tilt * 0.5 : tilt;
+        } else {
+          var rad = n.ring === 0 ? 46 : n.ring === 1 ? 22 : 8;
+          p.kind = 'circle'; p.w = 2 * rad * ui * sz; p.h = p.w;
         }
-        if (n.plate) return;
-        g.beginPath(); g.arc(n.x, n.y, Math.max(1.2 * U.ui, Math.min(n.rho, 3 * U.ui)), 0, TAU);
-        g.fillStyle = R.rgba(T.ink2, n.ring >= 3 ? 0.45 : 0.7); g.fill();
+        n.plate = p; n.hw = p.kind === 'rect' ? Math.max(p.w, p.h) / 2 : p.w / 2;
+        plates.push(p);
       });
-      labels(g, T, U, ctx, nodes);
-    }
-    // ребро с зазором 3 px у узла (Joint gap донора 04) и ореолом поверхности
-    function trimDraw(g, pts, a, b, U, color) {
-      var gap = 3 * U.ui, ra = (a.plate ? a.rho : Math.min(a.rho, 3 * U.ui)) + gap, rb = (b.plate ? b.rho : Math.min(b.rho, 3 * U.ui)) + gap;
-      var keep = pts.filter(function (p) {
-        return Math.hypot(p[0] - a.x, p[1] - a.y) > ra && Math.hypot(p[0] - b.x, p[1] - b.y) > rb && Math.abs(p[0]) < 1e5 && Math.abs(p[1]) < 1e5;
+      R.frame(ctx, {
+        plates: plates,
+        floor: function (g, F) { floor(g, F, ctx, nodes); },
+        print: function (g, s, F) { if (s.src.node) mark(g, s, F, s.src.node); },
+        above: function (g, F) { overlay(g, F, ctx, nodes); }
       });
-      if (keep.length < 2) return;
-      g.beginPath(); g.moveTo(keep[0][0], keep[0][1]);
-      for (var i = 1; i < keep.length; i++) g.lineTo(keep[i][0], keep[i][1]);
-      g.strokeStyle = color; g.stroke();
     }
 
-    // подписи §7.7: фокус Geist 500 t4, кольцо 1 t2, кольцо 2 только числа Mono t1
-    function labels(g, T, U, ctx, nodes) {
+    // печать пола: горизонт, связи организма, точки дальних колец, подписи дисков
+    function floor(g, F, ctx, nodes) {
+      var dim = S.st.dim || 0, hov = S.st.hover;
+      if (+ctx.P.horizon && V.horizon) V.horizon(g, F, ctx, S);
+      var by = new Map(nodes.map(function (n) { return [n.t, n]; }));
+      nodes.forEach(function (b) {
+        var a = b.t.parent && by.get(b.t.parent); if (!a || (!a.vis && !b.vis)) return;
+        var depth = Math.max(a.ring, b.ring), alpha = depth <= 1 ? 0.55 : depth === 2 ? 0.36 : 0.2;
+        var lit = hov && (a.t.id === hov || b.t.id === hov);
+        if (dim > 0.01 && !lit) alpha *= 1 - 0.65 * dim;
+        V.links(g, F, a, b, alpha, nodes, by);
+      });
+      nodes.forEach(function (n) {
+        if (!n.vis || n.plate) return;
+        var r = n.t.more ? 2.6 * F.ui : 1.6 * F.ui;
+        g.beginPath(); g.arc(n.x, n.y, r, 0, TAU);
+        if (n.t.more) { g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink2, 0.5); g.stroke(); }
+        else { g.fillStyle = R.color.css(F.T.ink2, 0.55 * (1 - 0.6 * dim)); g.fill(); }
+      });
       var mode = ctx.P.labels, maxRing = mode === 'focus' ? 0 : mode === 'ring1' ? 1 : 2;
-      var boxes = nodes.filter(function (n) { return n.vis; }).map(function (n) { return [n.x - n.rho - 2, n.y - n.rho - 2, n.x + n.rho + 2, n.y + n.rho + 2, n]; });
-      if (V.reserve) V.reserve(boxes, ctx, U);
-      var c = V.origin(ctx, U);
-      var list = nodes.filter(function (n) { return n.vis && n.ring <= maxRing && !(n.t.more && n.ring > 1); })
-        .sort(function (a, b) { return a.ring - b.ring || b.rho - a.rho; });
-      list.forEach(function (n) {
-        var lines;
-        if (n.ring === 0) lines = [[name1(n.t), 4, 500, false, T.ink], [focusLine(n.t), 1, 400, true, T.ink3]];
-        else if (n.ring === 1) lines = [[name1(n.t), 2, 500, false, T.ink], [REL[n.t.rel] || (n.t.parent ? '' : ''), 1, 400, true, T.ink3]];
-        else lines = [[num2(n.t), 1, 400, true, T.ink2]];
-        if (n.ring === 1 && n.t.parent && n.t.parent.id !== (S.nav.center || S.tree.root.id)) {
-          lines[1][0] = REL[n.t.rel] ? 'via ' + n.t.parent.id : '';   // кольцо 1 через ребёнка фокуса
-        }
-        if (n.ring === 1 && n.t.more) lines = [[n.t.n.label + ' more', 1, 400, true, T.ink3]];
-        var wmax = 0, hs = [];
-        lines.forEach(function (L) { R.font(g, U, L[1], L[2], L[3]); wmax = Math.max(wmax, g.measureText(L[0]).width); hs.push(U.fs(L[1]) * 1.2); });
-        var hh = hs.reduce(function (s, v) { return s + v; }, 0);
-        var ang = Math.atan2(n.y - c[1], n.x - c[0]);
-        if (n.ring === 0) ang = V.focusLabelAngle !== undefined ? V.focusLabelAngle : -Math.PI / 2 - 0.6;
-        var tries = [ang, ang + Math.PI / 2, ang - Math.PI / 2, ang + Math.PI];
-        for (var i = 0; i < tries.length; i++) {
-          var a = tries[i], d = n.rho + 6 * U.ui + (n.ring === 0 ? 8 * U.ui : 0);
-          var ax = n.x + Math.cos(a) * d, ay = n.y + Math.sin(a) * d;
-          var x0 = Math.cos(a) >= 0.3 ? ax : Math.cos(a) <= -0.3 ? ax - wmax : ax - wmax / 2;
-          var y0 = Math.sin(a) >= 0.3 ? ay : Math.sin(a) <= -0.3 ? ay - hh : ay - hh / 2;
-          var bx = [x0 - 2, y0 - 2, x0 + wmax + 2, y0 + hh + 2];
-          if (bx[0] < U.margin * 0.5 || bx[2] > ctx.W - U.margin * 0.5 || bx[1] < U.margin * 0.5 || bx[3] > ctx.H - U.margin * 0.5) continue;
-          var hit = boxes.some(function (b) { return b[4] !== n && !(bx[2] < b[0] || bx[0] > b[2] || bx[3] < b[1] || bx[1] > b[3]); });
-          if (hit) continue;
-          boxes.push(bx);
-          var yy = y0;
-          g.textBaseline = 'top'; g.textAlign = 'left';
-          lines.forEach(function (L, j) {
-            R.font(g, U, L[1], L[2], L[3]); g.fillStyle = R.rgba(L[4]);
-            if (L[0]) g.fillText(L[0], x0, yy + (hs[j] - U.fs(L[1])) / 2);
-            yy += hs[j];
-          });
-          break;
+      nodes.forEach(function (n) {
+        if (!n.vis || n.ring > maxRing || n.ring === 0 || n.paper && n.ring === 1) return;
+        if (n.ring === 2 && n.t.more) return;
+        var o = V.origin(ctx), a = Math.atan2(n.y - o[1], n.x - o[0]), d = (n.hw || 3) + 6 * F.ui;
+        var x = n.x + Math.cos(a) * d, y = n.y + Math.sin(a) * d, al = Math.cos(a) > 0.3 ? 'left' : Math.cos(a) < -0.3 ? 'right' : 'center';
+        var fade = 1 - 0.6 * dim * (hov === n.t.id ? 0 : 1);
+        if (n.ring === 1) {
+          R.ink.text(g, F, name1(n.t), x, y, { s: 1, w: 500, align: al, base: 'middle', alpha: fade });
+          R.ink.text(g, F, REL[n.t.rel] || '', x, y + 14 * F.ui, { s: 0, mono: true, tone: 'ink3', align: al, base: 'middle', alpha: fade });
+        } else {
+          var m = String(n.t.n.value ? money(n.t.n.value) : (String(n.t.id).match(/\d+/) || [''])[0]);
+          R.ink.text(g, F, m, x, y, { s: 0, mono: true, tone: 'ink2', align: al, base: 'middle', alpha: fade });
         }
       });
     }
 
-    // печать на диске: тип формой, не цветом (L8); заблокированное решение = точка акцента
-    function mark(g, T, U, nd, p) {
-      var r = p.r, x = p.cx - p.dx, y = p.cy - p.dy, type = nd.t.n.type, s = r * 0.32;
-      if (r < 5 * U.ui) return;
-      g.strokeStyle = R.rgba(T.ink2, 0.75); g.fillStyle = R.rgba(T.ink2, 0.75); g.lineWidth = U.lineW;
-      g.beginPath();
-      if (type === 'Loan') { g.arc(x, y, s * 0.42, 0, TAU); g.fill(); return; }
-      if (type === 'Borrower') { g.arc(x - s * 0.45, y, s * 0.28, 0, TAU); g.arc(x + s * 0.45, y, s * 0.28, 0, TAU); g.fill(); return; }
-      if (type === 'Collateral') { g.rect(x - s * 0.4, y - s * 0.4, s * 0.8, s * 0.8); g.fill(); return; }
-      if (type === 'Covenant') { g.moveTo(x - s * 0.6, y - s * 0.22); g.lineTo(x + s * 0.6, y - s * 0.22); g.moveTo(x - s * 0.6, y + s * 0.22); g.lineTo(x + s * 0.6, y + s * 0.22); g.stroke(); return; }
-      if (type === 'Rule') { g.moveTo(x - s * 0.7, y); g.lineTo(x + s * 0.7, y); g.stroke(); return; }
-      if (type === 'Agent') { g.arc(x, y, s * 0.5, 0, TAU); g.stroke(); return; }
-      if (type === 'Decision') {
-        g.moveTo(x, y - s * 0.6); g.lineTo(x + s * 0.6, y); g.lineTo(x, y + s * 0.6); g.lineTo(x - s * 0.6, y); g.closePath();
-        if (nd.t.n.status === 'blocked') { g.fillStyle = R.rgba(T.accent); }
-        g.fill(); return;
+    // печать на плашке: лист несёт текст, диск — знак типа; заблокированное решение = точка акцента
+    function mark(g, s, F, n) {
+      var t = n.t, ui = F.ui;
+      if (s.kind === 'rect') {
+        O.paper(g, F, s);
+        g.save(); g.translate(s.x, s.y); if (s.rot) g.rotate(s.rot);
+        var x = -s.w / 2 + 11 * ui, y = -s.h / 2;
+        if (n.ring === 0) {
+          R.ink.text(g, F, WORD[t.n.type], x, y + 20 * ui, { s: 0, caps: true, tone: 'ink3' });
+          R.ink.text(g, F, name1(t), x, y + 48 * ui, { s: 4, w: 500 });
+          R.ink.text(g, F, focusLine(t), x, y + 70 * ui, { s: 0, mono: true, tone: 'ink2' });
+        } else if (n.ring === 1 && s.h > 30 * ui) {
+          R.ink.text(g, F, name1(t), x, y + s.h * 0.44, { s: 1, w: 500 });
+          R.ink.text(g, F, (REL[t.rel] || '') + ' · ' + sub1(t), x, y + s.h * 0.44 + 15 * ui, { s: 0, mono: true, tone: 'ink3' });
+        }
+        g.restore();
+        return;
       }
-      if (type === 'Approval') { g.arc(x, y, s * 0.5, 0, TAU); g.stroke(); g.beginPath(); g.arc(x, y, s * 0.16, 0, TAU); g.fill(); return; }
-      if (type === 'Evidence') { g.moveTo(x, y - s * 0.55); g.lineTo(x + s * 0.55, y + s * 0.4); g.lineTo(x - s * 0.55, y + s * 0.4); g.closePath(); g.fill(); }
+      var r = s.w / 2, k = r * 0.3;
+      g.save(); g.translate(s.x, s.y);
+      if (n.ring === 0) {
+        R.ink.text(g, F, WORD[t.n.type], 0, -10 * ui, { s: 0, caps: true, tone: 'ink3', align: 'center' });
+        R.ink.text(g, F, name1(t), 0, 12 * ui, { s: 3, w: 500, align: 'center' });
+      } else if (r > 5 * ui) {
+        g.beginPath();
+        if (t.n.type === 'Decision') { g.moveTo(0, -k); g.lineTo(k, 0); g.lineTo(0, k); g.lineTo(-k, 0); g.closePath(); }
+        else if (t.n.type === 'Agent') { g.arc(0, 0, k * 0.8, 0, TAU); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink2, 0.7); g.stroke(); g.beginPath(); }
+        else if (t.n.type === 'Borrower') { g.arc(-k * 0.5, 0, k * 0.32, 0, TAU); g.arc(k * 0.5, 0, k * 0.32, 0, TAU); }
+        else g.arc(0, 0, k * 0.4, 0, TAU);
+        g.fillStyle = t.n.status === 'blocked' ? R.color.css(F.T.accent) : R.color.css(F.T.ink2, 0.7); g.fill();
+      }
+      g.restore();
     }
 
-    // слой взаимодействия: кольцо выбора акцентом; заголовок, легенда, «Fictional data»
-    function overlay(g, T, U, ctx, nodes) {
-      var sel = S.nav.sel >= 0 && S.ring1 ? S.ring1[S.nav.sel % S.ring1.length] : null;
-      if (sel) {
-        var n = nodes.filter(function (q) { return q.t === sel; })[0];
-        if (n && n.vis) { g.beginPath(); g.arc(n.x, n.y, n.rho + 4 * U.ui, 0, TAU); g.strokeStyle = R.rgba(T.accent); g.lineWidth = U.lineW; g.stroke(); }
-      }
-      var o = V.origin(ctx, U);
-      S.ring1 = nodes.filter(function (q) { return q.ring === 1 && q.vis && !q.t.more; })
-        .sort(function (a, b) { return Math.atan2(a.y - o[1], a.x - o[0]) - Math.atan2(b.y - o[1], b.x - o[0]); })
-        .map(function (q) { return q.t; });
-      var m = U.margin, c = S.nodes.filter(function (q) { return q.ring === 0; })[0];
-      g.textBaseline = 'top'; g.textAlign = 'left';
-      R.caps(g, U, 1); g.fillStyle = R.rgba(T.ink3); g.fillText('ONTOLOGY IN FOCUS', m, m);
-      R.font(g, U, 3, 500); g.fillStyle = R.rgba(T.ink);
-      g.fillText(c ? (TYPE_WORD[c.t.n.type] + ' ' + name1(c.t)) : '', m, m + U.fs(1) * 1.6);
-      R.font(g, U, 1, 400, true); g.fillStyle = R.rgba(T.ink3);
-      g.fillText(S.tree.all.length + ' objects · ' + Math.round(+ctx.P.depthH) + ' steps from focus', m, m + U.fs(1) * 1.6 + U.fs(3) * 1.3);
-      if (V.legend !== false) {
-        var ly = ctx.H - m - U.fs(1) * 1.3 * 3;
-        R.caps(g, U, 1); g.fillStyle = R.rgba(T.ink3); g.fillText('HOW TO READ', m, ly);
-        R.font(g, U, 1, 400, true);
-        g.fillText('Height and size = closeness to the focus', m, ly + U.fs(1) * 1.3);
-        g.fillText('Click to bring forward · drag to pan · double-click: home', m, ly + U.fs(1) * 2.6);
-      }
-      R.font(g, U, 1, 400, true); g.textAlign = 'right'; g.fillStyle = R.rgba(T.ink3);
-      g.fillText('Fictional data', ctx.W - m, m);
-      g.textAlign = 'left';
-      if (V.overlayExtra) V.overlayExtra(g, T, U, ctx, S, nodes);
+    function overlay(g, F, ctx, nodes) {
+      var m = Math.min(F.W, F.H) * 0.06, foc = nodes.filter(function (n) { return n.ring === 0; })[0];
+      R.ink.text(g, F, 'Ontology in focus · ' + V.name, m, m, { s: 0, caps: true, tone: 'ink3' });
+      if (foc) R.ink.text(g, F, WORD[foc.t.n.type] + ' ' + name1(foc.t), m, m + 24 * F.ui, { s: 2, w: 500 });
+      R.ink.text(g, F, S.tree.all.length + ' objects · ' + Math.round(+ctx.P.depthH) + ' steps', m, m + 42 * F.ui, { s: 0, mono: true, tone: 'ink3' });
+      var ly = F.H - m - 30 * F.ui;
+      R.ink.text(g, F, 'How to read', m, ly, { s: 0, caps: true, tone: 'ink3' });
+      R.ink.text(g, F, V.legend, m, ly + 15 * F.ui, { s: 0, mono: true, tone: 'ink3' });
+      R.ink.text(g, F, 'Click a node to bring it forward · drag it, its neighbours follow · scroll to zoom', m, ly + 30 * F.ui, { s: 0, mono: true, tone: 'ink3' });
+      var sel = S.nav.sel >= 0 && S.ring1 && S.ring1.length ? S.ring1[S.nav.sel % S.ring1.length] : null;
+      var n = sel && nodes.filter(function (q) { return q.t === sel; })[0];
+      if (n) { g.beginPath(); g.arc(n.x, n.y, (n.hw || 4) + 5 * F.ui, 0, TAU); g.strokeStyle = R.color.css(F.T.accent); g.lineWidth = F.lineW; g.stroke(); }
+      S.ring1 = nodes.filter(function (q) { return q.ring === 1 && q.vis && !q.t.more; }).sort(function (a, b) {
+        var o = V.origin(ctx); return Math.atan2(a.y - o[1], a.x - o[0]) - Math.atan2(b.y - o[1], b.x - o[0]);
+      }).map(function (q) { return q.t; });
+      R.ink.fictional(g, F);
     }
 
-    // ── взаимодействие §7.7 ───────────────────────────────────────────
-    function redraw(ctx) { if (ctx.reduced || RELIEF.paused) window.postMessage({ type: 'es:progress', value: ctx.p }, '*'); }
-    function pick(ctx, x, y) {
-      var best = null, bd = 1e9;
-      S.nodes.forEach(function (n) { if (!n.vis || n.t.more) return; var d = Math.hypot(n.x - x, n.y - y); if (d < Math.max(n.rho, 6) + 4 && d < bd) { bd = d; best = n; } });
-      return best;
-    }
+    // ── взаимодействие ──────────────────────────────────────────────────
+    function redraw(ctx) { if (ctx.reduced) window.postMessage({ type: 'es:progress', value: ctx.p }, '*'); }
     function goTo(ctx, n) {
-      var ts = R.tsec(ctx);
-      S.nav.sel = -1;
-      H.navGo(S.nav, n.w, ts, n.t.id);
-      if (ctx.reduced) { H.navStep(S.nav, ts + 1, R.EASE); }
+      var ts = R.motion.time(ctx);
+      S.nav.sel = -1; H.navGo(S.nav, n.w, ts, n.t.id);
+      if (ctx.reduced) H.navStep(S.nav, ts + 1, R.motion.ease);
       redraw(ctx);
     }
     function attach(ctx) {
-      var cv = ctx.canvas, lastClick = 0;
-      function local(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
-      cv.addEventListener('pointerdown', function (e) {
-        var p = local(e);
-        S.drag = { x: p[0], y: p[1], m0: S.nav.m, w0: V.unmap(p), moved: false };
-        try { cv.setPointerCapture(e.pointerId); } catch (er) {}
-      });
-      cv.addEventListener('pointermove', function (e) {
-        if (!S.drag) return;
-        var p = local(e);
-        if (!S.drag.moved && Math.hypot(p[0] - S.drag.x, p[1] - S.drag.y) < 4) return;
-        S.drag.moved = true; S.nav.anim = null;
-        H.navDrag(S.nav, S.drag.m0, S.drag.w0, V.unmap(p));
-        var best = null, bd = 9;   // центр протяжки = узел ближе всех к 0
-        S.tree.all.forEach(function (t) { var d = Cx.abs(H.apply(S.nav.m, t.z)); if (d < bd) { bd = d; best = t; } });
-        if (best && best.id !== S.nav.center) { S.nav.center = best.id; }
-        redraw(ctx);
-      });
-      cv.addEventListener('pointerup', function (e) {
-        var d = S.drag; S.drag = null; if (!d || d.moved) { if (d) S.settledAt = R.tsec(ctx); return; }
-        var p = local(e), n = pick(ctx, p[0], p[1]), now = e.timeStamp;
-        if (n) { goTo(ctx, n); }
-        else if (now - lastClick < 350) {   // двойной клик по пустому = домой
-          var root = S.nodes.filter(function (q) { return q.t === S.tree.root; })[0];
-          if (root) goTo(ctx, root);
+      O.interact(ctx, {
+        view: S.view, sim: S.sim, state: S.st,
+        pick: function (x, y) {
+          var best = null, bd = 1e9;
+          S.shown.forEach(function (n) { if (!n.vis || n.t.more) return; var d = Math.hypot(n.x - x, n.y - y); if (d < Math.max(n.hw || 4, 6) + 4 && d < bd) { bd = d; best = n; } });
+          return best ? { id: best.t.id, n: best } : null;
+        },
+        onClick: function (h) { goTo(ctx, h.n); },
+        onHome: function () { var r = S.shown.filter(function (q) { return q.t === S.tree.root; })[0]; if (r) goTo(ctx, r); },
+        onPanStart: function (d) { d.m0 = S.nav.m; d.w0 = V.unmap(S, ctx, O.toWorld(S.view, ctx, d.x, d.y)); },
+        onPan: function (d, p) {   // фон = непрерывный Мёбиус: U(p0) = p1
+          S.nav.anim = null;
+          H.navDrag(S.nav, d.m0, d.w0, V.unmap(S, ctx, O.toWorld(S.view, ctx, p[0], p[1])));
+          var best = null, bd = 9;
+          S.tree.all.forEach(function (t) { var dd = C.abs(H.apply(S.nav.m, t.z)); if (dd < bd) { bd = dd; best = t; } });
+          if (best) S.nav.center = best.id;
+          S.settledAt = R.motion.time(ctx);
         }
-        lastClick = now;
       });
       document.addEventListener('keydown', function (e) {
-        if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-        if (e.target && e.target.closest && e.target.closest('.pv2')) return;
+        if (e.target && (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || (e.target.closest && e.target.closest('.pv2')))) return;
         if (!S.ring1 || !S.ring1.length) return;
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { S.nav.sel = (S.nav.sel + 1) % S.ring1.length; e.preventDefault(); redraw(ctx); }
-        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { S.nav.sel = (S.nav.sel - 1 + S.ring1.length) % S.ring1.length; e.preventDefault(); redraw(ctx); }
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { S.nav.sel = (S.nav.sel + 1) % S.ring1.length; e.preventDefault(); }
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { S.nav.sel = (S.nav.sel - 1 + S.ring1.length) % S.ring1.length; e.preventDefault(); }
         else if (e.key === 'Enter' && S.nav.sel >= 0) {
-          var t = S.ring1[S.nav.sel % S.ring1.length], n = S.nodes.filter(function (q) { return q.t === t; })[0];
+          var t = S.ring1[S.nav.sel % S.ring1.length], n = S.shown.filter(function (q) { return q.t === t; })[0];
           if (n) goTo(ctx, n);
         }
+        redraw(ctx);
       });
     }
 
-    R.scene({
-      id: 'horizon', variant: V.variant, title: 'Horizon · ' + V.name,
-      blurb: 'Ontology in focus: the object sits in the centre, its grounds around it, the rest compressed toward the horizon.',
+    RELIEF.def = {
+      id: 'horizon', title: 'Horizon · ' + V.name,
+      blurb: 'Ontology in focus as a living organism: the object at the heart, its grounds around it, the rest compressed toward the horizon.',
       groups: GROUPS,
-      init: function (ctx) { rebuild(ctx); },
-      structural: function (ctx, path) { if (path === 'focus' || path === 'depthH' || path === 'link') rebuild(ctx, false); },
-      draw: draw, attach: attach
-    });
+      init: function (ctx) { rebuild(ctx); setTimeout(function () { attach(ctx); }, 0); },
+      structural: function (ctx, path) { if (path === 'focus' || path === 'depthH' || path === 'link') rebuild(ctx); },
+      draw: draw
+    };
     return S;
   }
-
-  window.HORIZON = { make: make, money: money, moneyFull: moneyFull, name1: name1, REL: REL };
+  window.HORIZON = { make: make, money: money, name1: name1, REL: REL };
 })();

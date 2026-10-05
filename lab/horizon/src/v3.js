@@ -1,56 +1,47 @@
-/* horizon · v3 «Horizon line»: тот же диск, увиденный через преобразование Кэли
-   в верхнюю полуплоскость. Край диска становится прямой линией горизонта внизу кадра:
-   фокус стоит над ней, основания вокруг, всё остальное буквально уходит к горизонту.
-   Корень раскладывает детей клином вниз: у точки «бесконечности» пусто, контекст не улетает. */
+/* horizon · v3 «Plant»: фокус — корень у земли, онтология растёт вверх стеблями. Стебли —
+   мягкие дуги с натяжением, листья — листы бумаги, плоды — диски. Ветер качает каждую ветку
+   вокруг её узла, верх сильнее низа. Ход Мёбиуса ведёт новый фокус к корню, родитель уходит вниз. */
 (function () {
   'use strict';
-  var R = window.RELIEF, H = window.HYPER, C = H.C, TAU = Math.PI * 2;
-  var G = { cx: 0, yH: 0, s: 1, beta: -Math.PI / 2, W: 0, H: 0, m: 0 };
-  function cayley(w) {
-    var z = C.mul(w, C.polar(1, -G.beta));
-    return C.div(C.mul([0, 1], C.add([1, 0], z)), C.sub([1, 0], z));   // i(1+z)/(1−z)
-  }
+  var R = window.RELIEF, H = window.HYPER, O = R.org, C = H.C, TAU = Math.PI * 2;
+  var G = { cx: 0, cy: 0, r: 1, rot: 0, ground: 0 };
+  function spin(w, a) { var c = Math.cos(a), s = Math.sin(a); return [w[0] * c - w[1] * s, w[0] * s + w[1] * c]; }
   HORIZON.make({
-    variant: '03', name: 'Horizon line',
-    focusLabelAngle: -Math.PI / 2,
-    // корень раскладывает детей клином ±112° вниз, к горизонту: сектор у бесконечности пуст
-    wedge: [Math.PI / 2, Math.PI * 0.62],
-    frame: function (S, ctx, U) {
-      G.W = ctx.W; G.H = ctx.H; G.m = U.margin;
-      G.cx = ctx.W / 2;
-      G.yH = ctx.H - U.margin - U.fs(1) * 6.2;
-      G.s = Math.max(40, Math.min(G.yH - (U.margin + U.fs(3) * 6), (ctx.W / 2 - U.margin) / 1.2));
+    name: 'Plant',
+    wedge: [-Math.PI / 2, Math.PI * 0.44],
+    legend: 'Grows from the focus · leaves are documents, fruit are parties and decisions',
+    frame: function (S, ctx, ui) {
+      var m = Math.min(ctx.W, ctx.H) * 0.06;
+      G.ground = ctx.H - m - 44 * ui; G.cx = ctx.W / 2; G.cy = G.ground - 40 * ui;
+      G.r = Math.max(60, Math.min(G.cy - m - 70 * ui, ctx.W / 2 - m));
+      // поворот: родитель текущего центра смотрит вниз, к земле (сглажено по кадрам)
+      var c = S.nav.anim ? S.nav.anim.target : S.nav.center, ct = c && S.tree.all.filter(function (t) { return t.id === c; })[0];
+      var target = 0;
+      if (ct && ct.parent) { var wp = H.apply(S.nav.m, ct.parent.z); if (C.abs(wp) > 1e-4) target = Math.PI / 2 - Math.atan2(wp[1], wp[0]); }
+      var d = Math.atan2(Math.sin(target - G.rot), Math.cos(target - G.rot));
+      G.rot += d * (ctx.reduced ? 1 : 0.08);
     },
-    map: function (w) {
-      var c = cayley(w), x = G.cx + G.s * c[0], y = G.yH - G.s * c[1];
-      var vis = x > -G.m && x < G.W + G.m && y > -G.m && isFinite(x) && isFinite(y);
-      return [x, y, vis];
+    map: function (S, ctx, w) { var q = spin(w, G.rot); return [G.cx + q[0] * G.r, G.cy + q[1] * G.r * 1.04]; },
+    unmap: function (S, ctx, p) { return H.clampDisk(spin([(p[0] - G.cx) / G.r, (p[1] - G.cy) / (G.r * 1.04)], -G.rot), 0.97); },
+    origin: function () { return [G.cx, G.cy]; },
+    // ветер: ветка поворачивается вокруг своего узла, угол растёт с высотой
+    wind: function (S, t, w, base, ws, k, ui) {
+      if (!t.depth || !k) return [0, 0];
+      var ph = O.hash01(t.id + 'w') * 0.9, gust = 0.75 + 0.25 * Math.sin(ws + 1.3);
+      var th = (1.1 + 0.7 * t.depth) * Math.PI / 180 * k * gust * (0.7 * Math.sin(ws + ph) + 0.3 * Math.sin(2 * ws + ph * 2));
+      var hgt = Math.max(0, G.cy - base[1]);
+      return [hgt * th, 0];
     },
-    unmap: function (p) {
-      var c = [(p[0] - G.cx) / G.s, Math.max(0.03, (G.yH - p[1]) / G.s)];
-      var z = C.div(C.sub(c, [0, 1]), C.add(c, [0, 1]));
-      return H.clampDisk(C.mul(z, C.polar(1, G.beta)), 0.97);
+    // стебель: мягкая дуга, выгнутая вверх-наружу (без углов)
+    links: function (g, F, a, b, alpha) {
+      var dx = b.x - a.x, dy = b.y - a.y, side = dx >= 0 ? -1 : 1;
+      O.arc(g, F, [a.x, a.y], [b.x, b.y], 0.16 * side * (dy < 0 ? 1 : -1), { alpha: alpha });
     },
-    size: function (w) { return Math.min(Math.pow(Math.max(0, cayley(w)[1]), 0.4), 1 - (w[0] * w[0] + w[1] * w[1])); },
-    origin: function () { return [G.cx, G.yH - G.s]; },
-    horizon: function (g, T, U, ctx) {
-      g.lineWidth = U.lineW;
-      g.beginPath(); g.moveTo(U.margin, G.yH); g.lineTo(ctx.W - U.margin, G.yH);
-      g.strokeStyle = R.rgba(T.ink, 0.12); g.stroke();
-      // засечки прибора: шаг 2u, через пять длиннее
-      for (var i = 0, x = G.cx; x < ctx.W - U.margin; i++, x += 2 * U.u) {
-        [x, 2 * G.cx - x].forEach(function (xx, j) {
-          if (j === 1 && i === 0) return;
-          if (xx < U.margin) return;
-          g.beginPath(); g.moveTo(xx, G.yH); g.lineTo(xx, G.yH + (i % 5 === 0 ? 5 : 2.5) * U.ui);
-          g.strokeStyle = R.rgba(T.ink, i % 5 === 0 ? 0.22 : 0.12); g.stroke();
-        });
-      }
-      if (ctx.W < 560) return;
-      R.font(g, U, 1, 400, true); g.fillStyle = R.rgba(T.ink3); g.textAlign = 'right'; g.textBaseline = 'bottom';
-      g.fillText('horizon · the rest of the model', ctx.W - U.margin, G.yH - 4 * U.ui);
-      g.textAlign = 'left'; g.textBaseline = 'top';
+    horizon: function (g, F, ctx) {
+      var m = Math.min(F.W, F.H) * 0.06, gr = g.createLinearGradient(m, 0, F.W - m, 0);
+      gr.addColorStop(0, R.color.css(F.T.ink, 0)); gr.addColorStop(0.5, R.color.css(F.T.ink, 0.16)); gr.addColorStop(1, R.color.css(F.T.ink, 0));
+      g.save(); g.strokeStyle = gr; g.lineWidth = F.lineW;
+      g.beginPath(); g.moveTo(m, G.ground); g.quadraticCurveTo(F.W / 2, G.ground + 6 * F.ui, F.W - m, G.ground); g.stroke(); g.restore();
     }
   });
-  R.boot();
 })();
