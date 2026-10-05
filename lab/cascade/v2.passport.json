@@ -3,7 +3,7 @@
   "title": "Cascade · octopus",
   "blurb": "Loan book as a living organism of matte discs and paper sheets: area is exposure, distance is share.",
   "version": "0.3.0",
-  "engineHash": "37aa5a31e45d4e3e1110b54c44902d359ed9e203adea740485bce5a76670984a",
+  "engineHash": "84cc300fbb57bbe334237acf316b91f78482d777f2f0fc8276fc2a105a195896",
   "kind": "engine",
   "contract": {
     "embed": {

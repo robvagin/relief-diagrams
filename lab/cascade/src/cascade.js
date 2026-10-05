@@ -250,7 +250,7 @@
       nodes: nodes, links: links,
       tip: function (n) { var t = n.src; return { lines: [t.depth === 0 ? 'Loan book' : t.label, fmtEUR(t.value) + ' · ' + t.count + ' loans', t.depth ? (t.share * 100).toFixed(1) + ' % of parent' : 'as of ' + D.meta.asOf], w: 176 }; },
       floor: function (g, F, sc) {
-        var I = R.org.I, al = function (i) { return 1 - 0.7 * (sc[i] ? sc[i].dim : 0); };
+        var al = function (i) { return 1 - 0.7 * (sc[i] ? sc[i].dim : 0); };
         if (V === 'v2') {
           // щупальца: сплайн через голову → присоску → сегмент → бусины; одна толщина
           arms.forEach(function (A) {
@@ -260,7 +260,7 @@
             R.org.strokeRelief(g, F, function (ox, oy) { R.org.curveThrough(g, pts.map(function (q) { return [q[0] + ox, q[1] + oy]; })); }, Math.min.apply(null, ch.map(al)));
           });
           // засечки доли на отрезке «присоска → сегмент»
-          T.forEach(function (n, i) { if (n.depth === 2 && P.ticks) { var p = sc[n.parent], q = sc[i]; R.org.ticks(g, F, [p.x, p.y], [q.x, q.y], n.share, n.full * R.org.I.cz, al(i)); } });
+          T.forEach(function (n, i) { if (n.depth === 2 && P.ticks) { var p = sc[n.parent], q = sc[i]; R.org.ticks(g, F, [p.x, p.y], [q.x, q.y], n.share, n.full * R.org.zoom(), al(i)); } });
         }
         if (V === 'v3') {
           stems.forEach(function (S) {
@@ -279,7 +279,7 @@
         // подписи на полу у узлов (z0), притухают вместе с узлом
         T.forEach(function (n, i) {
           if (!n.lab) return;
-          var q = sc[i], x = q.x + n.lab.dx * R.org.I.cz, y = q.y + n.lab.dy * R.org.I.cz, a = 1 - 0.75 * q.dim;
+          var q = sc[i], x = q.x + n.lab.dx * R.org.zoom(), y = q.y + n.lab.dy * R.org.zoom(), a = 1 - 0.75 * q.dim;
           if (n.depth === 3) { R.ink.text(g, F, n.label, x, y + 11.67 * F.ui, { s: 0, mono: true, tone: 'ink2', alpha: a }); return; }
           R.ink.text(g, F, n.label, x, y + (n.depth === 1 ? 14 : 11.67) * F.ui, { s: n.depth === 1 ? 1 : 0, w: n.depth === 1 ? 500 : 400, tone: 'ink', alpha: a });
           R.ink.text(g, F, fmt(n, P.metric), x, y + (n.depth === 1 ? 30 : 26) * F.ui, { s: 0, mono: true, tone: 'ink3', alpha: a });
