@@ -68,7 +68,7 @@
     if (P.state === 'loop') {
       if (reduced) t = canFix || !fail ? tRest - 0.01 : tB - 0.01;
       else if (p != null) t = p * cycle;
-      else t = ((tsec % cycle) + cycle) % cycle;
+      else t = (((tsec + T0) % cycle) + cycle) % cycle;   // кадр 0 = начало сборки: живое с первого кадра, инструкция в конце круга
     } else if (P.state === 'instruction') {
       st.mode = 'instruction'; for (let i = 0; i < n; i++) { st.appear.push(0); st.landed.push(-1); }
       return st;
