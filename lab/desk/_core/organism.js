@@ -230,6 +230,21 @@
     return out;
   }
 
+  // вписать организм в кадр: поза покоя (ветер 0) → рамка с радиусами узлов → масштаб и центр
+  // (поля 6 % + место под шапку), правило раскладки остаётся, меняется только масштаб кадра
+  function fitModel(M, F, top) {
+    var pos = fk(M.chain, 0, { wind: 0, period: 36 }, 'fit', [0, 0]), x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    M.nodes.forEach(function (n) { var p = pos[n.id], hx = n.w / 2, hy = (n.shape === 'disc' ? n.w : n.h) / 2;
+      x0 = Math.min(x0, p.x - hx); x1 = Math.max(x1, p.x + hx); y0 = Math.min(y0, p.y - hy); y1 = Math.max(y1, p.y + hy); });
+    var m = F.m, tp = top == null ? 0.06 * F.H : top, aw = F.W - 2 * m, ah = F.H - 2 * m - tp;
+    var k = Math.min(1, aw / (x1 - x0), ah / (y1 - y0));
+    M.chain.forEach(function (c) { c.rest = [c.rest[0] * k, c.rest[1] * k]; });
+    M.nodes.forEach(function (n) { n.w *= k; n.h *= k; });
+    M.cx = F.W / 2 - (x0 + x1) / 2 * k; M.cy = m + tp + ah / 2 - (y0 + y1) / 2 * k;
+    M.k = k;
+    return M;
+  }
+
   // вход сцены
   function run(scene, opt) {
     RELIEF_APP.run({
@@ -239,5 +254,5 @@
     }, opt);
   }
 
-  window.ORG = { run: run, state: S, bez: bez, sag: sag, fk: fk, hash: hash, rot: rot, unit: unit, chainLinks: chainLinks };
+  window.ORG = { run: run, state: S, bez: bez, sag: sag, fk: fk, hash: hash, rot: rot, unit: unit, chainLinks: chainLinks, fitModel: fitModel };
 })();

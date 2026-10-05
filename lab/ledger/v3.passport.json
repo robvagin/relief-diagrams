@@ -1,9 +1,9 @@
 {
-  "id": "desk-v2",
-  "title": "Desk · plant",
-  "blurb": "RELIEF lab variant: desk, own light §7.2–7.4 until the rail lands",
+  "id": "ledger-v3",
+  "title": "Ledger · chandelier",
+  "blurb": "RELIEF lab variant: ledger, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "b7516b4d47a08f17f370aec4ab8505b5796d5fe32c7957cd38d97103e784534a",
+  "engineHash": "fc3fbc978feb986e2a7437a91f253929c19b82161f503d1a4e540f67e4ffcbcd",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -338,6 +338,17 @@
       "min": 1,
       "max": 3,
       "step": 1
+    },
+    {
+      "id": "labelsL",
+      "label": "Подписи",
+      "type": "select",
+      "default": "key",
+      "options": [
+        "none",
+        "key",
+        "all"
+      ]
     }
   ],
   "presets": [],
