@@ -7,6 +7,7 @@
 
 lab/index.json: каждый lab/<сцена>/<вариант>.html одной строкой {scene, id, path, title}; title из <title>.
 """
+import hashlib
 import functools
 import http.server
 import io
@@ -36,6 +37,7 @@ def lab_index():
                 head = io.open(os.path.join(d, f), encoding='utf-8', errors='replace').read(8192)
                 m = TITLE.search(head)
                 items.append({'scene': scene, 'id': f[:-5], 'path': 'lab/%s/%s' % (scene, f),
+                              'revision': hashlib.sha256(open(os.path.join(d, f), 'rb').read()).hexdigest()[:16],
                               'title': re.sub(r'\s+', ' ', m.group(1)).strip() if m else f})
     return {'schema': 1, 'scenes': SCENES, 'items': items}
 

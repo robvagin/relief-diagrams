@@ -70,7 +70,7 @@
     return fetch('lab/index.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : { items: [] }; })
       .then(function (j) {
         (j.items || []).forEach(function (it) {
-          st.items.push({ group: it.scene, id: it.id, path: it.path, title: it.title });
+          st.items.push({ group: it.scene, id: it.id, path: it.path, title: it.title, revision: it.revision });
         });
       }).catch(function () { });
   }
@@ -78,6 +78,8 @@
   /* ── кадр ───────────────────────────────────────────────────────────── */
   function frameURL(it, embed) {
     var u = it.path, q = [];
+    var revision = it.revision || Q.get('rev');
+    if (revision) q.push('rev=' + encodeURIComponent(revision));
     if (embed) { q.push('embed=1'); q.push('mode=studio'); }
     q.push('theme=' + st.theme); q.push('seed=' + encodeURIComponent(st.seed));
     if (st.preset) q.push('preset=' + encodeURIComponent(st.preset));
