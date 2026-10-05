@@ -27,7 +27,9 @@
       links.push({ a: id, b: 'r' + i, kind: 'thread', alpha: 0.45 });
     });
     if (table) { var t = LG.tableNode(F, S); chain.push({ id: 'table', parent: 'core', rest: [0.3 * S, -0.02 * S], amp: 0.6 }); nodes.push(t); links.push({ a: 'core', b: 'table', kind: 'thread' }); }
-    return { cx: cx, cy: cy, chain: chain, nodes: nodes, links: links, r0: r0, Lmax: Lmax, vmax: vmax, rc: rc };
+    var M = ORG.fitModel({ cx: cx, cy: cy, chain: chain, nodes: nodes, links: links, vmax: vmax }, F, null, 1.1);
+    M.r0 = r0 * M.k; M.Lmax = Lmax * M.k; M.rc = rc * M.k;
+    return M;
   }
   function core(g, F, I, w) {
     var s = LG.series(), n = s.months.length, r = w / 2, num = K.eur(s.exposure[n - 1]);

@@ -39,7 +39,7 @@
       });
     });
     if (table) { chain.push({ id: 'table', parent: 'hub', rest: [-0.33 * W, -0.22 * H], amp: 0.5 }); nodes.push(LG.tableNode(F, S)); links.push({ a: 'hub', b: 'table' }); }
-    return ORG.fitModel({ cx: cx, cy: cy, chain: chain, nodes: nodes, links: links }, F);
+    return ORG.fitModel({ cx: cx, cy: cy, chain: chain, nodes: nodes, links: links }, F, null, 1.2);
   }
   // засечки каждые 10 % доли вдоль луча (в долях длины луча)
   function ticks(share, Lunit, len) { var out = []; for (var k = 1; k * 0.1 <= share + 1e-9 && k < 12; k++) out.push(1 - (share - k * 0.1) * Lunit / len); return out.filter(function (f) { return f > 0.05 && f < 0.98; }); }

@@ -68,7 +68,9 @@
       }
       stems.push({ ids: ids, kind: 'stem' });
     });
-    return { cx: cx, cy: cy, chain: chain, nodes: nodes, stems: stems };
+    var M = { cx: cx, cy: cy, chain: chain, nodes: nodes, stems: stems };
+    nodes[0].fixed = true;
+    return ORG.fitModel(ORG.relax(M, 0.02 * S), F, null, 1.15);
   }
   // вектор последнего звена: от суставов (при нулевом ветре) к точке листа
   function tipVector(chain, ids, ex, ey) {

@@ -64,7 +64,9 @@
         });
       }
     });
-    return { cx: cx, cy: cy, chain: chain, nodes: nodes, links: links };
+    var M = { cx: cx, cy: cy, chain: chain, nodes: nodes, links: links };
+    nodes[0].fixed = true;
+    return ORG.fitModel(ORG.relax(M, 0.012 * S), F, null, 1.15);
   }
 
   var CACHE = { key: '', m: null };

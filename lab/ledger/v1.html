@@ -2229,18 +2229,56 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     return out;
   }
 
-  // вписать организм в кадр: поза покоя (ветер 0) → рамка с радиусами узлов → масштаб и центр
-  // (поля 6 % + место под шапку), правило раскладки остаётся, меняется только масштаб кадра
-  function fitModel(M, F, top) {
-    var pos = fk(M.chain, 0, { wind: 0, period: 36 }, 'fit', [0, 0]), x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-    M.nodes.forEach(function (n) { var p = pos[n.id], hx = n.w / 2, hy = (n.shape === 'disc' ? n.w : n.h) / 2;
-      x0 = Math.min(x0, p.x - hx); x1 = Math.max(x1, p.x + hx); y0 = Math.min(y0, p.y - hy); y1 = Math.max(y1, p.y + hy); });
-    var m = F.m, tp = top == null ? 0.06 * F.H : top, aw = F.W - 2 * m, ah = F.H - 2 * m - tp;
-    var k = Math.min(1, aw / (x1 - x0), ah / (y1 - y0));
+  // вписать организм в кадр: поза покоя (ветер 0) → рамка с радиусами узлов и запасом на наклон
+  // листов (±8°) и качание → масштаб и центр (поля 6 % + место под шапку). Правило раскладки
+  // остаётся, меняется только масштаб кадра; kmax > 1 разрешает организму заполнить кадр.
+  function halfExt(n) {
+    if (n.shape === 'disc') return [n.w / 2, n.w / 2];
+    var c = Math.cos(8 * Math.PI / 180), s = Math.sin(8 * Math.PI / 180);
+    return [(c * n.w + s * n.h) / 2, (s * n.w + c * n.h) / 2];
+  }
+  function restPos(M) { return fk(M.chain, 0, { wind: 0, period: 36 }, 'fit', [0, 0]); }
+  function fitModel(M, F, top, kmax) {
+    var pos = restPos(M), x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    M.nodes.forEach(function (n) { if (n.ghost) return; var p = pos[n.id], e = halfExt(n);
+      x0 = Math.min(x0, p.x - e[0]); x1 = Math.max(x1, p.x + e[0]); y0 = Math.min(y0, p.y - e[1]); y1 = Math.max(y1, p.y + e[1]); });
+    var m = F.m + 6 * F.ui, tp = top == null ? 0.07 * F.H : top, aw = F.W - 2 * m, ah = F.H - 2 * m - tp;
+    var k = Math.min(kmax == null ? 1 : kmax, aw / (x1 - x0), ah / (y1 - y0));
     M.chain.forEach(function (c) { c.rest = [c.rest[0] * k, c.rest[1] * k]; });
     M.nodes.forEach(function (n) { n.w *= k; n.h *= k; });
     M.cx = F.W / 2 - (x0 + x1) / 2 * k; M.cy = m + tp + ah / 2 - (y0 + y1) / 2 * k;
     M.k = k;
+    return M;
+  }
+  // воздух между плашками: в позе покоя раздвинуть пересечения (рамки с зазором gap), лёгкое
+  // уступает тяжёлому, корень и закреплённые стоят; затем позы пересчитываются в векторы подвеса
+  function relax(M, gap, keep) {
+    var pos = restPos(M), ids = M.nodes.filter(function (n) { return !n.ghost; }).map(function (n) { return n.id; });
+    var byId = {}; M.nodes.forEach(function (n) { byId[n.id] = n; });
+    var P = {}; Object.keys(pos).forEach(function (k) { P[k] = [pos[k].x, pos[k].y]; });
+    keep = keep || {};
+    for (var it = 0; it < 80; it++) {
+      var moved = false;
+      for (var i = 0; i < ids.length; i++) for (var j = i + 1; j < ids.length; j++) {
+        var a = byId[ids[i]], b = byId[ids[j]];
+        if (keep[a.id + '|' + b.id] || keep[b.id + '|' + a.id]) continue;
+        var ea = halfExt(a), eb = halfExt(b), pa = P[a.id], pb = P[b.id];
+        var ox = ea[0] + eb[0] + gap - Math.abs(pb[0] - pa[0]), oy = ea[1] + eb[1] + gap - Math.abs(pb[1] - pa[1]);
+        if (ox <= 0 || oy <= 0) continue;
+        // круги расходятся по линии центров, листы — по оси меньшего перекрытия
+        var dx = pb[0] - pa[0], dy = pb[1] - pa[1], d = Math.hypot(dx, dy) || 1, push;
+        if (a.shape === 'disc' && b.shape === 'disc') { push = a.w / 2 + b.w / 2 + gap - d; if (push <= 0) continue; dx /= d; dy /= d; }
+        else if (ox < oy) { push = ox; dx = dx >= 0 ? 1 : -1; dy = 0; } else { push = oy; dy = dy >= 0 ? 1 : -1; dx = 0; }
+        var wa = a.fixed ? 0 : 1 / Math.max(1, a.w * a.h), wb = b.fixed ? 0 : 1 / Math.max(1, b.w * b.h), ws = wa + wb;
+        if (!ws) continue;
+        pa[0] -= dx * push * wa / ws * 0.5; pa[1] -= dy * push * wa / ws * 0.5;
+        pb[0] += dx * push * wb / ws * 0.5; pb[1] += dy * push * wb / ws * 0.5;
+        moved = true;
+      }
+      if (!moved) break;
+    }
+    // обратно в векторы подвеса (в покое углы нулевые, вектор = разность позиций)
+    M.chain.forEach(function (c) { if (c.parent) { var q = P[c.id], r = P[c.parent]; c.rest = [q[0] - r[0], q[1] - r[1]]; } });
     return M;
   }
 
@@ -2253,7 +2291,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     }, opt);
   }
 
-  window.ORG = { run: run, state: S, bez: bez, sag: sag, fk: fk, hash: hash, rot: rot, unit: unit, chainLinks: chainLinks, fitModel: fitModel };
+  window.ORG = { run: run, state: S, bez: bez, sag: sag, fk: fk, hash: hash, rot: rot, unit: unit, chainLinks: chainLinks, fitModel: fitModel, relax: relax };
 })();
 </script>
 <script>
@@ -2499,7 +2537,9 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
       links.push({ a: id, b: 'r' + i, kind: 'thread', alpha: 0.45 });
     });
     if (table) { var t = LG.tableNode(F, S); chain.push({ id: 'table', parent: 'core', rest: [0.3 * S, -0.02 * S], amp: 0.6 }); nodes.push(t); links.push({ a: 'core', b: 'table', kind: 'thread' }); }
-    return { cx: cx, cy: cy, chain: chain, nodes: nodes, links: links, r0: r0, Lmax: Lmax, vmax: vmax, rc: rc };
+    var M = ORG.fitModel({ cx: cx, cy: cy, chain: chain, nodes: nodes, links: links, vmax: vmax }, F, null, 1.1);
+    M.r0 = r0 * M.k; M.Lmax = Lmax * M.k; M.rc = rc * M.k;
+    return M;
   }
   function core(g, F, I, w) {
     var s = LG.series(), n = s.months.length, r = w / 2, num = K.eur(s.exposure[n - 1]);
