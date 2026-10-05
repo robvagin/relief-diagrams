@@ -104,19 +104,19 @@
       nodes.forEach(function (n) {   // связь держит длину, какую ей дал якорь: тянешь узел — ветка едет
         var pa = n.t.parent && byT.get(n.t.parent); if (pa) sim.link(pa.t.id, n.t.id, Math.hypot(n.ax - pa.ax, n.ay - pa.ay), 10);
       });
-      sim.end(); sim.advance(ctx); O.viewStep(S.view, ctx);
+      sim.end(); sim.advance(ctx); O.viewStep(S.sim, ctx);
       O.hoverStep(sim, S.st, ctx);
 
       // экран: зум и параллакс по высоте
       nodes.forEach(function (n) {
-        var lift = n.q.lift * 10 * ui, z = n.z + lift, s = O.toScreen(S.view, ctx, n.q.x, n.q.y, z);
-        n.x = s[0]; n.y = s[1]; n.zz = z; n.zoom = S.view.zoom;
+        var lift = n.q.lift * 10 * ui, z = n.z + lift, s = O.toScreen(S.sim, ctx, n.q.x, n.q.y, z);
+        n.x = s[0]; n.y = s[1]; n.zz = z; n.zoom = S.sim.zoom();
       });
       S.shown = nodes;
       var plates = [];
       nodes.forEach(function (n, i) {
         if (!n.vis || n.t.more || n.ring >= 3) return;
-        var zoom = S.view.zoom, sz = n.sz * zoom, env = n.ring === 0 && !S.nav.anim ? R.motion.settle(ts, S.settledAt, +P.settle) : 1;
+        var zoom = S.sim.zoom(), sz = n.sz * zoom, env = n.ring === 0 && !S.nav.anim ? R.motion.settle(ts, S.settledAt, +P.settle) : 1;
         var tilt = (O.hash01(ctx.seed + n.t.id) - 0.5) * 2 * (4 + 4 * O.hash01(n.t.id + 't')) * Math.PI / 180;
         var p = { id: n.t.id, z: n.zz, env: env, assembleIndex: i, x: n.x, y: n.y, node: n };
         if (n.paper) {
@@ -245,16 +245,7 @@
           return best ? { id: best.t.id, n: best } : null;
         },
         onClick: function (h) { goTo(ctx, h.n); },
-        onHome: function () { var r = S.shown.filter(function (q) { return q.t === S.tree.root; })[0]; if (r) goTo(ctx, r); },
-        onPanStart: function (d) { d.m0 = S.nav.m; d.w0 = V.unmap(S, ctx, O.toWorld(S.view, ctx, d.x, d.y)); },
-        onPan: function (d, p) {   // фон = непрерывный Мёбиус: U(p0) = p1
-          S.nav.anim = null;
-          H.navDrag(S.nav, d.m0, d.w0, V.unmap(S, ctx, O.toWorld(S.view, ctx, p[0], p[1])));
-          var best = null, bd = 9;
-          S.tree.all.forEach(function (t) { var dd = C.abs(H.apply(S.nav.m, t.z)); if (dd < bd) { bd = dd; best = t; } });
-          if (best) S.nav.center = best.id;
-          S.settledAt = R.motion.time(ctx);
-        }
+        onHome: function () { var r = S.shown.filter(function (q) { return q.t === S.tree.root; })[0]; if (r) goTo(ctx, r); }
       });
       document.addEventListener('keydown', function (e) {
         if (e.target && (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || (e.target.closest && e.target.closest('.pv2')))) return;

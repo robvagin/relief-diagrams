@@ -37,11 +37,12 @@
       var dx = b.x - a.x, dy = b.y - a.y, side = dx >= 0 ? -1 : 1;
       O.arc(g, F, [a.x, a.y], [b.x, b.y], 0.16 * side * (dy < 0 ? 1 : -1), { alpha: alpha });
     },
-    horizon: function (g, F, ctx) {
+    horizon: function (g, F, ctx, S) {
+      var gy = O.toScreen(S.sim, ctx, G.cx, G.ground, 0)[1];
       var m = Math.min(F.W, F.H) * 0.06, gr = g.createLinearGradient(m, 0, F.W - m, 0);
       gr.addColorStop(0, R.color.css(F.T.ink, 0)); gr.addColorStop(0.5, R.color.css(F.T.ink, 0.16)); gr.addColorStop(1, R.color.css(F.T.ink, 0));
       g.save(); g.strokeStyle = gr; g.lineWidth = F.lineW;
-      g.beginPath(); g.moveTo(m, G.ground); g.quadraticCurveTo(F.W / 2, G.ground + 6 * F.ui, F.W - m, G.ground); g.stroke(); g.restore();
+      g.beginPath(); g.moveTo(m, gy); g.quadraticCurveTo(F.W / 2, gy + 6 * F.ui, F.W - m, gy); g.stroke(); g.restore();
     }
   });
 })();

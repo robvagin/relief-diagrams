@@ -76,10 +76,10 @@
       w.forEach(function (v, i) { if (v > 0) sim.link(l.id, AV.AG[i], Math.hypot(agents[i].ax - q.ax, agents[i].ay - q.ay), i === l._fam ? 3 : 0.3 * v); });
     });
     rest.forEach(function (l) { l._fam = -1; });
-    sim.end(); sim.advance(ctx); O.viewStep(S.view, ctx); O.hoverStep(sim, S.st, ctx);
+    sim.end(); sim.advance(ctx); O.viewStep(S.sim, ctx); O.hoverStep(sim, S.st, ctx);
 
-    var z1 = R.zh(1, P, ui), z2 = R.zh(2, P, ui), z3 = R.zh(3, P, ui), zoom = S.view.zoom, plates = [], shown = [];
-    function scr(q, z) { var p = O.toScreen(S.view, ctx, q.x, q.y, z); return p; }
+    var z1 = R.zh(1, P, ui), z2 = R.zh(2, P, ui), z3 = R.zh(3, P, ui), zoom = S.sim.zoom(), plates = [], shown = [];
+    function scr(q, z) { var p = O.toScreen(S.sim, ctx, q.x, q.y, z); return p; }
     var hp = scr(hub, z3 + hub.lift * 10 * ui);
     plates.push({ id: 'model', kind: 'circle', x: hp[0], y: hp[1], w: 2 * hub.r * zoom, h: 2 * hub.r * zoom, z: z3, env: 0, label: 'model' });
     shown.push({ id: 'model', x: hp[0], y: hp[1], r: hub.r * zoom, kind: 'model' });

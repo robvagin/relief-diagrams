@@ -37,10 +37,11 @@
       g.bezierCurveTo(a.x + (b.x - p0[0]) * t / 3, a.y + (b.y - p0[1]) * t / 3, b.x - (p3[0] - a.x) * t / 3, b.y - (p3[1] - a.y) * t / 3, b.x, b.y);
       g.stroke(); g.restore();
     },
-    horizon: function (g, F) {
-      // вода: два мягких круга глубины вокруг тела, без контура диска
+    horizon: function (g, F, ctx, S) {
+      // вода: два мягких круга глубины вокруг тела, без контура диска; едут с камерой
+      var c = O.toScreen(S.sim, ctx, G.cx, G.cy, 0), z = S.sim.zoom();
       [0.5, 0.86].forEach(function (k, i) {
-        g.beginPath(); g.arc(G.cx, G.cy, G.r * k, 0, TAU); g.lineWidth = F.lineW;
+        g.beginPath(); g.arc(c[0], c[1], G.r * k * z, 0, TAU); g.lineWidth = F.lineW;
         g.strokeStyle = R.color.css(F.T.ink, i ? 0.07 : 0.05); g.stroke();
       });
     }

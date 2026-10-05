@@ -3,7 +3,7 @@
   "title": "Agents · Graph",
   "blurb": "Living organism in the RELIEF language: paper sheets and discs on springs, one light.",
   "version": "0.2.0",
-  "engineHash": "0e42aa882f470f70635c68bf0f884de8f78d19b479e1e4f0460583dbefbf0570",
+  "engineHash": "65a03b032e2bfd6fe70d6f21fd3c8085463ca85e82399368dbae0feff144fd90",
   "kind": "fragment",
   "contract": {
     "embed": {

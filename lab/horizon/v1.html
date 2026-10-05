@@ -879,16 +879,17 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
   function ensure(c, w, h) { if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); } }
 
   /* ── спрайты: покрытие из поля расстояний, один раз на ключ ─────────── */
-  var SPR = new Map(), LIMIT = 600;
+  var SPR = new Map(), LIMIT = 2400;
   function sprite(c, sig, dens, tint) {
     var sq = Math.max(0.25, Math.round(sig * 4) / 4), dq = Math.round(dens * 200) / 200;
     if (dq <= 0) return null;
-    var key = [tint.join(','), c.kind, c.w.toFixed(1), c.h.toFixed(1), (c.r || 0).toFixed(1), sq, dq, c.holes ? JSON.stringify(c.holes) : ''].join('|');
+    var qs = function (v) { return (Math.round(v * 2) / 2).toFixed(1); };        // размер квантуется 0,5 px: семья мелких дисков делит спрайты
+    var key = [tint.join(','), c.kind, qs(c.w), qs(c.h), qs(c.r || 0), sq, dq, c.holes ? JSON.stringify(c.holes) : ''].join('|');
     var s = SPR.get(key);
     if (s) { SPR.delete(key); SPR.set(key, s); return s; }      // LRU: свежий в конец
-    var pad = Math.ceil(3.4 * sq) + 2, w = Math.ceil(c.w) + 2 * pad, h = Math.ceil(c.h) + 2 * pad;
+    var pad = Math.ceil(3.4 * sq) + 2, w = Math.ceil(+qs(c.w)) + 2 * pad, h = Math.ceil(+qs(c.h)) + 2 * pad;
     var cv = canvas(w, h), g = cv.getContext('2d'), im = g.createImageData(w, h), d = im.data;
-    var shape = { kind: c.kind, x: w / 2, y: h / 2, w: c.w, h: c.h, r: c.r, holes: c.holes };
+    var shape = { kind: c.kind, x: w / 2, y: h / 2, w: +qs(c.w), h: +qs(c.h), r: +qs(c.r || 0), holes: c.holes };
     var sd = R.sdf.sd, cover = R.sdf.cover;
     for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) {
       var v = Math.min(1, dq * cover(sd(shape, i + 0.5, j + 0.5), sq)), p = (j * w + i) * 4;
@@ -948,13 +949,23 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     }
     if (!started) return null;
     // поле уходит в собственный холст: рельс держит его в кеше и кладёт multiply сколько угодно кадров
-    var out = canvas(w, h); out.getContext('2d').drawImage(dark, 0, 0, w, h, 0, 0, w, h);
+    var out = pooled(w, h); out.getContext('2d').drawImage(dark, 0, 0, w, h, 0, 0, w, h);
     return { cv: out, x: x0, y: y0, w: w, h: h };
   }
+  /* пул холстов полей: кадр берёт новые, прошлый кадр отдаёт свои (shade.recycle в начале сборки) */
+  var POOL = [], USED = [];
+  function pooled(w, h) {
+    var c = null;
+    for (var i = 0; i < POOL.length; i++) if (POOL[i].width >= w && POOL[i].height >= h) { c = POOL.splice(i, 1)[0]; break; }
+    if (!c) c = canvas(w, h);
+    var x = c.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'copy';
+    USED.push(c); return c;
+  }
+  function recycle() { POOL = POOL.concat(USED); USED = []; if (POOL.length > 600) POOL.length = 600; }
   function put(g, F) {
     if (!F) return;
     g.save(); g.globalCompositeOperation = 'multiply';
-    g.drawImage(F.cv, F.x, F.y); g.restore();
+    g.drawImage(F.cv, 0, 0, F.w, F.h, F.x, F.y, F.w, F.h); g.restore();
   }
 
   /* ── пятно лампы: lit = mix(1, E^0.6, pool), E = cos³; кеш на размер и лампу, ¼ разрешения ── */
@@ -992,7 +1003,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     g.drawImage(tmp, 0, 0, w, h, 0, 0, W, H); g.restore();
   }
 
-  R.shade = { layer: layer, put: put, pool: pool, canopy: canopy, sprite: sprite };
+  R.shade = { layer: layer, put: put, recycle: recycle, pool: pool, canopy: canopy, sprite: sprite };
 })();
 </script>
 <script>
@@ -1362,6 +1373,215 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
 })();
 </script>
 <script>
+/* инлайн: src/motion/graph.js · правится ИСТОЧНИК, не этот файл */
+/* motion/graph.js · живой граф как Obsidian graph view, общий модуль для сцен (приказ владельца 2026-10-05, закон 5).
+   Узлы на силовой модели: якорь к месту раскладки (правило рождает композицию, L12), пружины по рёбрам,
+   отталкивание по зазору между формами, демпфирование. Интегрируется СКОРОСТЬ (канон кинематики, закон 1),
+   полу-неявный Эйлер, dt = 1/fpsNominal, один шаг на номер кадра: кадр N одинаков при любом числе
+   перерисовок (детерминизм). Якорь дышит гармониками одного периода (цикл замкнут), огибающая плавания
+   гасится у выбранного.
+   Взаимодействие: тянешь узел — соседи едут за ним на пружинах; наведение поднимает узел с соседями,
+   остальное притухает ЦВЕТОМ (не альфой: pseudo-3d-layers §2); клик = фокус (камера едет к узлу);
+   колесо = зум к курсору; протяжка по пустому = панорама; двойной клик по пустому или Esc = домой.
+
+   API:
+     var G = RELIEF.graph.create(nodes, edges, opts)
+       nodes: [{id, x, y (место раскладки), r (радиус столкновения), z, mass?, fixed?}]
+       edges: [{a, b (индексы), k?, len? (по умолчанию дистанция раскладки)}]
+     G.sync(ctx)               шаги физики до номера кадра ctx.t (и сброс при переигровке)
+     G.view                    камера {zoom, x, y} в мировых координатах; G.toScreen / G.toWorld
+     G.state(i)                {x, y, lift, fade, hot} узла i после физики и наведения
+     RELIEF.graph.bind(G, canvas, pick)   указатель: pick(sx, sy) → индекс узла под курсором или -1
+*/
+(function () {
+  'use strict';
+  var R = window.RELIEF = window.RELIEF || {};
+  var TAU = Math.PI * 2;
+
+  function create(nodes, edges, opts) {
+    opts = opts || {};
+    var n = nodes.length, P = new Float64Array(n * 2), V = new Float64Array(n * 2), A = new Float64Array(n * 2);
+    var nb = []; for (var i = 0; i < n; i++) nb.push([]);
+    edges.forEach(function (e) {
+      if (e.len == null) e.len = Math.hypot(nodes[e.a].x - nodes[e.b].x, nodes[e.a].y - nodes[e.b].y);
+      nb[e.a].push(e.b); nb[e.b].push(e.a);
+    });
+    var lift = new Float64Array(n), liftV = new Float64Array(n), fade = new Float64Array(n), fadeV = new Float64Array(n);
+    var G = {
+      nodes: nodes, edges: edges, nb: nb, n: n, P: P, V: V, t: -1, opts: opts,
+      hover: -1, focus: -1, drag: -1, dragW: null,
+      view: { zoom: 1, x: 0, y: 0 }, home: { zoom: 1, x: 0, y: 0 }, viewT: null,
+      fit: { s: 1, ox: 0, oy: 0 }, version: 0
+    };
+    function reset() {
+      for (var i = 0; i < n; i++) { P[2 * i] = nodes[i].x; P[2 * i + 1] = nodes[i].y; V[2 * i] = V[2 * i + 1] = 0; lift[i] = liftV[i] = fade[i] = fadeV[i] = 0; }
+      G.t = -1;
+    }
+    reset();
+    G.reset = reset;
+
+    /* якорь узла с дыханием: три гармоники одного периода, фазы из потока рельса по id */
+    function anchor(i, ts, prm) {
+      var nd = nodes[i], amp = (prm.drift == null ? 1 : prm.drift) * (nd.drift == null ? 1 : nd.drift);
+      if (!(amp > 0) || i === G.focus) return [nd.x, nd.y];
+      var ph = R.motion.phases(prm.seed, 'g/' + nd.id), per = Math.max(4, prm.period || 36), w = TAU * ((ts % per) / per);
+      var a = amp * (prm.amp == null ? 3 : prm.amp);
+      return [nd.x + a * (0.62 * Math.sin(w + ph[0]) + 0.28 * Math.sin(2 * w + ph[1]) + 0.10 * Math.sin(3 * w + ph[2])),
+              nd.y + a * (0.62 * Math.sin(w + ph[3]) + 0.28 * Math.sin(2 * w + ph[4]) + 0.10 * Math.sin(3 * w + ph[5]))];
+    }
+
+    /* критически демпфированная пружина значения (наведение, притухание): скорость, не позиция */
+    function spring(x, v, target, dt, omega) {
+      var a = omega * omega * (target - x) - 2 * omega * v;
+      v += a * dt; x += v * dt;
+      return [x, v];
+    }
+
+    function step(ts, dt, prm) {
+      var ka = prm.anchorK == null ? 18 : prm.anchorK, ke = prm.springK == null ? 30 : prm.springK;
+      var rep = prm.repel == null ? 1 : prm.repel, damp = prm.damp == null ? 9 : prm.damp, gap = prm.gap == null ? 3 : prm.gap;
+      A.fill(0);
+      for (var i = 0; i < n; i++) {
+        var t = anchor(i, ts, prm);
+        A[2 * i] += ka * (t[0] - P[2 * i]); A[2 * i + 1] += ka * (t[1] - P[2 * i + 1]);
+      }
+      for (var k = 0; k < edges.length; k++) {
+        var e = edges[k], ax = P[2 * e.a], ay = P[2 * e.a + 1], bx = P[2 * e.b], by = P[2 * e.b + 1];
+        var dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy) || 1e-6, f = (e.k == null ? ke : e.k) * (d - e.len) / d;
+        A[2 * e.a] += f * dx; A[2 * e.a + 1] += f * dy; A[2 * e.b] -= f * dx; A[2 * e.b + 1] -= f * dy;
+      }
+      // отталкивание только у перекрытия форм + зазор: семья держит воздух, дальнее не толкается
+      if (rep > 0) for (var p = 0; p < n; p++) for (var q = p + 1; q < n; q++) {
+        var ddx = P[2 * q] - P[2 * p], ddy = P[2 * q + 1] - P[2 * p + 1], lim = nodes[p].r + nodes[q].r + gap;
+        if (ddx > lim || ddx < -lim || ddy > lim || ddy < -lim) continue;
+        var dd = Math.hypot(ddx, ddy) || 1e-3;
+        if (dd >= lim) continue;
+        var push = rep * 220 * (lim - dd) / dd, wp = 1 / (nodes[p].mass || 1), wq = 1 / (nodes[q].mass || 1);
+        A[2 * p] -= push * ddx * wp; A[2 * p + 1] -= push * ddy * wp; A[2 * q] += push * ddx * wq; A[2 * q + 1] += push * ddy * wq;
+      }
+      for (var j = 0; j < n; j++) {
+        if (j === G.drag && G.dragW) { V[2 * j] = (G.dragW[0] - P[2 * j]) / dt; V[2 * j + 1] = (G.dragW[1] - P[2 * j + 1]) / dt; P[2 * j] = G.dragW[0]; P[2 * j + 1] = G.dragW[1]; continue; }
+        if (nodes[j].fixed) { P[2 * j] = nodes[j].x; P[2 * j + 1] = nodes[j].y; continue; }
+        var m = nodes[j].mass || 1;
+        V[2 * j] += (A[2 * j] / m - damp * V[2 * j]) * dt; V[2 * j + 1] += (A[2 * j + 1] / m - damp * V[2 * j + 1]) * dt;
+        P[2 * j] += V[2 * j] * dt; P[2 * j + 1] += V[2 * j + 1] * dt;
+      }
+      // наведение и фокус: подъём узла с соседями, притухание остальных — пружинами ζ = 1, ω = 2π/0,5 с
+      var hot = G.hover >= 0 ? G.hover : G.focus, om = TAU / 0.5, set = hot >= 0 ? hotSet(hot) : null;
+      for (var h = 0; h < n; h++) {
+        var lt = set ? (h === hot ? 1 : set[h] ? 0.55 : 0) : 0, ft = set ? (set[h] ? 0 : 1) : 0;
+        var s1 = spring(lift[h], liftV[h], lt, dt, om); lift[h] = s1[0]; liftV[h] = s1[1];
+        var s2 = spring(fade[h], fadeV[h], ft, dt, om); fade[h] = s2[0]; fadeV[h] = s2[1];
+      }
+      // камера едет к цели той же пружиной
+      if (G.viewT) {
+        ['zoom', 'x', 'y'].forEach(function (k2) {
+          var key = '_v' + k2, s3 = spring(G.view[k2], G[key] || 0, G.viewT[k2], dt, TAU / 0.72);
+          G.view[k2] = s3[0]; G[key] = s3[1];
+        });
+      }
+    }
+
+    var hotCache = { i: -2, set: null };
+    function hotSet(i) {
+      if (hotCache.i === i) return hotCache.set;
+      var s = {}; s[i] = 1; nb[i].forEach(function (j) { s[j] = 1; });
+      hotCache = { i: i, set: s };
+      return s;
+    }
+    G.hotSet = hotSet;
+
+    /* шаги до номера кадра: один шаг на кадр, переигровка (t назад) сбрасывает мир */
+    G.sync = function (ctx, prm) {
+      var fps = R.motion.clock.fps || 60, dt = 1 / fps, target = ctx.t || 0;
+      prm = Object.assign({ seed: ctx.seed }, prm || {});
+      if (ctx.reduced) {                         // покой: мир осевший, без дыхания, кадр финальный
+        if (G.t !== 'still') { reset(); prm.drift = 0; for (var s = 0; s < 360; s++) step(0, dt, prm); G.t = 'still'; }
+        return;
+      }
+      if (G.t === 'still' || target < G.t) reset();
+      var guard = 0;
+      while (G.t < target && guard++ < 600) { G.t++; step(G.t / fps, dt, prm); }
+      if (G.t < target) G.t = target;            // догон после долгой паузы вкладки не молотит тысячи шагов
+    };
+
+    G.state = function (i) { return { x: P[2 * i], y: P[2 * i + 1], lift: lift[i], fade: Math.max(0, Math.min(1, fade[i])) }; };
+    G.toScreen = function (x, y) { var f = G.fit, v = G.view; return [(x - v.x) * f.s * v.zoom + f.cx, (y - v.y) * f.s * v.zoom + f.cy]; };
+    G.toWorld = function (sx, sy) { var f = G.fit, v = G.view; return [(sx - f.cx) / (f.s * v.zoom) + v.x, (sy - f.cy) / (f.s * v.zoom) + v.y]; };
+    G.scale = function () { return G.fit.s * G.view.zoom; };
+    /* вписать мир (bbox) в кадр с полями 6 % */
+    G.fitTo = function (W, H, bbox) {
+      var m = Math.min(W, H) * 0.06, s = Math.min((W - 2 * m) / (bbox[2] - bbox[0]), (H - 2 * m) / (bbox[3] - bbox[1]));
+      G.fit = { s: s, cx: W / 2, cy: H / 2 };
+      G.home = { zoom: 1, x: (bbox[0] + bbox[2]) / 2, y: (bbox[1] + bbox[3]) / 2 };
+      if (!G.viewT && !G._viewed) { G.view = Object.assign({}, G.home); G._viewed = true; }
+    };
+    G.goHome = function () { G.focus = -1; G.viewT = Object.assign({}, G.home); };
+    G.goFocus = function (i, zoom) {
+      G.focus = i; var st = G.state(i);
+      G.viewT = { zoom: zoom || 1.7, x: st.x, y: st.y };
+    };
+    return G;
+  }
+
+  /* указатель: наведение, перетаскивание узла, панорама, колесо, клик-фокус, двойной клик и Esc = домой */
+  function bind(G, canvas, pick, onChange) {
+    var down = null, ch = onChange || function () {};
+    function local(e) { var r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('pointermove', function (e) {
+      var p = local(e);
+      G.mouse = p;
+      if (down) {
+        var dx = p[0] - down.p[0], dy = p[1] - down.p[1];
+        if (!down.moved && Math.hypot(dx, dy) > 3) down.moved = true;
+        if (down.node >= 0 && down.moved) { G.drag = down.node; G.dragW = G.toWorld(p[0], p[1]); }
+        else if (down.node < 0 && down.moved) {
+          var s = G.scale(); G.viewT = null;
+          G.view.x = down.view.x - dx / s; G.view.y = down.view.y - dy / s;
+        }
+        ch(); return;
+      }
+      var h = pick(p[0], p[1]);
+      if (h !== G.hover) { G.hover = h; canvas.style.cursor = h >= 0 ? 'grab' : 'default'; ch(); }
+    });
+    canvas.addEventListener('pointerleave', function () { if (!down) { G.hover = -1; G.mouse = null; ch(); } });
+    canvas.addEventListener('pointerdown', function (e) {
+      if (e.button > 0) return;
+      var p = local(e);
+      try { canvas.setPointerCapture(e.pointerId); } catch (er) { }
+      down = { p: p, node: pick(p[0], p[1]), moved: false, view: Object.assign({}, G.view) };
+      if (down.node >= 0) canvas.style.cursor = 'grabbing';
+    });
+    function up(e) {
+      if (!down) return;
+      var d = down; down = null;
+      G.drag = -1; G.dragW = null;
+      canvas.style.cursor = G.hover >= 0 ? 'grab' : 'default';
+      if (!d.moved) { if (d.node >= 0) G.goFocus(d.node); }
+      ch();
+    }
+    canvas.addEventListener('pointerup', up);
+    canvas.addEventListener('pointercancel', up);
+    canvas.addEventListener('dblclick', function (e) { var p = local(e); if (pick(p[0], p[1]) < 0) { G.goHome(); ch(); } });
+    canvas.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      var p = local(e), before = G.toWorld(p[0], p[1]);
+      var z = Math.max(0.5, Math.min(4, (G.viewT ? G.viewT.zoom : G.view.zoom) * Math.exp(-e.deltaY * 0.0015)));
+      G.viewT = null; G.view.zoom = z;
+      var after = G.toWorld(p[0], p[1]);                     // зум к курсору: точка под курсором стоит
+      G.view.x += before[0] - after[0]; G.view.y += before[1] - after[1];
+      ch();
+    }, { passive: false });
+    window.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { G.goHome(); ch(); }
+    });
+  }
+
+  R.graph = { create: create, bind: bind };
+})();
+</script>
+<script>
 /* инлайн: src/rail.js · правится ИСТОЧНИК, не этот файл */
 /* rail.js · сборщик кадра RELIEF: одна функция рисует пол, плашки, тени, кант, материал.
    Сцена отдаёт ТОЛЬКО список плашек и печать (что на них напечатано); свет, тени, плавание,
@@ -1403,14 +1623,12 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     };
   };
 
-  /* ключ кеша теней: свет, тон, кадр и состояние плашек на tq (округлено до 1/64 px) */
-  function shadeKey(L, tn, W, H, ps) {
+  /* ключ кеша теней: свет, тон, кадр, СОСТАВ плашек и tq. Позиции в ключ не входят: поле строится
+     раз на tq по позициям этого кадра (физика графа двигает узлы каждый кадр, иначе пересборка каждый кадр) */
+  function shadeKey(L, tn, W, H, ps, tq) {
     var q = function (v) { return Math.round(v * 64); };
-    var parts = [W, H, L.mode, q(L.az), q(L.elev), q(L.soft), q(L.dens), q(L.contact), q(L.lamp.x), q(L.lamp.y), q(L.lamp.h), q(L.ui), tn.shadow.join(',')];
-    for (var i = 0; i < ps.length; i++) {
-      var p = ps[i];
-      parts.push(p.kind, q(p.x), q(p.y), q(p.w), q(p.h), q(p.r || 0), q(p.rot || 0), q(p.z), p.noShadow ? 1 : 0, p.holes ? JSON.stringify(p.holes) : '');
-    }
+    var parts = [tq, W, H, L.mode, q(L.az), q(L.elev), q(L.soft), q(L.dens), q(L.contact), q(L.lamp.x), q(L.lamp.y), q(L.lamp.h), q(L.ui), tn.shadow.join(','), ps.length];
+    for (var i = 0; i < ps.length; i++) parts.push(ps[i].kind, ps[i].noShadow ? 1 : 0, ps[i].id == null ? i : ps[i].id);
     return parts.join('|');
   }
 
@@ -1452,7 +1670,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
       return {
         id: p.id, kind: p.kind || 'rect', x: p.x + m.dx, y: p.y + m.dy, w: p.w, h: sz,
         r: p.r == null ? (+P.radius || 0) * ui : p.r, rot: (p.rot || 0) + m.rot, holes: p.holes,
-        z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fill, noShadow: p.noShadow, ghost: p.ghost, src: p
+        z: Math.max(0, ((p.z || 0) + m.dh) * asm), fill: p.fade > 0.005 ? C.mix(p.fill || tn.plate, tn.ground, Math.min(1, p.fade)) : p.fill, noShadow: p.noShadow, ghost: p.ghost, src: p
       };
     }
     var plates = (spec.plates || []).map(function (p, i) { return place(p, i, tsec); });
@@ -1465,7 +1683,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     var G = (L.canopy > 0) ? R.canopy.mask(ctx.seed, W, H, ui, tq, Math.max(1, +P.period || 36), still) : null;
     var occ = shadePl.filter(function (s) { return s.z > 0 && !s.noShadow; });
     F.G = G;
-    var key = shadeKey(L, tn, W, H, shadePl), cache = R._shade && R._shade.key === key ? R._shade : (R._shade = { key: key, floor: undefined, plates: {} });
+    var key = shadeKey(L, tn, W, H, shadePl, still ? 'still' : tq), cache = R._shade && R._shade.key === key ? R._shade : (R.shade.recycle(), R._shade = { key: key, floor: undefined, plates: {} });
 
 
     g.save();
@@ -1831,12 +2049,10 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
 <script>
 /* инлайн: lab/horizon/src/organism.js · правится ИСТОЧНИК, не этот файл */
 /* organism.js · живая часть вариантов horizon и agents (приказ владельца, волна 3).
-   Узлы на пружинах как Obsidian graph view: каждый тянется к своему якорю (якорь рождает правило
-   раскладки и ветер), связи держат длину, диски расталкиваются. Тянешь узел — соседи едут следом
-   на пружинах; наведение поднимает узел с соседями, остальное притухает; колесо = зум, фон = панорама,
-   мышь = параллакс (выше = сильнее сдвиг). Физика шагает ТОЛЬКО по номеру кадра (dt = 1/60 на кадр):
-   кадр N одинаков при любом числе перерисовок (L11). Перо одно (L7), прямых углов нет: лучи веером,
-   дуги, щупальца, нити. Когда в main появится src/motion/graph.js, этот файл уступает ему место. */
+   Физика, наведение, тяга узла, зум и панорама — общий модуль src/motion/graph.js (RELIEF.graph,
+   из main); здесь адаптер к организмам (якорь = правило раскладки + ветер), параллакс по высоте
+   и перо: лучи веером с засечками, дуги, щупальца, нити, провис бумаги, сходимость донора 04.
+   Перо одно (L7), прямых углов нет. */
 (function () {
   'use strict';
   var R = window.RELIEF, TAU = Math.PI * 2;
@@ -1848,132 +2064,91 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     return (h >>> 0) / 4294967296;
   }
 
-  // ── физика ───────────────────────────────────────────────────────────
-  function Sim() { this.nodes = []; this.byId = {}; this.links = []; this.lastT = null; this.drag = null; }
-  Sim.prototype.reset = function () { this.nodes = []; this.byId = {}; this.links = []; this.lastT = null; this.drag = null; };
+  // ── физика и взаимодействие: общий модуль src/motion/graph.js (RELIEF.graph) ─────────
+  // Набор узлов у RELIEF.graph фиксирован при создании, поэтому адаптер пересоздаёт граф, когда
+  // меняется состав (новое дерево, другой вид), а якоря (место раскладки + ветер организма)
+  // обновляет каждый кадр. Указатель вешается один раз на прокси, который смотрит в текущий граф.
+  function Sim() { this.byId = {}; this.nodes = []; this.G = null; this.sig = ''; this.cur = null; }
+  Sim.prototype.reset = function () { this.G = null; this.sig = ''; this.byId = {}; this.nodes = []; };
+  Sim.prototype.begin = function () { this.next = []; this.links = []; };
   Sim.prototype.node = function (id, o) {
-    var n = this.byId[id];
-    if (!n) { n = this.byId[id] = { id: id, x: o.x, y: o.y, vx: 0, vy: 0, ax: o.x, ay: o.y, r: o.r || 0, ka: o.ka || 26, m: o.m || 1, lift: 0, nb: [] }; this.nodes.push(n); }
-    n.alive = true;
+    var n = this.byId[id] || (this.byId[id] = { id: id, x: o.x, y: o.y, lift: 0, fade: 0, nb: [] });
+    n.ax = o.x; n.ay = o.y; n.r = o.r || 0; n.m = o.m || 1;
+    this.next.push(n);
     return n;
   };
-  Sim.prototype.begin = function () { this.nodes.forEach(function (n) { n.alive = false; }); this.links = []; this.nodes.forEach(function (n) { n.nb = []; }); };
+  Sim.prototype.link = function (a, b, len, k) { this.links.push([a, b, len, k]); };
   Sim.prototype.end = function () {
-    var self = this;
-    this.nodes = this.nodes.filter(function (n) { if (!n.alive) delete self.byId[n.id]; return n.alive; });
-  };
-  Sim.prototype.link = function (a, b, len, k) {
-    var A = this.byId[a], B = this.byId[b]; if (!A || !B) return;
-    this.links.push({ a: A, b: B, len: len, k: k == null ? 14 : k }); A.nb.push(B); B.nb.push(A);
-  };
-  // один шаг 1/60 с: якорь, связи, расталкивание дисков, затухание (ζ ≈ 1, без отскока)
-  Sim.prototype.step = function () {
-    var dt = 1 / 60, ns = this.nodes, i, j;
-    for (i = 0; i < ns.length; i++) { var n = ns[i]; n.fx = n.ka * (n.ax - n.x); n.fy = n.ka * (n.ay - n.y); }
-    for (i = 0; i < this.links.length; i++) {
-      var L = this.links[i], dx = L.b.x - L.a.x, dy = L.b.y - L.a.y, d = Math.hypot(dx, dy) || 1e-6, f = L.k * (d - L.len) / d;
-      L.a.fx += f * dx; L.a.fy += f * dy; L.b.fx -= f * dx; L.b.fy -= f * dy;
+    var self = this, ids = this.next.map(function (n) { return n.id; }), sig = ids.join('|') + '#' + this.links.length;
+    var idx = {}; ids.forEach(function (id, i) { idx[id] = i; });
+    if (sig !== this.sig || !this.G) {
+      var nodes = this.next.map(function (n) { return { id: n.id, x: n.ax, y: n.ay, r: n.r, mass: n.m }; });
+      var edges = this.links.filter(function (l) { return idx[l[0]] != null && idx[l[1]] != null; })
+        .map(function (l) { return { a: idx[l[0]], b: idx[l[1]], len: l[2], k: l[3] }; });
+      var old = this.G;
+      this.G = RELIEF.graph.create(nodes, edges, {});
+      if (old) { this.G.view = old.view; this.G._viewed = true; this.G.mouse = old.mouse; }
+      this.sig = sig;
+      var keep = {}; ids.forEach(function (id) { keep[id] = 1; });
+      Object.keys(this.byId).forEach(function (id) { if (!keep[id]) delete self.byId[id]; });
+    } else {
+      this.next.forEach(function (n, i) { var g = self.G.nodes[i]; g.x = n.ax; g.y = n.ay; g.r = n.r; });
     }
-    for (i = 0; i < ns.length; i++) {
-      if (!ns[i].r) continue;
-      for (j = i + 1; j < ns.length; j++) {
-        if (!ns[j].r) continue;
-        var a = ns[i], b = ns[j], ex = b.x - a.x, ey = b.y - a.y, dd = Math.hypot(ex, ey) || 1e-6, need = a.r + b.r + 4;
-        if (dd < need) { var p = 60 * (need - dd) / dd; a.fx -= p * ex; a.fy -= p * ey; b.fx += p * ex; b.fy += p * ey; }
-      }
-    }
-    for (i = 0; i < ns.length; i++) {
-      var q = ns[i];
-      if (this.drag && this.drag.node === q) { q.x = this.drag.x; q.y = this.drag.y; q.vx = q.vy = 0; continue; }
-      var damp = 2 * Math.sqrt(q.ka + 1);
-      q.vx = (q.vx + q.fx / q.m * dt) * Math.exp(-damp * dt);
-      q.vy = (q.vy + q.fy / q.m * dt) * Math.exp(-damp * dt);
-      q.x += q.vx * dt; q.y += q.vy * dt;
-    }
+    this.nodes = this.next; this.ids = ids; this.idx = idx;
+    var G = this.G;
+    this.nodes.forEach(function (n, i) { n.nb = G.nb[i].map(function (j) { return self.nodes[j]; }); });
   };
-  // шаги по приросту номера кадра; первый кадр, перемотка и покой = прямо на якоря
   Sim.prototype.advance = function (ctx) {
-    var t = ctx.t || 0;
-    if (ctx.reduced || this.lastT === null || t < this.lastT || t - this.lastT > 240) {
-      this.nodes.forEach(function (n) { n.x = n.ax; n.y = n.ay; n.vx = n.vy = 0; });
-      this.lastT = t; return;
-    }
-    var k = Math.min(8, t - this.lastT);
-    for (var s = 0; s < k; s++) this.step();
-    this.lastT = t;
+    var G = this.G, W = ctx.W, H = ctx.H;
+    G.fit = { s: 1, cx: W / 2, cy: H / 2 }; G.home = { zoom: 1, x: W / 2, y: H / 2 };
+    if (!G._viewed) { G.view = { zoom: 1, x: W / 2, y: H / 2 }; G._viewed = true; }
+    G.sync(ctx, { drift: 0, anchorK: 20, springK: 12, damp: 9, gap: 3 });
+    this.nodes.forEach(function (n, i) { var st = G.state(i); n.x = st.x; n.y = st.y; n.lift = st.lift; n.fade = st.fade; });
   };
+  Sim.prototype.zoom = function () { return this.G ? this.G.view.zoom : 1; };
 
-  // ── вид: зум, панорама, параллакс ────────────────────────────────────
-  function View() { return { zoom: 1, px: 0, py: 0, mx: 0, my: 0, smx: 0, smy: 0 }; }
-  function toScreen(V, ctx, x, y, z) {
-    var cx = ctx.W / 2, cy = ctx.H / 2, k = 0.9 * (z || 0) / 28;   // z3 сдвигается на ≈ 0,9 px на единицу мыши × 10
-    return [cx + (x - cx) * V.zoom + V.px + V.smx * k * 10, cy + (y - cy) * V.zoom + V.py + V.smy * k * 10];
+  // мир → экран: камера графа + параллакс по высоте (выше = сильнее сдвиг)
+  function toScreen(S, ctx, x, y, z) {
+    var p = S.G ? S.G.toScreen(x, y) : [x, y], k = 0.9 * (z || 0) / 28 * 10;
+    return [p[0] + (S.pmx || 0) * k, p[1] + (S.pmy || 0) * k];
   }
-  function toWorld(V, ctx, sx, sy) {
-    var cx = ctx.W / 2, cy = ctx.H / 2;
-    return [cx + (sx - V.px - cx) / V.zoom, cy + (sy - V.py - cy) / V.zoom];
-  }
+  function toWorld(S, ctx, sx, sy) { return S.G ? S.G.toWorld(sx, sy) : [sx, sy]; }
   // мышь приезжает к параллаксу сглаживанием по кадрам (без часов)
-  function viewStep(V, ctx) { var a = ctx.reduced ? 1 : 0.12; V.smx += (V.mx - V.smx) * a; V.smy += (V.my - V.smy) * a; }
-
-  // ── взаимодействие: наведение, тяга узла, фон = панорама, колесо = зум, клик = фокус ──
+  function viewStep(S, ctx) {
+    var m = S.G && S.G.mouse, tx = m ? clamp((m[0] / ctx.W - 0.5) * 2, -1, 1) : 0, ty = m ? clamp((m[1] / ctx.H - 0.5) * 2, -1, 1) : 0, a = ctx.reduced ? 1 : 0.12;
+    S.pmx = (S.pmx || 0) + (tx - (S.pmx || 0)) * a; S.pmy = (S.pmy || 0) + (ty - (S.pmy || 0)) * a;
+  }
+  // указатель: RELIEF.graph.bind на прокси текущего графа; клик по узлу = фокус сцены (а не камеры),
+  // клик по точке-займу (не узлу) = выбор следа
   function interact(ctx, o) {
-    var cv = ctx.canvas, V = o.view, S = o.sim, down = null, lastUp = -1e9;
-    function local(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
-    function redraw() { if (ctx.reduced || o.paused && o.paused()) window.postMessage({ type: 'es:progress', value: ctx.p }, '*'); }
-    function pick(p) { return o.pick ? o.pick(p[0], p[1]) : null; }
-    cv.addEventListener('pointermove', function (e) {
-      var p = local(e);
-      V.mx = clamp((p[0] / ctx.W - 0.5) * 2, -1, 1); V.my = clamp((p[1] / ctx.H - 0.5) * 2, -1, 1);
-      if (down) {
-        if (!down.moved && Math.hypot(p[0] - down.x, p[1] - down.y) < 4) return;
-        down.moved = true;
-        if (down.node && o.dragNode !== false) {
-          var w = toWorld(V, ctx, p[0], p[1]);
-          S.drag = { node: down.node, x: w[0] + down.ox, y: w[1] + down.oy };
-        } else if (o.onPan) o.onPan(down, p);
-        else { V.px = down.px + (p[0] - down.x); V.py = down.py + (p[1] - down.y); }
-        redraw(); return;
-      }
-      var h = pick(p); var id = h ? h.id : null;
-      if (id !== o.state.hover) { o.state.hover = id; redraw(); }
+    var S = o.sim, cv = ctx.canvas, last = {};
+    var proxy = new Proxy({}, {
+      get: function (t, k) {
+        if (k === 'goFocus') return function (i) { var h = last[i]; if (h && o.onClick) o.onClick(h); };
+        if (k === 'goHome') return function () { S.G.goHome(); if (o.onHome) o.onHome(); };
+        var v = S.G[k]; return typeof v === 'function' ? v.bind(S.G) : v;
+      },
+      set: function (t, k, v) { S.G[k] = v; return true; }
     });
-    cv.addEventListener('pointerdown', function (e) {
-      var p = local(e), h = pick(p), w = toWorld(V, ctx, p[0], p[1]);
-      var n = h && S.byId[h.id];
-      down = { x: p[0], y: p[1], px: V.px, py: V.py, node: n || null, ox: n ? n.x - w[0] : 0, oy: n ? n.y - w[1] : 0, hit: h, moved: false };
-      if (o.onPanStart && !n) o.onPanStart(down, p);
-      try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    function pickIndex(x, y) {
+      var h = o.pick ? o.pick(x, y) : null;
+      o.state.hover = h && h.id != null ? h.id : null;
+      if (!h || h.id == null || S.idx[h.id] == null) return -1;
+      var i = S.idx[h.id]; last[i] = h; return i;
+    }
+    function redraw() { if (ctx.reduced) window.postMessage({ type: 'es:progress', value: ctx.p }, '*'); }
+    RELIEF.graph.bind(proxy, cv, pickIndex, redraw);
+    cv.addEventListener('click', function (e) {
+      var r = cv.getBoundingClientRect(), h = o.pick ? o.pick(e.clientX - r.left, e.clientY - r.top) : null;
+      if (h && h.id == null && o.onClick) { o.onClick(h); redraw(); }
     });
-    cv.addEventListener('pointerup', function (e) {
-      var d = down; down = null; S.drag = null;
-      if (!d) return;
-      if (!d.moved) {
-        if (d.hit && o.onClick) o.onClick(d.hit);
-        else if (e.timeStamp - lastUp < 350) { V.zoom = 1; V.px = V.py = 0; if (o.onHome) o.onHome(); }
-        lastUp = e.timeStamp;
-      }
-      redraw();
-    });
-    cv.addEventListener('pointerleave', function () { V.mx = V.my = 0; o.state.hover = null; redraw(); });
-    cv.addEventListener('wheel', function (e) {
-      e.preventDefault();
-      var p = local(e), before = toWorld(V, ctx, p[0], p[1]);
-      V.zoom = clamp(V.zoom * Math.exp(-e.deltaY * 0.0015), 0.6, 2.6);
-      var after = toScreen({ zoom: V.zoom, px: V.px, py: V.py, smx: 0, smy: 0 }, ctx, before[0], before[1], 0);
-      V.px += p[0] - after[0]; V.py += p[1] - after[1];
-      redraw();
-    }, { passive: false });
   }
-  // подъём наведением: цель 1 у узла и соседей, сглаживание по кадрам; dim = доля притухания остальных
+  // подъём наведением уже посчитан графом (lift, fade); здесь только общая доля притухания кадра
   function hoverStep(S, state, ctx) {
-    var h = state.hover && S.byId[state.hover], set = {};
-    if (h) { set[h.id] = 1; h.nb.forEach(function (n) { set[n.id] = 0.6; }); }
-    var a = ctx.reduced ? 1 : 0.14;
-    S.nodes.forEach(function (n) { n.lift += ((set[n.id] || 0) - n.lift) * a; });
-    state.dim = (state.dim || 0) + ((h ? 1 : 0) - (state.dim || 0)) * a;
-    return set;
+    var a = ctx.reduced ? 1 : 0.14, on = state.hover != null ? 1 : 0;
+    state.dim = (state.dim || 0) + (on - (state.dim || 0)) * a;
   }
+  function View() { return {}; }
 
   // ── перо: лучи с засечками, мягкие дуги, щупальца, нити ───────────────
   function css(c, a) { return R.color.css(c, a); }
@@ -2384,19 +2559,19 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
       nodes.forEach(function (n) {   // связь держит длину, какую ей дал якорь: тянешь узел — ветка едет
         var pa = n.t.parent && byT.get(n.t.parent); if (pa) sim.link(pa.t.id, n.t.id, Math.hypot(n.ax - pa.ax, n.ay - pa.ay), 10);
       });
-      sim.end(); sim.advance(ctx); O.viewStep(S.view, ctx);
+      sim.end(); sim.advance(ctx); O.viewStep(S.sim, ctx);
       O.hoverStep(sim, S.st, ctx);
 
       // экран: зум и параллакс по высоте
       nodes.forEach(function (n) {
-        var lift = n.q.lift * 10 * ui, z = n.z + lift, s = O.toScreen(S.view, ctx, n.q.x, n.q.y, z);
-        n.x = s[0]; n.y = s[1]; n.zz = z; n.zoom = S.view.zoom;
+        var lift = n.q.lift * 10 * ui, z = n.z + lift, s = O.toScreen(S.sim, ctx, n.q.x, n.q.y, z);
+        n.x = s[0]; n.y = s[1]; n.zz = z; n.zoom = S.sim.zoom();
       });
       S.shown = nodes;
       var plates = [];
       nodes.forEach(function (n, i) {
         if (!n.vis || n.t.more || n.ring >= 3) return;
-        var zoom = S.view.zoom, sz = n.sz * zoom, env = n.ring === 0 && !S.nav.anim ? R.motion.settle(ts, S.settledAt, +P.settle) : 1;
+        var zoom = S.sim.zoom(), sz = n.sz * zoom, env = n.ring === 0 && !S.nav.anim ? R.motion.settle(ts, S.settledAt, +P.settle) : 1;
         var tilt = (O.hash01(ctx.seed + n.t.id) - 0.5) * 2 * (4 + 4 * O.hash01(n.t.id + 't')) * Math.PI / 180;
         var p = { id: n.t.id, z: n.zz, env: env, assembleIndex: i, x: n.x, y: n.y, node: n };
         if (n.paper) {
@@ -2525,16 +2700,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
           return best ? { id: best.t.id, n: best } : null;
         },
         onClick: function (h) { goTo(ctx, h.n); },
-        onHome: function () { var r = S.shown.filter(function (q) { return q.t === S.tree.root; })[0]; if (r) goTo(ctx, r); },
-        onPanStart: function (d) { d.m0 = S.nav.m; d.w0 = V.unmap(S, ctx, O.toWorld(S.view, ctx, d.x, d.y)); },
-        onPan: function (d, p) {   // фон = непрерывный Мёбиус: U(p0) = p1
-          S.nav.anim = null;
-          H.navDrag(S.nav, d.m0, d.w0, V.unmap(S, ctx, O.toWorld(S.view, ctx, p[0], p[1])));
-          var best = null, bd = 9;
-          S.tree.all.forEach(function (t) { var dd = C.abs(H.apply(S.nav.m, t.z)); if (dd < bd) { bd = dd; best = t; } });
-          if (best) S.nav.center = best.id;
-          S.settledAt = R.motion.time(ctx);
-        }
+        onHome: function () { var r = S.shown.filter(function (q) { return q.t === S.tree.root; })[0]; if (r) goTo(ctx, r); }
       });
       document.addEventListener('keydown', function (e) {
         if (e.target && (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || (e.target.closest && e.target.closest('.pv2')))) return;
@@ -2591,8 +2757,9 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
     links: function (g, F, a, b, alpha) {
       O.ray(g, F, [a.x, a.y], [b.x, b.y], { ra: a.hw || 2, rb: b.hw || 2, alpha: alpha, ticks: b.ring <= 2 });
     },
-    horizon: function (g, F) {
-      g.beginPath(); g.arc(G.cx, G.cy, G.r, 0, TAU); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.1); g.stroke();
+    horizon: function (g, F, ctx, S) {
+      var c = O.toScreen(S.sim, ctx, G.cx, G.cy, 0);   // горизонт едет с камерой
+      g.beginPath(); g.arc(c[0], c[1], G.r * S.sim.zoom(), 0, TAU); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.1); g.stroke();
     }
   });
 })();

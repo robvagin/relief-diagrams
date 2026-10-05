@@ -25,8 +25,9 @@
     links: function (g, F, a, b, alpha) {
       O.ray(g, F, [a.x, a.y], [b.x, b.y], { ra: a.hw || 2, rb: b.hw || 2, alpha: alpha, ticks: b.ring <= 2 });
     },
-    horizon: function (g, F) {
-      g.beginPath(); g.arc(G.cx, G.cy, G.r, 0, TAU); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.1); g.stroke();
+    horizon: function (g, F, ctx, S) {
+      var c = O.toScreen(S.sim, ctx, G.cx, G.cy, 0);   // горизонт едет с камерой
+      g.beginPath(); g.arc(c[0], c[1], G.r * S.sim.zoom(), 0, TAU); g.lineWidth = F.lineW; g.strokeStyle = R.color.css(F.T.ink, 0.1); g.stroke();
     }
   });
 })();

@@ -52,12 +52,12 @@
       if (L.record) { var qr = sim.node('record', { x: L.record.x, y: L.record.y, ka: 40 }); qr.ax = L.record.x; qr.ay = L.record.y; L.record.q = qr; }
       if (L.hub) { var qh = sim.node('hub', { x: L.hub.x, y: L.hub.y, ka: 80 }); qh.ax = L.hub.x; qh.ay = L.hub.y; L.hub.q = qh; }
       (L.springs || []).forEach(function (sp) { sim.link(sp[0], sp[1], sp[2], sp[3]); });
-      sim.end(); sim.advance(ctx); O.viewStep(S.view, ctx); O.hoverStep(sim, S.st, ctx);
+      sim.end(); sim.advance(ctx); O.viewStep(S.sim, ctx); O.hoverStep(sim, S.st, ctx);
 
       var plates = [];
       S.hit = [];
       L.sheets.forEach(function (s, i) {
-        var lift = s.q.lift * 10 * ui, z = s.z + lift, p = O.toScreen(S.view, ctx, s.q.x, s.q.y, z), zoom = S.view.zoom;
+        var lift = s.q.lift * 10 * ui, z = s.z + lift, p = O.toScreen(S.sim, ctx, s.q.x, s.q.y, z), zoom = S.sim.zoom();
         var a = morph ? AV.AG[ms.cur] : s.a, dx = s.q.x - s.x;
         s.sx = p[0]; s.sy = p[1]; s.sw = s.w * zoom; s.sh = s.h * zoom; s.sz = z;
         s.srot = (s.rot || 0) + (V.swingRot ? dx * 0.004 : 0);
@@ -70,13 +70,13 @@
         plates.push({ id: 'sheet/' + s.id, kind: 'rect', x: p[0], y: p[1], w: s.sw, h: s.sh, z: z, rot: s.srot, r: 6 * ui, env: 1, assembleIndex: i, sheet: s });
       });
       if (L.record) {
-        var rp = O.toScreen(S.view, ctx, L.record.q.x, L.record.q.y, L.record.z);
-        L.record.sx = rp[0]; L.record.sy = rp[1]; L.record.sr = L.record.r * S.view.zoom;
+        var rp = O.toScreen(S.sim, ctx, L.record.q.x, L.record.q.y, L.record.z);
+        L.record.sx = rp[0]; L.record.sy = rp[1]; L.record.sr = L.record.r * S.sim.zoom();
         plates.push({ id: 'record', kind: 'circle', x: rp[0], y: rp[1], w: 2 * L.record.sr, h: 2 * L.record.sr, z: L.record.z, env: 0, assembleIndex: 9, record: true });
       }
       if (L.hub) {
-        var hp = O.toScreen(S.view, ctx, L.hub.q.x, L.hub.q.y, L.hub.z);
-        L.hub.sx = hp[0]; L.hub.sy = hp[1]; L.hub.sr = L.hub.r * S.view.zoom;
+        var hp = O.toScreen(S.sim, ctx, L.hub.q.x, L.hub.q.y, L.hub.z);
+        L.hub.sx = hp[0]; L.hub.sy = hp[1]; L.hub.sr = L.hub.r * S.sim.zoom();
         plates.push({ id: 'hub', kind: 'circle', x: hp[0], y: hp[1], w: 2 * L.hub.sr, h: 2 * L.hub.sr, z: L.hub.z, env: 0.3, hub: true });
       }
       S.L = L; S.sheets = L.sheets;
@@ -95,7 +95,7 @@
     // лист агента: шапка, взгляд точками, выбранный займ кольцом акцентом
     function printSheet(g, s, F, sh, ctx) {
       O.paper(g, F, s);
-      var ag = ctx.data.agents[AV.AG.indexOf(sh.agent)], ui = F.ui * S.view.zoom, dim = S.st.dim || 0;
+      var ag = ctx.data.agents[AV.AG.indexOf(sh.agent)], ui = F.ui * S.sim.zoom(), dim = S.st.dim || 0;
       var fade = sh.q.lift > 0.3 ? 1 : 1 - 0.55 * dim;
       g.save(); g.translate(s.x, s.y); if (s.rot) g.rotate(s.rot);
       var x0 = -s.w / 2 + 14 * ui, y0 = -s.h / 2 + 22 * ui;
