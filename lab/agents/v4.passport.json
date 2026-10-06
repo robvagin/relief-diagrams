@@ -1,9 +1,9 @@
 {
-  "id": "horizon",
-  "title": "Horizon · Plant",
+  "id": "agents",
+  "title": "Data · Sunflower",
   "blurb": "Living organism in the RELIEF language: paper sheets and discs on springs, one light.",
   "version": "0.2.0",
-  "engineHash": "d65bb8600cbbd524a019ad74410378b4c97daf61be889e801c223ae83ec88d2c",
+  "engineHash": "320aa5ea6dcce44b5778500afe5a8b39e0d1a205c71f4ab20903209faa4f252e",
   "kind": "fragment",
   "contract": {
     "embed": {
@@ -87,7 +87,6 @@
   "brandFree": true,
   "gate": {
     "date": "2026-10-05",
-    "score": "10/10",
-    "report": "gate/acceptance.json"
+    "score": "0/10"
   }
 }

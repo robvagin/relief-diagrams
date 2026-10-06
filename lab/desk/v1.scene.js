@@ -104,6 +104,6 @@
         }
       };
     }
-  }, { variant: 'v1', name: 'mobile', defaults: { tilt: 6, wind: 1 } });
+  }, { variant: 'v1', name: 'mobile', defaults: { tilt: 1.2, wind: .32, assemble:0, parallax:.12, dens:.15 } });
   function R_END(P, n) { return P.assemble ? 0.08 * (n - 1) + 0.52 : 0; }
 })();

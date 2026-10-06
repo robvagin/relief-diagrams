@@ -34,6 +34,7 @@ def build_one(scene, v):
     text = io.open(srcp, encoding='utf-8').read()
     text = text.replace('<!--@title-->', 'RELIEF · %s' % VARIANTS[scene][v])
     scripts = ['<script>window.RELIEF_VARIANT = %s;</script>' % json.dumps(v),
+               '<script src="../src/light/air.js"></script>',
                '<script src="../lab/cascade/src/organism.js"></script>',
                '<script src="../lab/%s/src/%s.js"></script>' % (scene, scene)]
     text = text.replace('<!--@scene-->', '\n'.join(scripts))
@@ -100,6 +101,7 @@ def main():
         if only and scene not in only:
             continue
         for v in vs:
+            if (scene=='cascade' and v=='v2') or (scene=='stack' and v=='v1'): continue
             if not os.path.exists(os.path.join(ROOT, 'lab', scene, 'src', scene + '.js')):
                 continue
             html = build_one(scene, v)

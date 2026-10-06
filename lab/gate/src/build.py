@@ -82,6 +82,7 @@ def main():
     for out, title, scene in TARGETS:
         if only and not any(o in out for o in only):
             continue
+        if out!='lab/gate/v2.html': continue
         if not all(os.path.exists(os.path.join(HERE, s)) for s in scene):
             continue
         html = B.build({'src': TEMPLATE, 'title': title, 'scene': scene, 'data': False})

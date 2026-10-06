@@ -64,6 +64,7 @@
   };
 
   function make(V) {
+    if(V.name==='Plant')GROUPS['Ритм'][1][5]=4;
     var S = { G: null, tree: null, nav: H.Nav(), sim: new O.Sim(), view: O.View(), st: { hover: null }, shown: [], rot: 0 };
 
     function rebuild(ctx) {
@@ -115,9 +116,9 @@
       S.shown = nodes;
       var plates = [];
       nodes.forEach(function (n, i) {
-        if (!n.vis || n.t.more || n.ring >= 3) return;
+        if (!n.vis || n.t.more || n.ring >= (V.name==='Plant'?4:3)) return;
         var zoom = S.sim.zoom(), sz = n.sz * zoom, env = n.ring === 0 && !S.nav.anim ? R.motion.settle(ts, S.settledAt, +P.settle) : 1;
-        var tilt = (O.hash01(ctx.seed + n.t.id) - 0.5) * 2 * (4 + 4 * O.hash01(n.t.id + 't')) * Math.PI / 180;
+        var tilt = (O.hash01(ctx.seed + n.t.id) - 0.5) * 2 * (1 + .7 * O.hash01(n.t.id + 't')) * Math.PI / 180;
         var p = { id: n.t.id, z: n.zz, env: env, assembleIndex: i, x: n.x, y: n.y, node: n };
         if (n.paper) {
           // ширина листа по тексту, который на нём напечатан (лист не режет подпись)

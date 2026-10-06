@@ -8,7 +8,7 @@
 
   function groupsFor(def) {
     var K = R.knobs, own = def.groups || {}, out = [];
-    K.order.forEach(function (name) {
+    K.order.concat(Object.keys(own).filter(function(n){return K.order.indexOf(n)<0;})).forEach(function (name) {
       var rows = (own[name] || []).concat(K.common[name] || []);
       if (rows.length) out.push({ name: name, rows: rows });
     });

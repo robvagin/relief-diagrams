@@ -2212,7 +2212,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
 
   function groupsFor(def) {
     var K = R.knobs, own = def.groups || {}, out = [];
-    K.order.forEach(function (name) {
+    K.order.concat(Object.keys(own).filter(function(n){return K.order.indexOf(n)<0;})).forEach(function (name) {
       var rows = (own[name] || []).concat(K.common[name] || []);
       if (rows.length) out.push({ name: name, rows: rows });
     });
@@ -2760,17 +2760,17 @@ window.RELIEF=window.RELIEF||{};RELIEF.dataText="{\"meta\":{\"name\":\"Fictional
       f = Math.min(0.92, f);
       var base = bez(p0, p1, p2, p3, f), side = k % 2 ? 1 : -1;
       var half = z.kind === 'circle' ? z.w / 2 : Math.max(z.w, z.h) / 2;
-      var sway = O.swing(ctx.seed, 'leaf' + k, tsec, P, 6 * D2R * flt, still ? 0 : 1);
+      var sway = O.swing(ctx.seed, 'leaf' + k, tsec, P, 1.4 * D2R * flt, still ? 0 : 1);
       if (last) {
         var c = [base[0], base[1] - z.w * 0.48];
         els.push({ step: s, z: z, x: c[0], y: c[1], rot: 0, st: st, half: z.w / 2, att: base });
         continue;
       }
       var ang = (side < 0 ? 200 : -20) * D2R + side * (12 + k * 4) * D2R + sway;   // черешок вверх-наружу
-      var len = S * (0.17 + (k % 2) * 0.04);
+      var opening=still||P.state!=='loop'?1:R.motion.spring(0,1,Math.max(0,tsec-k*2.4));var len=S*(.17+(k%2)*.04)*(.4+.6*opening);z.w*=.82+.18*opening;if(z.h)z.h*=.82+.18*opening;
       var tip = [base[0] + Math.cos(ang) * len, base[1] + Math.sin(ang) * len - S * 0.02];
       var cE = [tip[0] + Math.cos(ang) * half * 0.85, tip[1] + Math.sin(ang) * half * 0.5];
-      var tilt = z.kind === 'rect' ? (side * (5 + k * 1.2)) * D2R + sway * 0.8 : 0;
+      var tilt = z.kind === 'rect' ? (side * (1 + k * .15)) * D2R + sway * 0.8 : 0;
       els.push({ step: s, z: z, x: cE[0], y: cE[1], rot: tilt, st: st, half: half, att: base, tip: tip, side: side });
     }
     return { els: els, stems: stems, ui: ui, S: S };

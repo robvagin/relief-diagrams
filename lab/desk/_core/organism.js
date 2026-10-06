@@ -70,10 +70,11 @@
     var max = Math.max(12, w - (n.shape === 'disc' ? 18 : 12));
     function fitLine(s, y, px) {
       s = String(s || ''); g.font = '400 ' + px + 'px Geist,system-ui'; g.letterSpacing = '0px';
+      if(g.measureText(s).width>max){px=Math.max(7,px*max/g.measureText(s).width);g.font='400 '+px+'px Geist,system-ui';}
       if (g.measureText(s).width > max) { while (s.length && g.measureText(s + '…').width > max) s = s.slice(0, -1); s += '…'; }
       g.fillText(s, 0, y);
     }
-    if (n.shape === 'disc') { fitLine(lines[1] || lines[0], 0, 11); return; }
+    if (n.shape === 'disc') { fitLine(n.compactValue || lines[1] || lines[0], 0, 11); return; }
     fitLine(lines[0], -Math.min(20, h / 4), 11);
     fitLine(lines[1], 0, w > 120 ? 18 : 12);
     if (h > 65 && lines[2]) fitLine(lines[2], 20, 11);
@@ -85,6 +86,7 @@
     var F0 = { W: W, H: H, ui: ui, u: Math.min(W, H) / 48, m: 0.06 * Math.min(W, H), P: P, t: t, reduced: !!ctx.reduced };
     var pose = scene.pose(ctx, F0, t);
     var nodes = pose.nodes, links = pose.links || [];
+    nodes.forEach(function(n){if(n.shape==='sheet')n.rot=(Math.PI/90)*Math.tanh((n.rot||0)/.08);});
     var G = graphFor(ctx, pose, F0);
     // якорь узла = поза организма в этот кадр; граф кладёт сверху пружины, наведение и камеру
     nodes.forEach(function (n, i) { G.nodes[i].x = n.x; G.nodes[i].y = n.y; G.nodes[i].fixed = !!n.fixed; });
@@ -92,7 +94,7 @@
     var z = G.view.zoom, hot = G.hover >= 0 ? G.hover : G.drag >= 0 ? G.drag : -1;
     var mx = 0, my = 0;
     if (G.mouse && !ctx.capture) { mx = clamp((G.mouse[0] - W / 2) / (W / 2), -1, 1); my = clamp((G.mouse[1] - H / 2) / (H / 2), -1, 1); }
-    var par = (+P.parallax || 0) * ui;
+    var par = (+P.parallax || 0) * ui * .045;
     // порядок сборки: от корня по рёбрам
     var depth = {}, root = S.idx[pose.root || (nodes[0] && nodes[0].id)] || 0, q = [root], seen = {}, ord = 0; seen[root] = 1;
     while (q.length) { var id = q.shift(); depth[id] = ord++; G.nb[id].forEach(function (j) { if (!seen[j]) { seen[j] = 1; q.push(j); } }); }
@@ -109,7 +111,7 @@
         id: n.id, kind: n.shape === 'disc' ? 'circle' : 'rect', x: sp[0], y: sp[1], w: sw, h: n.shape === 'disc' ? sw : sh,
         r: n.shape === 'pill' ? Math.min(sw, sh) / 2 : n.shape === 'disc' ? 0 : (+P.radius || 0) * ui * z,
         z: zl * Math.sqrt(z), rot: n.rot || 0, env: n.env == null ? 1 : n.env, assembleIndex: depth[i] == null ? 0 : depth[i],
-        fill: n.fill, _n: nn
+        fill: n.fill, life:n.life, _n: nn
       });
     });
     S.last = scr.slice().sort(function (a, b) { return (a.node.height == null ? a.node.z : a.node.height) - (b.node.height == null ? b.node.z : b.node.height); });
@@ -131,9 +133,9 @@
         g.save();
         g.translate(s.x, s.y); g.rotate(s.rot || 0); g.scale(z, z);
         var n = nn.node;
-        if (n.w * z < 120 && z < 1.5 && n.info) { compact(g, Fr, n, z); g.restore(); return; }
+        if (n.shape !== 'pill' && n.w * z < 100 && z < 1.5 && n.info) { compact(g, Fr, n, z); g.restore(); return; }
         if (n.shape !== 'disc') sag(g, Fr, n.w, n.h, +P.sag, s.rot);
-        g.globalAlpha = nn.dim;
+        g.globalAlpha *= nn.dim;
         n.print(g, Fr, Fr.I || K.inks(Fr), n.w, n.h, n);
         g.restore();
       },
@@ -167,7 +169,7 @@
     if (l.kind === 'stem') { K.stroke(g, F, path, F.I.ink2, al * 0.38 * (l.alpha == null ? 1 : l.alpha)); K.relief(g, F, path, al * (l.alpha == null ? 1 : l.alpha)); }
     else K.stroke(g, F, path, F.I.ink2, al * (l.alpha == null ? 0.55 : l.alpha));
     // засечки на луче (Satellites): короткие штрихи поперёк по долям длины
-    if (l.ticks) {
+    if (false && l.ticks) {
       g.save(); g.strokeStyle = F.I.ink3; g.globalAlpha = 0.5 * al; g.lineWidth = F.lineW;
       l.ticks.forEach(function (f) {
         var p = bez(pa, pb, ta, tb, ten, f), n = [-p.t[1], p.t[0]], s = 3 * F.ui;

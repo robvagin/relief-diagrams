@@ -1749,6 +1749,42 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
 })();
 </script>
 <script>
+/* suspended paper light */
+/* Dated iteration: suspended paper, immediate receiver shadows, no nearby floor. */
+(function(){
+'use strict';var R=window.RELIEF,cache=new Map();
+function sprite(F,kind){var key=F.ctx.theme+'/'+kind,c=cache.get(key);if(c)return c;
+ c=document.createElement('canvas');c.width=c.height=128;var q=c.getContext('2d');
+ if(kind==='haze'){var gr=q.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,R.color.css(F.tn.shadow,.25));gr.addColorStop(1,R.color.css(F.tn.shadow,0));q.fillStyle=gr;q.fillRect(0,0,128,128);}
+ else{q.filter='blur(5px)';q.fillStyle=R.color.css(F.tn.shadow,.16);q.beginPath();if(kind==='circle')q.arc(64,64,40,0,Math.PI*2);else q.rect(24,24,80,80);q.fill();}
+ cache.set(key,c);return c;}
+R.airTokens=function(theme,accent){var T=Object.assign({},R.tokens(theme,accent));function gray(c){var m=(c[0]+c[1]+c[2])/3;return [m,m,m];}
+ T.accent=T.ink2.slice();T.shadowTint=gray(T.shadowTint);T.lightTint=gray(T.lightTint);
+ if(theme!=='night'){T.ground=R.color.mix(gray(T.ground),T.lightTint,.38);T.plate=R.color.mix(gray(T.plate),T.lightTint,.48);}T.groundY=R.color.lum(T.ground);return T;};
+R.frame=function(ctx,spec){R.seedFrom(ctx);var g=ctx.g,P=ctx.P,W=ctx.W,H=ctx.H,ui=R.ui(W,H),T=R.airTokens(ctx.theme,P.accent),tn=R.material.tints(T,+P.temp||0),L=R.light.state(P,W,H,ui),t=R.motion.time(ctx);
+ L.contact=0;var F={ctx:ctx,g:g,P:P,W:W,H:H,ui:ui,u:Math.min(W,H)/48,T:T,tn:tn,L:L,tsec:t,lineW:R.lineW(ui),still:!!ctx.reduced};
+ var plates=spec.plates.map(function(p,i){var m=R.motion.float(ctx.seed,p.id==null?i:p.id,t,P,p.w,p.h,p.z||0,ctx.reduced?0:Math.min(.22,p.env==null?1:p.env));return Object.assign({},p,{x:p.x+m.dx,y:p.y+m.dy,rot:(p.rot||0)+m.rot,z:Math.max(0,(p.z||0)+m.dh),h:p.kind==='circle'?p.w:p.h,src:p});});F.plates=plates;
+ g.save();g.fillStyle=R.color.css(tn.ground);g.fillRect(0,0,W,H);
+ // One distant, diffuse receiver rather than a pile of contact halos.
+ if(L.dens>0){var off=R.light.offset(L,W/2,H/2,230*ui,0),size=Math.min(W,H)*1.15;g.save();g.globalAlpha=Math.min(.28,L.dens*.9);g.drawImage(sprite(F,'haze'),W*.52+off[0]-size/2,H*.52+off[1]-size/2,size,size);g.restore();}
+ if(spec.floor)spec.floor(g,F);
+ plates.slice().sort(function(a,b){return a.z-b.z;}).forEach(function(p){if(p.ghost)return;
+  g.save();g.globalAlpha=p.life==null?1:p.life;g.beginPath();R.sdf.path(g,p);g.fillStyle=R.color.css(p.fill||tn.plate);g.fill('evenodd');g.clip('evenodd');
+  if(spec.print)spec.print(g,p,F);
+  if(L.dens>0)plates.filter(function(o){return !o.ghost&&!o.noShadow&&o.z>p.z+.01&&Math.abs(o.x-p.x)<(o.w+p.w)*.56&&Math.abs(o.y-p.y)<(o.h+p.h)*.56;}).slice(0,3).forEach(function(o){g.save();g.globalAlpha=Math.min(.5,L.dens*1.7)/(1+Math.abs(o.z-p.z)/Math.max(1,30*ui));var off=R.light.offset(L,o.x,o.y,Math.max(ui,o.z-p.z),0);g.translate(o.x+off[0],o.y+off[1]);g.rotate(o.rot||0);g.drawImage(sprite(F,o.kind),-.8*o.w,-.8*o.h,1.6*o.w,1.6*o.h);g.restore();});
+  g.restore();
+ });R.material.surface(g,W,H,ctx.seed,P,T);g.restore();if(spec.above){g.save();spec.above(g,F);g.restore();}R.last=F;return F;};
+// Card-local ink: physical bounds, no oversized global scene typography.
+R.cardInk=function(g,s,F,lines){var circle=s.kind==='circle',w=s.w,h=s.h,pad=Math.max(4,Math.min(w,h)*.12),aw=w-pad*2;
+ g.save();g.translate(s.x,s.y);g.rotate(s.rot||0);if(Math.cos(s.rot||0)<0)g.rotate(Math.PI);g.textAlign=circle?'center':'left';g.textBaseline='middle';g.letterSpacing='0px';
+ var compact=w<62||h<38,shown=compact?[lines[1]||lines[0]]:lines.slice(0,h>90?4:h>56?3:2),row=Math.min(22,h/(shown.length+1));
+ shown.forEach(function(line,i){var value=String(line||''),px=Math.min(i===1&&!compact?22:12,row*.78,circle?w*.20:18);px=Math.max(5,px);g.font=(i===1?'500 ':'400 ')+px+'px Geist,system-ui';var max=circle?aw*.85:aw;
+  if(g.measureText(value).width>max){px=Math.max(5,px*Math.max(.64,max/g.measureText(value).width));g.font=(i===1?'500 ':'400 ')+px+'px Geist,system-ui';while(value.length&&g.measureText(value+'…').width>max)value=value.slice(0,-1);if(value!==String(line||''))value+='…';}
+  g.fillStyle=R.color.css(i===1||compact?F.T.ink:F.T.ink2);g.fillText(value,circle?0:-w/2+pad,(i-(shown.length-1)/2)*row);
+ });g.restore();};
+})();
+</script>
+<script>
 /* lab/desk/_core/ink.js */
 // ink.js — печать для организмов desk и ledger: текст (Geist, Geist Mono, трекинг по кеглю по
 // adaptive-typography), числа, мягкие кривые стеблей и щупалец одной толщины (L7), рельефная линия.
@@ -2134,10 +2170,11 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     var max = Math.max(12, w - (n.shape === 'disc' ? 18 : 12));
     function fitLine(s, y, px) {
       s = String(s || ''); g.font = '400 ' + px + 'px Geist,system-ui'; g.letterSpacing = '0px';
+      if(g.measureText(s).width>max){px=Math.max(7,px*max/g.measureText(s).width);g.font='400 '+px+'px Geist,system-ui';}
       if (g.measureText(s).width > max) { while (s.length && g.measureText(s + '…').width > max) s = s.slice(0, -1); s += '…'; }
       g.fillText(s, 0, y);
     }
-    if (n.shape === 'disc') { fitLine(lines[1] || lines[0], 0, 11); return; }
+    if (n.shape === 'disc') { fitLine(n.compactValue || lines[1] || lines[0], 0, 11); return; }
     fitLine(lines[0], -Math.min(20, h / 4), 11);
     fitLine(lines[1], 0, w > 120 ? 18 : 12);
     if (h > 65 && lines[2]) fitLine(lines[2], 20, 11);
@@ -2149,6 +2186,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     var F0 = { W: W, H: H, ui: ui, u: Math.min(W, H) / 48, m: 0.06 * Math.min(W, H), P: P, t: t, reduced: !!ctx.reduced };
     var pose = scene.pose(ctx, F0, t);
     var nodes = pose.nodes, links = pose.links || [];
+    nodes.forEach(function(n){if(n.shape==='sheet')n.rot=(Math.PI/90)*Math.tanh((n.rot||0)/.08);});
     var G = graphFor(ctx, pose, F0);
     // якорь узла = поза организма в этот кадр; граф кладёт сверху пружины, наведение и камеру
     nodes.forEach(function (n, i) { G.nodes[i].x = n.x; G.nodes[i].y = n.y; G.nodes[i].fixed = !!n.fixed; });
@@ -2156,7 +2194,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     var z = G.view.zoom, hot = G.hover >= 0 ? G.hover : G.drag >= 0 ? G.drag : -1;
     var mx = 0, my = 0;
     if (G.mouse && !ctx.capture) { mx = clamp((G.mouse[0] - W / 2) / (W / 2), -1, 1); my = clamp((G.mouse[1] - H / 2) / (H / 2), -1, 1); }
-    var par = (+P.parallax || 0) * ui;
+    var par = (+P.parallax || 0) * ui * .045;
     // порядок сборки: от корня по рёбрам
     var depth = {}, root = S.idx[pose.root || (nodes[0] && nodes[0].id)] || 0, q = [root], seen = {}, ord = 0; seen[root] = 1;
     while (q.length) { var id = q.shift(); depth[id] = ord++; G.nb[id].forEach(function (j) { if (!seen[j]) { seen[j] = 1; q.push(j); } }); }
@@ -2173,7 +2211,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
         id: n.id, kind: n.shape === 'disc' ? 'circle' : 'rect', x: sp[0], y: sp[1], w: sw, h: n.shape === 'disc' ? sw : sh,
         r: n.shape === 'pill' ? Math.min(sw, sh) / 2 : n.shape === 'disc' ? 0 : (+P.radius || 0) * ui * z,
         z: zl * Math.sqrt(z), rot: n.rot || 0, env: n.env == null ? 1 : n.env, assembleIndex: depth[i] == null ? 0 : depth[i],
-        fill: n.fill, _n: nn
+        fill: n.fill, life:n.life, _n: nn
       });
     });
     S.last = scr.slice().sort(function (a, b) { return (a.node.height == null ? a.node.z : a.node.height) - (b.node.height == null ? b.node.z : b.node.height); });
@@ -2195,9 +2233,9 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
         g.save();
         g.translate(s.x, s.y); g.rotate(s.rot || 0); g.scale(z, z);
         var n = nn.node;
-        if (n.w * z < 120 && z < 1.5 && n.info) { compact(g, Fr, n, z); g.restore(); return; }
+        if (n.shape !== 'pill' && n.w * z < 100 && z < 1.5 && n.info) { compact(g, Fr, n, z); g.restore(); return; }
         if (n.shape !== 'disc') sag(g, Fr, n.w, n.h, +P.sag, s.rot);
-        g.globalAlpha = nn.dim;
+        g.globalAlpha *= nn.dim;
         n.print(g, Fr, Fr.I || K.inks(Fr), n.w, n.h, n);
         g.restore();
       },
@@ -2231,7 +2269,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     if (l.kind === 'stem') { K.stroke(g, F, path, F.I.ink2, al * 0.38 * (l.alpha == null ? 1 : l.alpha)); K.relief(g, F, path, al * (l.alpha == null ? 1 : l.alpha)); }
     else K.stroke(g, F, path, F.I.ink2, al * (l.alpha == null ? 0.55 : l.alpha));
     // засечки на луче (Satellites): короткие штрихи поперёк по долям длины
-    if (l.ticks) {
+    if (false && l.ticks) {
       g.save(); g.strokeStyle = F.I.ink3; g.globalAlpha = 0.5 * al; g.lineWidth = F.lineW;
       l.ticks.forEach(function (f) {
         var p = bez(pa, pb, ta, tb, ten, f), n = [-p.t[1], p.t[0]], s = 3 * F.ui;
@@ -2641,21 +2679,21 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
     var lo = 1.8e8, hi = 2.05e8, X = function (i) { return x0 + (x1 - x0) * i / (n - 1); }, Y = function (v) { return yB - (yB - yT) * (v - lo) / (hi - lo); };
     var recMax = Math.max.apply(null, s.recovered), chain = [], nodes = [], links = [];
     var rx = x0 - 0.075 * W, ry = yB + 0.05 * H, rr = 0.055 * S;
-    nodes.push({ id: 'root', shape: 'disc', w: 2 * rr, h: 2 * rr, z: 2, print: rootPrint, info: ['Loan book', '12 months of exposure'] });
+    nodes.push({ id: 'root', shape: 'disc', w: 2 * rr, h: 2 * rr, z: 2, print: rootPrint, compactValue:'12 mo', info: ['Loan book', '12 months of exposure'] });
     chain.push({ id: 'root', rest: [0, 0], amp: 0 });
     var px = rx, py = ry, prev = 'root', ids = ['root'];
     s.exposure.forEach(function (v, i) {
       var x = X(i), y = Y(v), id = 'm' + i, rb = 0.014 * S + 0.032 * S * Math.sqrt(s.recovered[i] / recMax);
       chain.push({ id: id, parent: prev, rest: [x - px, y - py], amp: 0.22, lag: 0.45 * (i + 1) });
-      nodes.push({ id: id, shape: 'disc', w: 2 * rb, h: 2 * rb, z: i === n - 1 ? 2 : 1, mark: i === n - 1, print: bubble(i),
+      nodes.push({ id: id, shape: 'disc', w: 2 * rb, h: 2 * rb, z: i === n - 1 ? 2 : 1, mark: i === n - 1, compactValue:K.eur(v,0), print: bubble(i),
         info: [K.month(s.months[i]) + ' ' + s.months[i].slice(0, 4), 'Exposure ' + K.eur(v), 'Recovered ' + K.eur(s.recovered[i]), 'NPL ' + K.pct(s.npl[i])] });
       ids.push(id); prev = id; px = x; py = y;
     });
     // листья кварталов: на ножке вверх или вниз от узла лозы, по очереди
     [2, 5, 8, 11].forEach(function (i, q) {
-      var up = q % 2 === 0, w = 0.17 * S, h = 0.12 * S, dy = (up ? -1 : 1) * (0.11 * S + h / 2), dx = q === 3 ? -0.1 * S : (q % 2 ? 1 : -1) * 0.03 * S;
-      chain.push({ id: 'q' + q, parent: 'm' + i, rest: [dx, dy], amp: 3.5, lag: 0.45 * (i + 1) + 0.8 });
-      nodes.push({ id: 'q' + q, shape: 'sheet', w: w, h: h, z: q === 3 ? 3 : 2, rot0: up ? -1 : 1, print: quarter(i), info: ['Quarter to ' + K.month(s.months[i]), K.eur(s.exposure[i])] });
+      var up = q % 2 === 0, w = 0.23 * S, h = 0.15 * S, dy = (up ? -1 : 1) * (0.11 * S + h / 2), dx = q === 3 ? -0.1 * S : (q % 2 ? 1 : -1) * 0.03 * S;
+      chain.push({ id: 'q' + q, parent: 'm' + i, rest: [dx, dy], amp: .7, lag: 0.45 * (i + 1) + 0.8 });
+      nodes.push({ id: 'q' + q, shape: 'sheet', w: w, h: h, z: q === 3 ? 3 : 2, rot0: up ? -1 : 1, print: quarter(i), info: ['Quarter to ' + K.month(s.months[i]), K.eur(s.exposure[i]),'Recovered '+K.eur(s.recovered[i-2]+s.recovered[i-1]+s.recovered[i])] });
       links.push({ a: 'm' + i, b: 'q' + q, kind: 'stem', bend: (up ? -1 : 1) * 0.35 });
     });
     if (table) { chain.push({ id: 'table', parent: 'root', rest: [0.35 * W, -0.42 * H], amp: 0.5 }); nodes.push(LG.tableNode(F, S)); links.push({ a: 'root', b: 'table', kind: 'thread', bend: 0.2 }); }
@@ -2713,6 +2751,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
             K.relief(g, Fr, function (q, ox, oy) { q.moveTo(M.x0 - 10 * Fr.ui + ox, y + oy); q.lineTo(M.x1 + 10 * Fr.ui + ox, y + oy); }, 0.75);
             if (P.labelsL !== 'none') K.text(g, Fr, '€' + (v / 1e6).toFixed(0) + 'M', M.x0 - 16 * Fr.ui, y + 4 * Fr.ui, { size: 1, mono: true, color: I.ink3, align: 'right', min: 7 });
           }
+          [2,5,8,11].forEach(function(i,q){K.text(g,Fr,'Q'+((q+3)%4+1),M.X(i-1),M.yB+.18*F.H,{size:1,weight:500,color:I.ink2,align:'center',min:8});});
           s.months.forEach(function (m, i) {
             if (P.labelsL === 'none' || (P.labelsL === 'key' && i % 3 !== 2 && i !== 0)) return;
             K.text(g, Fr, K.month(m) + (i === 0 || m.slice(5) === '01' ? ' ' + m.slice(2, 4) : ''), M.X(i), M.yB + 0.12 * F.H, { size: 1, mono: true, color: I.ink2, align: 'center', min: 7 });
@@ -2721,7 +2760,7 @@ window.RELIEF=window.RELIEF||{};RELIEF.noise128="data:image/png;base64,iVBORw0KG
         }
       };
     }
-  }, { variant: 'v2', name: 'vine', defaults: { tilt: 5, wind: 1, tension: 0.6 } });
+  }, { variant: 'v2', name: 'vine', defaults: { tilt: 1, wind: .25, tension: .6, assemble:0, parallax:0, dens:.14 } });
 })();
 </script>
 </body>

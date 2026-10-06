@@ -59,7 +59,7 @@
 
   // мир → экран: камера графа + параллакс по высоте (выше = сильнее сдвиг)
   function toScreen(S, ctx, x, y, z) {
-    var p = S.G ? S.G.toScreen(x, y) : [x, y], k = 0.9 * (z || 0) / 28 * 10;
+    var p = S.G ? S.G.toScreen(x, y) : [x, y], k = 0.06 * (z || 0) / 28 * 10;
     return [p[0] + (S.pmx || 0) * k, p[1] + (S.pmy || 0) * k];
   }
   function toWorld(S, ctx, sx, sy) { return S.G ? S.G.toWorld(sx, sy) : [sx, sy]; }

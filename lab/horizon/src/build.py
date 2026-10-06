@@ -54,6 +54,7 @@ def main():
     check = '--check' in sys.argv
     bad = 0
     for scene, n, title, scripts in TARGETS:
+        if scene=='agents': continue
         if not all(os.path.exists(os.path.normpath(os.path.join(ROOT, 'lab/horizon/src', s))) for s in scripts):
             continue
         html = RB.build({'src': PAGE, 'title': title, 'scene': scripts, 'data': False})

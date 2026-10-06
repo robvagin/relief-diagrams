@@ -157,10 +157,10 @@
       N.forEach(function (n, i) {
         var st = G.state(i), lift = st.lift, dimK = st.fade;
         var z = (Z[n.z] + lift * 10) * zs * (1 - 0.45 * dimK);
-        var sp = G.toScreen(st.x, st.y), k = z / Math.max(1, 28 * ui) * 10 * ui;
+        var sp = G.toScreen(st.x, st.y), k = z / Math.max(1, 28 * ui) * .6 * ui;
         sp = [sp[0] + I.parX * k, sp[1] + I.parY * k];
         screen[i] = { x: sp[0], y: sp[1], z: z, dim: dimK, lift: lift };
-        var pl = { id: i, kind: n.kind === 'disc' ? 'circle' : 'rect', x: sp[0], y: sp[1], z: z, env: 0, rot: n.kind === 'disc' ? 0 : target[i].rot,
+        var pl = { id: i, kind: n.kind === 'disc' ? 'circle' : 'rect', x: sp[0], y: sp[1], z: z, env: 0, rot: n.kind === 'disc' ? 0 : opts.id==='stack'?(Math.PI/90)*Math.tanh(target[i].rot/.08):target[i].rot,
           w: (n.kind === 'disc' ? 2 * n.r : n.w) * zoom, h: (n.kind === 'disc' ? 2 * n.r : n.h) * zoom, r: n.kind === 'disc' ? 0 : (n.corner == null ? 2.5 : n.corner) * ui * zoom,
           assembleIndex: n.order == null ? i : n.order };
         // притухание ЦВЕТОМ: плашка уходит к полу, а не становится стеклом (pseudo-3d-layers §2)
@@ -186,6 +186,7 @@
           (mod.links || []).forEach(function (L) {
             var A = byId[L.a], B = byId[L.b];
             if (!A || !B) return;
+            if(L.secondary&&G.hover!==L.a&&G.hover!==L.b&&G.focus!==L.a&&G.focus!==L.b)return;
             var alpha = Math.min(al(L.a), al(L.b)) * (L.alpha == null ? 1 : L.alpha);
             var gap = 3 * F.ui, pa = edgePoint(A, B.x, B.y, gap), pb = edgePoint(B, A.x, A.y, gap);
             if (L.bend) {
@@ -194,7 +195,7 @@
             } else {
               strokeRelief(g, F, function (ox, oy) { g.moveTo(pa[0] + ox, pa[1] + oy); g.lineTo(pb[0] + ox, pb[1] + oy); }, alpha);
             }
-            if (L.ticks && P.ticks) ticks(g, F, pa, pb, L.ticks.share, L.ticks.full * zoom, alpha);
+            if (false && L.ticks && P.ticks) ticks(g, F, pa, pb, L.ticks.share, L.ticks.full * zoom, alpha);
           });
           if (mod.floorAfter) mod.floorAfter(g, F, screen, N);
           R.ink.fictional(g, F);

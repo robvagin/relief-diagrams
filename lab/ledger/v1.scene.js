@@ -12,7 +12,7 @@
     var recMax = Math.max.apply(null, s.recovered);
     nodes.push({ id: 'core', shape: 'disc', w: 2 * rc, h: 2 * rc, z: 2, print: core, info: ['Exposure Sep 2026', K.eur(s.exposure[n - 1]), '+' + K.pct(s.exposure[n - 1] / s.exposure[0] - 1) + ' in 12 months'] });
     chain.push({ id: 'core', rest: [0, 0], amp: 0 });
-    var pw = Math.min(0.05 * S, (TAU * r0 / n) * 0.62);
+    var pw = Math.min(0.062 * S, (TAU * r0 / n) * 0.62);
     s.exposure.forEach(function (v, i) {
       var a = -Math.PI / 2 + TAU * (i + 0.5) / n, len = Lmax * v / vmax, c = r0 + len / 2;
       var id = 'm' + i, rb = 0.012 * S + 0.03 * S * Math.sqrt(s.recovered[i] / recMax);
@@ -39,7 +39,7 @@
     K.text(g, F, '12 months', 0, px * 0.34 + 18 * F.ui, { size: 1, mono: true, color: I.ink2, align: 'center', min: 7 });
   }
   function petal(i, len) {
-    return function (g, F, I, w, h, n) { if (n.mark) K.dot(g, 0, -h / 2 + w * 0.5, Math.max(2.5, Math.min(w * 0.22, 4 * F.ui)), I.acc); };
+    return function(g,F,I,w,h,n){var s=LG.series(),str=K.month(s.months[i])+' · '+K.eur(s.exposure[i]);g.save();g.rotate(-Math.PI/2);if(Math.sin(n.rot||0)<0)g.rotate(Math.PI);g.textAlign='center';g.textBaseline='middle';g.fillStyle=I.ink;var px=Math.min(12,w*.30);g.font='400 '+px+'px Geist';var scale=Math.min(1,(h-w*.55)/Math.max(1,g.measureText(str).width));g.font='400 '+px*scale+'px Geist';g.fillText(str,0,0);g.restore();};
   }
   function bead(v) { return function (g, F, I, w) { var px = K.fit(g, F, v, w * 0.7, w * 0.3, { mono: true, weight: 500, min: 7 }); K.text(g, F, v, 0, px * 0.34, { px: px, mono: true, weight: 500, color: I.ink2, align: 'center' }); if (K.measure(g, F, 'recovered', {size:1,min:7}) < w * 0.8) K.text(g, F, 'recovered', 0, -px * 0.8, {size:1,min:7,color:I.ink3,align:'center'}); }; }
 
@@ -71,9 +71,11 @@
             K.relief(g, Fr, function (q, ox, oy) { q.moveTo(M.cx + rr + ox, M.cy + oy); q.arc(M.cx + ox, M.cy + oy, rr, 0, TAU); }, k ? 0.7 : 1);
             if (k && P.labelsL !== 'none') K.text(g, Fr, '€' + (v / 1e6) + 'M', M.cx + 4 * Fr.ui, M.cy - rr - 3 * Fr.ui, { size: 1, mono: true, color: I.ink3, min: 7 });
           });
+          // Quarter boundaries make the year readable without changing the encoded lengths.
+          for(var q=0;q<4;q++){var a=-Math.PI/2+q*TAU/4,ri=M.r0+M.Lmax+24*Fr.ui,ro=ri+12*Fr.ui;g.save();g.strokeStyle=I.ink3;g.globalAlpha=.24;g.lineWidth=.7;g.beginPath();g.moveTo(M.cx+Math.cos(a)*ri,M.cy+Math.sin(a)*ri);g.lineTo(M.cx+Math.cos(a)*ro,M.cy+Math.sin(a)*ro);g.stroke();g.restore();}
           // месяцы снаружи
           s.months.forEach(function (m, i) {
-            if (P.labelsL === 'none' || (P.labelsL === 'key' && i % 3 !== 2 && i !== 0)) return;
+            if (P.labelsL === 'none') return;
             var a = -Math.PI / 2 + TAU * (i + 0.5) / s.months.length, rr = M.r0 + M.Lmax * 0.84 + 0.1 * Math.min(F.W, F.H);
             var al = Math.cos(a) > 0.2 ? 'left' : Math.cos(a) < -0.2 ? 'right' : 'center';
             K.text(g, Fr, K.month(m) + (i === 0 || m.slice(5) === '01' ? ' ' + m.slice(2, 4) : ''), M.cx + Math.cos(a) * rr, M.cy + Math.sin(a) * rr + 4 * Fr.ui, { size: 1, mono: true, color: I.ink2, align: al, min: 7 });
@@ -82,5 +84,5 @@
         }
       };
     }
-  }, { variant: 'v1', name: 'flower', defaults: { tilt: 4, wind: 1, tension: 0.7 } });
+  }, { variant: 'v1', name: 'flower', defaults: { tilt: 1, wind: .25, tension: .7, assemble:0, parallax:0, dens:.12 } });
 })();

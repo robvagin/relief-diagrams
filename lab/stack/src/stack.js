@@ -68,21 +68,21 @@
     var ruleIx = {};
     Ly.rules.forEach(function (r, k) {
       var a = -Math.PI / 2 + k / Ly.rules.length * TAU;
-      ruleIx[r.id] = N.push(node({ id: r.id, kind: 'sheet', w: 140 * ui, h: 80 * ui, parent: dec, len: Rm * 0.36 * E, ang: a, sway: 1.2, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', rot: (k % 2 ? 1 : -1) * 5 * D2R })) - 1;
+      ruleIx[r.id] = N.push(node({ id: r.id, kind: 'sheet', w: 140 * ui, h: 80 * ui, parent: dec, len: Rm * 0.48 * E, ang: a, sway: 1.2, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', rot: (k % 2 ? 1 : -1) * 5 * D2R })) - 1;
     });
     // класс висит на первом правиле, которое его читает; остальные чтения — мягкими дугами
     var clsIx = {}, extra = [];
     Ly.classes.forEach(function (c) {
       var rd = Object.keys(READS).filter(function (k) { return READS[k].indexOf(c) >= 0; });
       var host = rd.length ? ruleIx[rd[0]] : dec, sib = Object.keys(clsIx).filter(function (q) { return N[clsIx[q]].parent === host; }).length;
-      var base = N[host].ang == null || host === dec ? 0 : N[host].ang, a = base + (sib - 0.5) * 26 * D2R + (host === dec ? Ly.classes.indexOf(c) * 0.9 : 0);
+      var base = N[host].ang == null || host === dec ? 0 : N[host].ang, a = base + (sib - 0.5) * 48 * D2R + (host === dec ? Ly.classes.indexOf(c) * 0.9 : 0);
       clsIx[c] = N.push(node({ id: 'k-' + c, kind: 'disc', r: 15 * ui, parent: host, len: Rm * (host === dec ? 0.7 : 0.32) * E, ang: a, sway: 2, depth: 2, z: 1, label: c, cls: c, layer: 'knowledge' })) - 1;
       rd.slice(1).forEach(function (k) { extra.push({ a: ruleIx[k], b: clsIx[c] }); });
     });
     Ly.data.forEach(function (d, k) {
       var cls = FEEDS[d.key], host = clsIx[cls[0]];
       var a = N[host].ang + (k - 1) * 10 * D2R;
-      var di = N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 156 * ui, h: 88 * ui, parent: host, len: Rm * 0.36 * E, ang: N[host].ang + (k % 2 ? 0.25 : -0.25), sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', rot: (k % 2 ? -1 : 1) * 6 * D2R })) - 1;
+      var di = N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 156 * ui, h: 88 * ui, parent: host, len: Rm * 0.48 * E, ang: N[host].ang + (k % 2 ? 0.25 : -0.25), sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', rot: (k % 2 ? -1 : 1) * 6 * D2R })) - 1;
       cls.slice(1).forEach(function (c) { if (clsIx[c] != null) extra.push({ a: clsIx[c], b: di }); });
       // точки займов: по 20 займов на диск, веером за листом данных
       if (d.key === 'loans') for (var i = 0; i < 6; i++) N.push(node({ id: 'dot' + i, kind: 'disc', r: 7 * ui, parent: di, len: 64 * ui + i * 4 * ui, ang: N[host].ang + (i - 2.5) * 16 * D2R, sway: 3, depth: 4, z: 1, dot: true, layer: 'data' }));
@@ -98,7 +98,7 @@
     // лепестки-правила: длинные листы по радиусу, внутренним краем под сердцевиной (тень сердцевины на них)
     Ly.rules.forEach(function (r, k) {
       var a = -Math.PI / 2 + k / Ly.rules.length * TAU;
-      N.push(node({ id: r.id, kind: 'sheet', w: 176 * ui, h: 84 * ui, parent: core, len: (52 + 62) * ui * E, ang: a, rot: a, spin: 1, sway: 1.3, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', petal: true }));
+      N.push(node({ id: r.id, kind: 'sheet', w: 176 * ui, h: 84 * ui, parent: core, len: (52 + 112) * ui * E, ang: a, rot: (k%2?1:-1)*.02, spin: .1, sway: 1.3, depth: 1, z: 2, label: r.id, rule: r, layer: 'rules', petal: true }));
     });
     // внешние лепестки-знания: диски в просветах между правилами, частично под ними
     Ly.classes.forEach(function (c, k) {
@@ -108,7 +108,7 @@
     // венчик данных: три листа и точки займов по внешнему кругу
     Ly.data.forEach(function (d, k) {
       var a = -Math.PI / 2 + Math.PI / 3 + k / 3 * TAU;
-      N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 156 * ui, h: 88 * ui, parent: core, len: Rm * 0.88 * E, ang: a, rot: a + Math.PI / 2, spin: 1, sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', petal: true }));
+      N.push(node({ id: 'd-' + d.key, kind: 'sheet', w: 156 * ui, h: 88 * ui, parent: core, len: Rm * 0.88 * E, ang: a, rot: (k%2?1:-1)*.02, spin: .1, sway: 2.4, depth: 3, z: 1, label: d.label, data: d, layer: 'data', petal: true }));
     });
     for (var i = 0; i < 18; i++) {
       var a = -Math.PI / 2 + (i + 0.5) / 18 * TAU;
@@ -147,7 +147,7 @@
     var links = [];
     if (L.wires) N.forEach(function (n, i) { if (n.parent >= 0) links.push({ a: n.parent, b: i, alpha: n.dot ? 0.45 : 0.8 }); });
     else if (!L.petals) N.forEach(function (n, i) { if (n.parent >= 0) links.push({ a: n.parent, b: i, alpha: n.dot ? 0.5 : 1 }); });
-    (L.extra || []).forEach(function (e) { links.push({ a: e.a, b: e.b, bend: 0.18, alpha: 0.55 }); });
+    (L.extra || []).forEach(function (e) { links.push({ a: e.a, b: e.b, bend: 0.18, alpha: 0.18, secondary:true }); });
     if (L.petals) N.forEach(function (n, i) { if (n.cls) links.push({ a: 0, b: i, bend: 0.12, alpha: 0.5 }); });
 
     return {
@@ -171,27 +171,10 @@
         title(g, F, Ly);
       },
       print: function (g, s, F, n) {
-        var ui2 = F.ui;
-        if (n.dec) {
-          R.ink.text(g, F, Ly.dec.id, s.x, s.y - 2 * ui2, { s: 2, w: 500, align: 'center' });
-          g.fillStyle = R.color.css(acc); g.beginPath(); g.arc(s.x - 26 * ui2, s.y + 13 * ui2, Math.max(3, 3.5 * ui2), 0, TAU); g.fill();
-          R.ink.text(g, F, Ly.dec.status, s.x + 4 * ui2, s.y + 17 * ui2, { s: 0, mono: true, tone: 'ink2', align: 'center' });
-          return;
-        }
-        if (n.dot || n.kind === 'disc') {
-          g.fillStyle = R.color.css(F.T.ink2, 0.7); g.beginPath(); g.arc(s.x, s.y, Math.max(1.2 * ui2, Math.min(2.4 * ui2, s.w * 0.08)), 0, TAU); g.fill();
-          return;
-        }
-        g.save(); g.translate(s.x, s.y); g.rotate(s.rot || 0);
-        if (n.petal && Math.cos(s.rot || 0) < 0) g.rotate(Math.PI);          // текст лепестка не вверх ногами
-        if (n.rule) {
-          R.ink.text(g, F, n.rule.id, -s.w / 2 + 9 * ui2, -s.h / 2 + 18 * ui2, { s: 0, mono: true, w: 500 });
-          R.ink.text(g, F, n.rule.kind, -s.w / 2 + 9 * ui2, -s.h / 2 + 34 * ui2, { s: 0, tone: 'ink3' });
-        } else if (n.data) {
-          R.ink.text(g, F, String(n.data.n), -s.w / 2 + 9 * ui2, -s.h / 2 + 26 * ui2, { s: 3, w: 500 });
-          R.ink.text(g, F, n.data.key, -s.w / 2 + 9 * ui2, -s.h / 2 + 44 * ui2, { s: 0, tone: 'ink3' });
-        }
-        g.restore();
+        if(n.dot){R.cardInk(g,s,F,['',String(1+Number(n.id.replace('dot','')))]);return;}
+        var lines=n.dec?[Ly.dec.id,Ly.dec.status,Ly.dec.action]:n.rule?[n.rule.id,n.rule.kind,n.rule.text]:n.data?[n.data.label,String(n.data.n)+' records','Source checked']:n.cls?[n.cls,'Class']:['Record'];
+        R.cardInk(g,s,F,lines);
+
       }
     };
   }
@@ -234,7 +217,7 @@
     id: 'stack', title: TITLES[V] || TITLES.v1,
     blurb: 'Model of record as hanging paper sheets and discs lifted by height: data, knowledge, rules, decision.',
     layoutKeys: ['explode', 'callouts', 'zscale'],
-    defaults: { zscale: 1.6, rim: 0.85, dens: 0.24 },
+    defaults: { zscale: 1.6, rim: 0, dens: .15, assemble:0, float:.3 },
     build: build,
     groups: {
       'Сцена': [['explode', 'Разнос', 0, 1, 0.01, V === 'v1' ? 0.8 : 0.6]],

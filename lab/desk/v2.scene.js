@@ -97,7 +97,17 @@
         return o;
       });
       var links = [];
-      M.stems.forEach(function (s) { links = links.concat(ORG.chainLinks(pos, s.ids, s.kind, s.alpha ? { alpha: s.alpha } : null)); });
+      M.stems.forEach(function (s) { var ids=s.ids.filter(function(id){return id.indexOf('-j')<0;});links=links.concat(ORG.chainLinks(pos,ids,'thread',{alpha:.28})); });
+      // Contextual stage satellites share one smooth life envelope with their link.
+      [0,1,2].forEach(function(j){
+        var parent=nodes.filter(function(n){return n.id==='st'+j;})[0],c=parent.data;
+        var phase=(t+j*5)%28,life=ctx.reduced?1:Math.pow(Math.sin(Math.PI*phase/28),2);
+        var w=parent.w*.42,angle=-.6+j*1.2,d=parent.w*.65+w*.35;
+        var x=parent.x+Math.cos(angle)*d,y=parent.y+Math.sin(angle)*d,id='stage-detail-'+j;
+        var label=j===1?'Share':'Loans',value=j===1?K.pct(c.value/D().breakdown.value):String(c.count);
+        nodes.push({id:id,shape:'disc',x:x,y:y,w:w*(.12+.88*life),h:w*(.12+.88*life),z:parent.z+.1,env:0,life:life,hit:life>.15,compactValue:value,info:[c.label,label+': '+value],print:function(g,F,I,ww,hh,n){g.save();Wd.W.bead(label,value)(g,F,I,ww,hh,n);g.restore();}});
+        links.push({a:parent.id,b:id,kind:'thread',alpha:.28*life});
+      });
       return {
         root: 'hub', nodes: nodes, links: links, key: 'plant',
         floor: function (g, Fr) {
@@ -108,5 +118,5 @@
         }
       };
     }
-  }, { variant: 'v2', name: 'plant', defaults: { tilt: 5, wind: 1, tension: 0.35 } });
+  }, { variant: 'v2', name: 'plant', defaults: { tilt: 1.2, wind: .32, tension: .85, assemble:0, parallax:.12, dens:.15 } });
 })();

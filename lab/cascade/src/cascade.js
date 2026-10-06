@@ -181,35 +181,13 @@
   }
 
   /* ── v3 · plant ──────────────────────────────────────────────────────── */
-  function plant(T, P, rect, ui, u) {
-    var root = T[0], H = rect.h;
-    root.x = rect.x + rect.w * 0.5; root.y = rect.y + rect.h - root.h / 2;
-    var st0 = root.kids.map(function (k) { return T[k]; }).sort(function (x, y) { return y.share - x.share; }), n = st0.length;
-    var st = n === 3 ? [st0[1], st0[0], st0[2]] : st0;
-    // стебли: веер вверх, высота = доля стадии; на стебле листья-сегменты по очереди слева и справа
-    var span = Math.min(130, P.spread * 0.45) * D2R;
-    T.stems = [];
-    st.forEach(function (s, i) {
-      var base = -Math.PI / 2 + (n === 1 ? 0 : -span / 2 + span * i / (n - 1));
-      var segs = s.kids.map(function (q) { return T[q]; }).sort(function (x, y) { return y.v - x.v; });
-      var total = root.h * 0.4 + 0.86 * H * (0.25 + 0.75 * Math.sqrt(s.share));
-      var nseg = Math.max(1, segs.length), stepL = total / (nseg + 1), prev = 0, ang = base, bend = (i - (n - 1) / 2) * 14 * D2R;
-      var chain = [0];
-      segs.forEach(function (g, j) {
-        ang += bend / nseg;
-        g.parent = prev; g.ang = ang; g.len = j === 0 ? root.h / 2 + stepL * 0.8 : stepL; g.sway = 1.3 + 0.35 * j; g.full = 0;
-        g.rot = ang + Math.PI / 2 + ((j % 2) ? 1 : -1) * 0.5;      // лист отогнут от стебля
-        prev = g.i; chain.push(g.i);
-        // плоды: висят под листом, вниз и наружу, на короткой ножке
-        var side = (j % 2) ? 1 : -1;
-        g.kids.forEach(function (ci, k) {
-          var c = T[ci]; c.parent = g.i; c.ang = Math.PI / 2 + side * (55 - k * 14) * D2R; c.len = g.re * 0.7 + c.re + u * 0.3 + 0.08 * H * c.share; c.sway = 2.2; c.full = 0;
-        });
+  function plant(T,P,rect,ui,u){
+    var root=T[0],positions={};root.x=rect.x+rect.w*.5;root.y=rect.y+rect.h*.86;positions[0]=[root.x,root.y];T.stems=[];
+    function place(n,x,y,parent){var p=positions[parent];n.parent=parent;n.len=Math.hypot(x-p[0],y-p[1]);n.ang=Math.atan2(y-p[1],x-p[0]);n.sway=.35;n.full=0;n.rot=0;positions[n.i]=[x,y];}
+    root.kids.forEach(function(si,j){var stage=T[si],cx=rect.x+rect.w*(.18+j*.32),cy=rect.y+rect.h*(j===1?.24:.47);place(stage,cx,cy,0);T.stems.push({stage:si,chain:[0,si]});
+      stage.kids.forEach(function(gi,k){var seg=T[gi],a=-Math.PI*.88+k*Math.PI*.78,dx=Math.cos(a)*rect.w*.13,dy=Math.sin(a)*rect.h*.24;place(seg,cx+dx,cy+dy,si);T.stems.push({stage:si,chain:[si,gi]});
+        var count=seg.kids.length;seg.kids.forEach(function(ci,l){var child=T[ci],aa=a+(l-(count-1)/2)*.48,dist=seg.re+child.re+u*2.4;place(child,positions[gi][0]+Math.cos(aa)*dist,positions[gi][1]+Math.sin(aa)*dist,gi);});
       });
-      // цветок стадии на вершине стебля
-      s.parent = prev; s.ang = ang; s.len = prev === 0 ? total : stepL; s.sway = 1.8; s.full = 0;
-      chain.push(s.i);
-      T.stems.push({ stage: s.i, chain: chain });
     });
   }
 
@@ -260,6 +238,7 @@
     if (V === 'v2') octopus(T, P, rect, ui, u); else if (V === 'v3') plant(T, P, rect, ui, u); else satellites(T, P, rect, ui, u, ctx.rand);
     var arms = T.arms, stems = T.stems;
     T = topo(T);
+
     var s = fit(T, rect, P);
     var z = function (n) { return n.depth === 0 ? 3 : n.depth === 3 ? 1 : 2; };
     var nodes = toNodes(T, z);
@@ -304,7 +283,7 @@
       floorAfter: function (g, F, sc) {
         // подписи на полу у узлов (z0), притухают вместе с узлом
         T.forEach(function (n, i) {
-          if (!n.lab) return;
+          if (!n.lab || n.r*2>=22 || n.sheet) return;
           var q = sc[i], x = q.x + n.lab.dx * R.org.zoom(), y = q.y + n.lab.dy * R.org.zoom(), a = 1 - 0.75 * q.dim;
           if (n.depth === 3) { R.ink.text(g, F, n.label, x, y + 11.67 * F.ui, { s: 0, mono: true, tone: 'ink2', alpha: a }); return; }
           R.ink.text(g, F, n.label, x, y + (n.depth === 1 ? 14 : 11.67) * F.ui, { s: n.depth === 1 ? 1 : 0, w: n.depth === 1 ? 500 : 400, tone: 'ink', alpha: a });
@@ -313,40 +292,10 @@
         legend(g, F, P, D, T);
       },
       print: function (g, s2, F, nd) {
-        var n = nd.src, i = s2.id, ui = F.ui;
-        if (n.depth === 0) {
-          if (!n.sheet) {
-            R.ink.text(g, F, 'Loan book', s2.x, s2.y - 6 * ui, { s: 3, w: 500, align: 'center' });
-            R.ink.text(g, F, fmt(n, P.metric), s2.x, s2.y + 16 * ui, { s: 1, mono: true, tone: 'ink2', align: 'center' });
-            return;
-          }
-          var k = Math.min(1.2, s2.w / (240 * ui));
-          g.save(); g.translate(s2.x, s2.y); g.rotate(s2.rot || 0);
-          R.ink.text(g, F, 'Loan book', -s2.w / 2 + 14 * ui, -s2.h / 2 + 24 * ui * k, { s: 2, w: 500 });
-          R.ink.text(g, F, fmt(n, P.metric), -s2.w / 2 + 14 * ui, -s2.h / 2 + 24 * ui * k + 32 * ui * k, { s: k > 0.9 ? 5 : 4, w: 500 });
-          R.ink.text(g, F, n.count + ' loans', -s2.w / 2 + 14 * ui, s2.h / 2 - 14 * ui, { s: 0, mono: true, tone: 'ink3' });
-          g.restore();
-          return;
-        }
-        if (!n.sheet) {
-          // семя: графитовая точка в центре диска, данные напечатаны (§2.4)
-          if (!n.inside || n.depth === 3) { g.fillStyle = R.color.css(F.T.ink2, 0.7 * (1 - 0.7 * (nd ? 0 : 0))); g.beginPath(); g.arc(s2.x, s2.y + (n.inside ? 7 * ui : 0), Math.max(1.2 * ui, Math.min(2.6 * ui, s2.w * 0.06)), 0, TAU); g.fill(); }
-          if (i === focusStage) { g.fillStyle = R.color.css(acc); g.beginPath(); g.arc(s2.x + s2.w * 0.24, s2.y - s2.w * 0.24, Math.max(3, 3.5 * ui), 0, TAU); g.fill(); }
-          if (n.inside && n.depth === 1) {
-            R.ink.text(g, F, n.label, s2.x, s2.y - 2 * ui, { s: 1, w: 500, align: 'center' });
-            R.ink.text(g, F, fmt(n, P.metric), s2.x, s2.y + 14 * ui, { s: 0, mono: true, tone: 'ink3', align: 'center' });
-          } else if (n.inside) {
-            R.ink.text(g, F, n.label, s2.x, s2.y + 1 * ui, { s: 0, mono: true, tone: 'ink2', align: 'center' });
-          }
-          return;
-        }
-        if (n.inside) {
-          g.save(); g.translate(s2.x, s2.y); g.rotate(s2.rot || 0);
-          if (Math.cos(s2.rot || 0) < 0) g.rotate(Math.PI);                 // подпись листа не вверх ногами
-          R.ink.text(g, F, n.label, -s2.w / 2 + 8 * ui, -s2.h / 2 + 16 * ui, { s: 0, w: 500 });
-          R.ink.text(g, F, fmt(n, P.metric), -s2.w / 2 + 8 * ui, -s2.h / 2 + 31 * ui, { s: 0, mono: true, tone: 'ink3' });
-          g.restore();
-        }
+        var n=nd.src;var title=n.depth===0?'Loan book':n.label;
+        var value=fmt(n,P.metric);if(s2.w<100)value=value.replace(/\.\d+/,'');var extra=n.depth?n.count+' loans · '+(n.share*100).toFixed(1)+'%':'As of '+D.meta.asOf;
+        if(s2.w<22)return; if(s2.w<46&&!n.sheet)R.cardInk(g,s2,F,['',n.depth===3?n.label:value.replace(/\.\d+/,'')]);else R.cardInk(g,s2,F,[title,value,extra]);
+
       }
     };
     return mod;
@@ -359,8 +308,8 @@
     var lines = ['How to read',
       'Area = ' + (P.metric === 'count' ? 'number of loans' : 'exposure, EUR') + ' (root fixed; small nodes enlarged)' ,
       V === 'v3' ? 'Stem height = share of the book' : V === 'v2' ? 'Arm length = share of its stage' : 'Distance to the parent = share of the parent',
-      P.ticks ? 'Tick = 10 % of the parent' : 'Ticks off',
-      'Height above the floor = level: book, stage, segment, country'];
+      'Card = segment · circle = stage or country',
+      'Select a node for exact values'];
     var y = F.H - m - (lines.length - 1) * 16 * ui;
     lines.forEach(function (s, i) { R.ink.text(g, F, s, m, y, { s: 0, mono: i > 0, caps: i === 0, w: i === 0 ? 500 : 400, tone: 'ink3' }); y += 16 * ui; });
   }
@@ -371,12 +320,12 @@
     blurb: 'Loan book as a living organism of matte discs and paper sheets: area is exposure, distance is share.',
     layoutKeys: ['levels', 'spread', 'phyllo', 'rmax', 'metric', 'ticks', 'zscale'],
     // плашки отделены от пола светом: выше лестница высот и ярче кант, чем у общего дефолта
-    defaults: { zscale: 1.6, rim: 0.85, dens: 0.24 },
+    defaults: { zscale: 1.6, rim: 0, dens: .15, assemble:0, ticks:0, float:.35 },
     build: build,
     groups: {
       'Сцена': [['levels', 'Уровней', 1, 3, 1, 3]],
-      'Ритм': [['spread', 'Раскрытие, °', 90, 360, 1, V === 'v1' ? 320 : V === 'v2' ? 300 : 240], ['ticks', 'Засечки', 0, 1, 1, 1],
-        ['phyllo', 'Филлотаксис', 0, 1, 1, 0], ['rmax', 'Крупнейший, px', 40, 240, 1, V === 'v1' ? 150 : V === 'v2' ? 110 : 120]],
+      'Ритм': [['spread', 'Раскрытие, °', 90, 360, 1, V === 'v1' ? 320 : V === 'v2' ? 300 : 240], ['ticks', 'Засечки', 0, 1, 1, 0],
+        ['phyllo', 'Филлотаксис', 0, 1, 1, 0], ['rmax', 'Крупнейший, px', 40, 240, 1, V === 'v1' ? 118 : V === 'v2' ? 110 : 86]],
       'Данные': [['metric', 'Мера', ['value', 'count'], 'value', ['Объём', 'Число']]]
     }
   });
