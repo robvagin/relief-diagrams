@@ -144,11 +144,12 @@
     EXPLORE_WIDGETS.buoyancy(nodes,ctx,t);
     EXPLORE_WIDGETS.route(nodes,ctx,yaw,t);
     nodes.forEach(function(n){n.x+=area.x;n.y+=area.y;});
+    RELIEF_ACCENT.decorate(nodes,ctx);
     return nodes;
   }
   function pick(x,y) {
     for(var i=S.last.length-1;i>=0;i--){var n=S.last[i];if(n.node.life!=null&&n.node.life<.15)continue;var dx=x-n.sx,dy=y-n.sy,c=Math.cos(-n.srot),s=Math.sin(-n.srot);
-      if(n.shape==='disc'?Math.hypot(dx,dy)<=n.sw/2+4:Math.abs(c*dx-s*dy)<=n.sw/2+5&&Math.abs(s*dx+c*dy)<=n.sh/2+5)return n.i;
+      if(n.node.accent?RELIEF_ACCENT.contains(Object.assign({},n.node,{w:n.sw,h:n.sh}),dx,dy):n.shape==='disc'?Math.hypot(dx,dy)<=n.sw/2+4:Math.abs(c*dx-s*dy)<=n.sw/2+5&&Math.abs(s*dx+c*dy)<=n.sh/2+5)return n.i;
     }return -1;
   }
   function graph(ctx,nodes) {
@@ -200,9 +201,9 @@
   var DISCS=new Map();
   function discTexture(n,F){
     var caption=(n.baseW||n.w)>=64;
-    var key=[n.id,caption,F.ctx.theme,F.P.accent,F.P.temp].join('|');if(DISCS.has(key))return DISCS.get(key);
+    var key=[n.id,n.accent||'',caption,F.ctx.theme,F.P.accent,F.P.temp].join('|');if(DISCS.has(key))return DISCS.get(key);
     var cv=document.createElement('canvas');cv.width=cv.height=256;var g=cv.getContext('2d');g.translate(128,128);g.scale(2.56,2.56);
-    var I=K.inks(F);g.fillStyle=R.color.css(F.tn.plate);g.beginPath();g.arc(0,0,50,0,TAU);g.fill();
+    var I=K.inks(F);if(!n.accent){g.fillStyle=R.color.css(F.tn.plate);g.beginPath();g.arc(0,0,50,0,TAU);g.fill();}
     function text(s,y,px,color,weight){K.font(g,F,{px:px,min:1,weight:weight||400});var width=g.measureText(s).width;
       K.text(g,F,s,0,y,{px:Math.min(px,px*78/Math.max(1,width)),min:1,weight:weight||400,align:'center',color:color||I.ink});}
     if(n.id==='hub'){text('Loan book',-5,11.5,I.ink2);text('240',23,26,I.ink,500);}
@@ -240,11 +241,12 @@
     S.textures.set(key,cv);if(S.textures.size>24)S.textures.delete(S.textures.keys().next().value);return cv;
   }
   function outline(g,n) {
+    if(n.accent){RELIEF_ACCENT.path(g,n.accent,0,0,n.w,n.h,n.accentAngle);return;}
     g.beginPath();if(n.kind==='circle')g.arc(0,0,n.w/2,0,TAU);else g.rect(-n.w/2,-n.h/2,n.w,n.h);
   }
   function paper(g,n,F) {
     g.save();g.translate(n.x,n.y);g.rotate(n.rot);
-    if(n.kind==='circle'){g.imageSmoothingQuality='high';g.drawImage(discTexture(n,F),-n.w/2,-n.h/2,n.w,n.h);}
+    if(n.kind==='circle'){if(n.accent){RELIEF_ACCENT.paint(g,n,F);outline(g,n);g.clip();}g.imageSmoothingQuality='high';g.drawImage(discTexture(n,F),-n.w/2,-n.h/2,n.w,n.h);}
     else {
       g.imageSmoothingQuality='high';
       var cv=texture(n,F),r=n.refresh;
@@ -280,11 +282,11 @@
   // Cached low-resolution silhouettes: only overlapping papers receive a faint shadow.
   function shadowSprite(n,F,gap) {
     var softness=Math.min(16,Math.max(4,Math.round((4+gap/8/F.ui)/2)*2));
-    var key=n.kind+'|'+softness+'|'+F.ctx.theme;
+    var key=n.kind+'|'+(n.accent||'')+'|'+(n.accentAngle||0).toFixed(3)+'|'+softness+'|'+F.ctx.theme;
     if(!S.shadows)S.shadows=new Map();if(S.shadows.has(key))return S.shadows.get(key);
     var cv=document.createElement('canvas');cv.width=cv.height=192;var g=cv.getContext('2d');
     g.fillStyle=R.color.css(F.tn.shadow,.36);
-    if(n.kind==='circle'){g.beginPath();g.arc(96,96,64,0,TAU);g.fill();}else g.fillRect(32,32,128,128);
+    if(n.accent){RELIEF_ACCENT.path(g,n.accent,96,96,128,128,n.accentAngle);g.fill();}else if(n.kind==='circle'){g.beginPath();g.arc(96,96,64,0,TAU);g.fill();}else g.fillRect(32,32,128,128);
     RELIEF_SOFT.blur(cv,softness);S.shadows.set(key,cv);return cv;
   }
   function receiverShadow(g,n,plates,F) {
@@ -292,7 +294,7 @@
     var candidates=plates.filter(function(o){return o.z>n.z+.1&&(o.life==null||o.life>.01);}).map(function(o){var gap=o.z-n.z,off=R.light.offset(F.L,o.x,o.y,o.z,n.z);return {o:o,gap:gap,x:o.x+off[0],y:o.y+off[1]};}).filter(function(c){return Math.abs(c.x-n.x)<(c.o.w+n.w)*.65&&Math.abs(c.y-n.y)<(c.o.h+n.h)*.65;}).sort(function(a,b){return a.gap-b.gap;}).slice(0,3);
     candidates.forEach(function(c){var o=c.o;
       g.save();g.translate(n.x,n.y);g.rotate(n.rot);outline(g,n);g.clip();g.rotate(-n.rot);g.translate(-n.x,-n.y);
-      g.globalAlpha=Math.min(.80,+F.P.dens*3.5)/(1+c.gap/(140*F.ui))*(o.life==null?1:o.life)*(n.life==null?1:n.life);
+      g.globalAlpha=Math.min(.90,Math.min(.80,+F.P.dens*3.5)*(o.accent?Math.max(0,+F.P.reliefStrength||0)/55:1))/(1+c.gap/(140*F.ui))*(o.life==null?1:o.life)*(n.life==null?1:n.life);
       g.translate(c.x,c.y);g.rotate(o.rot);g.imageSmoothingQuality='low';g.drawImage(shadowSprite(o,F,c.gap),-.75*o.w,-.75*o.h,1.5*o.w,1.5*o.h);g.restore();
     });
   }
@@ -347,10 +349,10 @@
   window.LETTER={world:world,state:S,refresh:refresh,impulse:impulse,drag:DRAG,discs:DISCS};
   RELIEF_APP.run({id:'desk',title:'Desk · '+EX.name,blurb:'The original mobile, suspended around a common axis.',
     hint:'One shared orbit. Tap a sheet for details; pinch or scroll to inspect.',
-    rows:{scene:[['story', 'Narrative panel', 0,1,1,1],['storyX', 'Panel X, %', -40,40,1,0],['storyY', 'Panel Y, %', -40,40,1,0],['storyHeight', 'Panel height', 0,800,10,320],['orbit', 'Orbit', 0,1,1,1],['orbitPeriod', 'Orbit period, s', 48,960,1,384],['orbitAngle', 'Angle, degrees', 0,360,1,0],
+    rows:{scene:[['accentForms', 'Accent shapes, %', 0,100,1,55],['reliefStrength', 'Relief strength', 0,100,1,55],['story', 'Narrative panel', 0,1,1,1],['storyX', 'Panel X, %', -40,40,1,0],['storyY', 'Panel Y, %', -40,40,1,0],['storyHeight', 'Panel height', 0,800,10,320],['orbit', 'Orbit', 0,1,1,1],['orbitPeriod', 'Orbit period, s', 48,960,1,384],['orbitAngle', 'Angle, degrees', 0,360,1,0],
       ['depthView', 'Depth', 0,1,0.01,0.65],['refresh', 'Content refresh', 0,1,1,1]]},
     draw:draw,structural:function(){S.shadows=null;S.textures.clear();DISCS.clear();},
     capture:function(ctx){var save={G:S.G,key:S.key,last:S.last,shadows:S.shadows,model:S.model,modelKey:S.modelKey,links:S.links},last=R.last,org={G:ORG.state.G,last:ORG.state.last};
       S.G=null;try{draw(ctx);}finally{Object.assign(S,save);Object.assign(ORG.state,org);R.last=last;}}
-  },{variant:EX.variant,name:EX.name,defaults:{story:1,storyX:0,storyY:0,storyHeight:320,orbit:1,orbitPeriod:384,orbitAngle:0,depthView:EX.letter?.65:1,refresh:1,refreshWeight:1,float:0,parallax:0,wind:0,assemble:0,tilt:6}});
+  },{variant:EX.variant,name:EX.name,defaults:{accentForms:55,reliefStrength:55,story:1,storyX:0,storyY:0,storyHeight:320,orbit:1,orbitPeriod:384,orbitAngle:0,depthView:EX.letter?.65:1,refresh:1,refreshWeight:1,float:0,parallax:0,wind:0,assemble:0,tilt:6}});
 })();

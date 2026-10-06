@@ -156,6 +156,7 @@ def build(scene, ver, title):
     parts.append(script(rd('lab', scene, ver + '.scene.js'), 'lab/%s/%s.scene.js' % (scene, ver)))
     if scene=='desk' and ver=='v4':
         parts.append(script(rd('lab','desk','portable-blur.js'),'cached cross-browser blur'))
+        parts.append(script(rd('lab','desk','relief-accents.js'),'compound relief accents'))
         parts.append(script(rd('lab','desk','narrative-r3.js'),'static narrative plane'))
     if scene == 'desk' and ver in ('v4', 'v5', 'v6', 'v7', 'v8', 'v9'):
         parts.append(script(rd('lab', 'desk', 'explore-next.scene.js' if ver == 'v9' else 'iteration-r3.scene.js' if ver=='v4' else 'iteration-r2.scene.js' if ver in ('v5','v8') else 'iteration.scene.js'), 'shared exploration renderer'))
