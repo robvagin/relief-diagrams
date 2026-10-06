@@ -84,7 +84,7 @@
     return {id:id,u:u,weight:weight,old:1-smooth(u/.20)};
   }
   function world(ctx,t) {
-    var area=RELIEF_STORY.layout(ctx.W,ctx.H,ctx.P.story).area;ctx=Object.assign({},ctx,{W:area.w,H:area.h});
+    var area=RELIEF_STORY.layout(ctx.W,ctx.H,ctx.P.story,ctx.P).area;ctx=Object.assign({},ctx,{W:area.w,H:area.h});
     var P=ctx.P,W=ctx.W,H=ctx.H,ui=R.ui(W,H),key=[W,H,P.spread].join('|');
     if(S.modelKey!==key){S.model=model({W:W,H:H,ui:ui,m:.06*Math.min(W,H)},P);S.modelKey=key;
       var adj={};S.model.nodes.forEach(function(n){adj[n.id]=[];});S.model.links.forEach(function(l){adj[l.a].push(l.b);adj[l.b].push(l.a);});
@@ -346,10 +346,10 @@
   window.LETTER={world:world,state:S,refresh:refresh,impulse:impulse,drag:DRAG,discs:DISCS};
   RELIEF_APP.run({id:'desk',title:'Desk · '+EX.name,blurb:'The original mobile, suspended around a common axis.',
     hint:'One shared orbit. Tap a sheet for details; pinch or scroll to inspect.',
-    rows:{scene:[['story', 'Narrative panel', 0,1,1,1],['orbit', 'Orbit', 0,1,1,1],['orbitPeriod', 'Orbit period, s', 48,960,1,384],['orbitAngle', 'Angle, degrees', 0,360,1,0],
+    rows:{scene:[['story', 'Narrative panel', 0,1,1,1],['storyX', 'Panel X, %', -40,40,1,0],['storyY', 'Panel Y, %', -40,40,1,0],['storyHeight', 'Panel height', 0,800,10,320],['orbit', 'Orbit', 0,1,1,1],['orbitPeriod', 'Orbit period, s', 48,960,1,384],['orbitAngle', 'Angle, degrees', 0,360,1,0],
       ['depthView', 'Depth', 0,1,0.01,0.65],['refresh', 'Content refresh', 0,1,1,1]]},
     draw:draw,structural:function(){S.shadows=null;S.textures.clear();DISCS.clear();},
     capture:function(ctx){var save={G:S.G,key:S.key,last:S.last,shadows:S.shadows,model:S.model,modelKey:S.modelKey,links:S.links},last=R.last,org={G:ORG.state.G,last:ORG.state.last};
       S.G=null;try{draw(ctx);}finally{Object.assign(S,save);Object.assign(ORG.state,org);R.last=last;}}
-  },{variant:EX.variant,name:EX.name,defaults:{story:1,orbit:1,orbitPeriod:384,orbitAngle:0,depthView:EX.letter?.65:1,refresh:1,refreshWeight:1,float:0,parallax:0,wind:0,assemble:0,tilt:6}});
+  },{variant:EX.variant,name:EX.name,defaults:{story:1,storyX:0,storyY:0,storyHeight:320,orbit:1,orbitPeriod:384,orbitAngle:0,depthView:EX.letter?.65:1,refresh:1,refreshWeight:1,float:0,parallax:0,wind:0,assemble:0,tilt:6}});
 })();

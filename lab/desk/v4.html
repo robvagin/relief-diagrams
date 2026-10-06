@@ -2832,13 +2832,15 @@ window.RELIEF_EXPLORE={variant:"v4",mode:"orbit",name:"Letter ensemble",letter:t
 /* static narrative plane */
 /* Real HTML narrative surface; the same geometry participates in Canvas lighting and export. */
 (function(){'use strict';var R=RELIEF,root=null,lastKey='',maskCache=new Map();
-function layout(W,H,on){if(!on)return{panel:null,area:{x:0,y:0,w:W,h:H}};
- var narrow=W<700,pad=narrow?16:Math.max(24,W*.035),w=narrow?W-pad*2:Math.max(240,Math.min(330,W*.29)),h=narrow?Math.min(220,H*.32):Math.min(360,H*.68),y=narrow?16:(H-h)*.46;
- return{panel:{x:pad,y:y,w:w,h:h},area:narrow?{x:0,y:y+h+14,w:W,h:Math.max(90,H-y-h-26)}:{x:W*.235,y:16,w:W*.765,h:H-32}};
+function layout(W,H,on,P){P=P||{};if(!on)return{panel:null,area:{x:0,y:0,w:W,h:H}};
+ var narrow=W<700,pad=narrow?16:Math.max(24,W*.035),w=narrow?W-pad*2:Math.max(240,Math.min(330,W*.29)),h=narrow?Math.min(220,H*.32):Math.min(360,H*.68),y=(narrow?16:(H-h)*.32)+(+P.storyY||0)*H/100;
+ pad=(narrow?pad:W*.16)+(+P.storyX||0)*W/100;
+ return{panel:{x:pad,y:y,w:w,h:h},area:narrow?{x:0,y:30+h,w:W,h:Math.max(90,H-h-42)}:{x:W*.235,y:16,w:W*.765,h:H-32}};
 }
-function geometry(ctx,F){var p=layout(ctx.W,ctx.H,ctx.P.story).panel;if(!p)return null;return{id:'narrative',kind:'rect',x:p.x+p.w/2,y:p.y+p.h/2,w:p.w,h:p.h,z:450*F.ui,rot:0,life:1,box:p};}
+function geometry(ctx,F){var p=layout(ctx.W,ctx.H,ctx.P.story,ctx.P).panel;if(!p)return null;return{id:'narrative',kind:'rect',x:p.x+p.w/2,y:p.y+p.h/2,w:p.w,h:p.h,z:(ctx.P.storyHeight==null?320:+ctx.P.storyHeight)*F.ui,rot:0,life:1,box:p};}
 function copy(g,p){var compact=p.h<300,scale=compact?1:Math.min(1,p.h/340),pad=compact?16:24*scale,w=p.w-pad*2;
  var groups=[{tag:'p',text:'PORTFOLIO OVERVIEW',size:10,weight:400,y:28},{tag:'h2',text:'See the whole\npicture.',size:30,weight:400,y:65},{tag:'p',text:'Explore the records, decisions and evidence behind the numbers. The details change; the context stays in view.',size:15,weight:400,y:154},{tag:'p',text:'Fictional portfolio · 240 loans',size:11,weight:400,y:310}];
+ if(p.w<280&&!compact){groups[1].size=26;groups[1].text='See the whole picture.';}
  if(compact){groups[0].size=9;groups[0].y=12;groups[1].size=24;groups[1].y=32;groups[1].text='See the whole picture.';groups[2].size=13;groups[2].y=92;groups[3].size=10;groups[3].y=p.h-25;}
  return groups.map(function(row){var px=row.size*scale,lines=[];g.font=row.weight+' '+px+'px Geist,system-ui';row.text.split('\n').forEach(function(par){var line='';par.split(' ').forEach(function(word){var next=line?line+' '+word:word;if(line&&g.measureText(next).width>w){lines.push(line);line=word;}else line=next;});lines.push(line);});return Object.assign({},row,{x:pad,y:row.y*scale,size:px,leading:px*(row.tag==='h2'?1.08:1.42),lines:lines});});
 }
@@ -2942,7 +2944,7 @@ window.RELIEF_STORY={layout:layout,geometry:geometry,ground:ground,paint:paint,c
     return {id:id,u:u,weight:weight,old:1-smooth(u/.20)};
   }
   function world(ctx,t) {
-    var area=RELIEF_STORY.layout(ctx.W,ctx.H,ctx.P.story).area;ctx=Object.assign({},ctx,{W:area.w,H:area.h});
+    var area=RELIEF_STORY.layout(ctx.W,ctx.H,ctx.P.story,ctx.P).area;ctx=Object.assign({},ctx,{W:area.w,H:area.h});
     var P=ctx.P,W=ctx.W,H=ctx.H,ui=R.ui(W,H),key=[W,H,P.spread].join('|');
     if(S.modelKey!==key){S.model=model({W:W,H:H,ui:ui,m:.06*Math.min(W,H)},P);S.modelKey=key;
       var adj={};S.model.nodes.forEach(function(n){adj[n.id]=[];});S.model.links.forEach(function(l){adj[l.a].push(l.b);adj[l.b].push(l.a);});
@@ -3204,12 +3206,12 @@ window.RELIEF_STORY={layout:layout,geometry:geometry,ground:ground,paint:paint,c
   window.LETTER={world:world,state:S,refresh:refresh,impulse:impulse,drag:DRAG,discs:DISCS};
   RELIEF_APP.run({id:'desk',title:'Desk · '+EX.name,blurb:'The original mobile, suspended around a common axis.',
     hint:'One shared orbit. Tap a sheet for details; pinch or scroll to inspect.',
-    rows:{scene:[['story', 'Narrative panel', 0,1,1,1],['orbit', 'Orbit', 0,1,1,1],['orbitPeriod', 'Orbit period, s', 48,960,1,384],['orbitAngle', 'Angle, degrees', 0,360,1,0],
+    rows:{scene:[['story', 'Narrative panel', 0,1,1,1],['storyX', 'Panel X, %', -40,40,1,0],['storyY', 'Panel Y, %', -40,40,1,0],['storyHeight', 'Panel height', 0,800,10,320],['orbit', 'Orbit', 0,1,1,1],['orbitPeriod', 'Orbit period, s', 48,960,1,384],['orbitAngle', 'Angle, degrees', 0,360,1,0],
       ['depthView', 'Depth', 0,1,0.01,0.65],['refresh', 'Content refresh', 0,1,1,1]]},
     draw:draw,structural:function(){S.shadows=null;S.textures.clear();DISCS.clear();},
     capture:function(ctx){var save={G:S.G,key:S.key,last:S.last,shadows:S.shadows,model:S.model,modelKey:S.modelKey,links:S.links},last=R.last,org={G:ORG.state.G,last:ORG.state.last};
       S.G=null;try{draw(ctx);}finally{Object.assign(S,save);Object.assign(ORG.state,org);R.last=last;}}
-  },{variant:EX.variant,name:EX.name,defaults:{story:1,orbit:1,orbitPeriod:384,orbitAngle:0,depthView:EX.letter?.65:1,refresh:1,refreshWeight:1,float:0,parallax:0,wind:0,assemble:0,tilt:6}});
+  },{variant:EX.variant,name:EX.name,defaults:{story:1,storyX:0,storyY:0,storyHeight:320,orbit:1,orbitPeriod:384,orbitAngle:0,depthView:EX.letter?.65:1,refresh:1,refreshWeight:1,float:0,parallax:0,wind:0,assemble:0,tilt:6}});
 })();
 </script>
 </body>

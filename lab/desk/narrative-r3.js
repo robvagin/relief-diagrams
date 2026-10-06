@@ -1,12 +1,14 @@
 /* Real HTML narrative surface; the same geometry participates in Canvas lighting and export. */
 (function(){'use strict';var R=RELIEF,root=null,lastKey='',maskCache=new Map();
-function layout(W,H,on){if(!on)return{panel:null,area:{x:0,y:0,w:W,h:H}};
- var narrow=W<700,pad=narrow?16:Math.max(24,W*.035),w=narrow?W-pad*2:Math.max(240,Math.min(330,W*.29)),h=narrow?Math.min(220,H*.32):Math.min(360,H*.68),y=narrow?16:(H-h)*.46;
- return{panel:{x:pad,y:y,w:w,h:h},area:narrow?{x:0,y:y+h+14,w:W,h:Math.max(90,H-y-h-26)}:{x:W*.235,y:16,w:W*.765,h:H-32}};
+function layout(W,H,on,P){P=P||{};if(!on)return{panel:null,area:{x:0,y:0,w:W,h:H}};
+ var narrow=W<700,pad=narrow?16:Math.max(24,W*.035),w=narrow?W-pad*2:Math.max(240,Math.min(330,W*.29)),h=narrow?Math.min(220,H*.32):Math.min(360,H*.68),y=(narrow?16:(H-h)*.32)+(+P.storyY||0)*H/100;
+ pad=(narrow?pad:W*.16)+(+P.storyX||0)*W/100;
+ return{panel:{x:pad,y:y,w:w,h:h},area:narrow?{x:0,y:30+h,w:W,h:Math.max(90,H-h-42)}:{x:W*.235,y:16,w:W*.765,h:H-32}};
 }
-function geometry(ctx,F){var p=layout(ctx.W,ctx.H,ctx.P.story).panel;if(!p)return null;return{id:'narrative',kind:'rect',x:p.x+p.w/2,y:p.y+p.h/2,w:p.w,h:p.h,z:450*F.ui,rot:0,life:1,box:p};}
+function geometry(ctx,F){var p=layout(ctx.W,ctx.H,ctx.P.story,ctx.P).panel;if(!p)return null;return{id:'narrative',kind:'rect',x:p.x+p.w/2,y:p.y+p.h/2,w:p.w,h:p.h,z:(ctx.P.storyHeight==null?320:+ctx.P.storyHeight)*F.ui,rot:0,life:1,box:p};}
 function copy(g,p){var compact=p.h<300,scale=compact?1:Math.min(1,p.h/340),pad=compact?16:24*scale,w=p.w-pad*2;
  var groups=[{tag:'p',text:'PORTFOLIO OVERVIEW',size:10,weight:400,y:28},{tag:'h2',text:'See the whole\npicture.',size:30,weight:400,y:65},{tag:'p',text:'Explore the records, decisions and evidence behind the numbers. The details change; the context stays in view.',size:15,weight:400,y:154},{tag:'p',text:'Fictional portfolio · 240 loans',size:11,weight:400,y:310}];
+ if(p.w<280&&!compact){groups[1].size=26;groups[1].text='See the whole picture.';}
  if(compact){groups[0].size=9;groups[0].y=12;groups[1].size=24;groups[1].y=32;groups[1].text='See the whole picture.';groups[2].size=13;groups[2].y=92;groups[3].size=10;groups[3].y=p.h-25;}
  return groups.map(function(row){var px=row.size*scale,lines=[];g.font=row.weight+' '+px+'px Geist,system-ui';row.text.split('\n').forEach(function(par){var line='';par.split(' ').forEach(function(word){var next=line?line+' '+word:word;if(line&&g.measureText(next).width>w){lines.push(line);line=word;}else line=next;});lines.push(line);});return Object.assign({},row,{x:pad,y:row.y*scale,size:px,leading:px*(row.tag==='h2'?1.08:1.42),lines:lines});});
 }
