@@ -74,6 +74,21 @@ function stack(g,n,F){
  }
 }
 function smooth(x){x=Math.max(0,Math.min(1,x));return x*x*x*(10+x*(-15+6*x));}
+// Analytic damped response: seek/export/frame-rate independent, low overshoot.
+function settle(age){var a=Math.max(0,age),w=3.4,z=.78,d=w*Math.sqrt(1-z*z);return Math.exp(-z*w*a)*(Math.cos(d*a)+z*w/d*Math.sin(d*a));}
+function buoyancy(nodes,ctx,t){
+ if(ctx.reduced||!+ctx.P.refresh)return;
+ var ui=R.ui(ctx.W,ctx.H),strength=Math.max(0,Math.min(2,+ctx.P.refreshWeight||0));
+ nodes.forEach(function(n,i){if(n.shape!=='sheet')return;
+  var age=n.birthAge,gate=age<0?1:smooth(age/1.4),phase=(i+1)*1.71;
+  var sx=.65*Math.sin(t*.48+phase),sy=1.1*Math.sin(t*.61+phase*.73),sr=.10*Math.sin(t*.43+phase);
+  var response=age>=0?settle(age):0;
+  n.x+=(sx*gate+.7*response)*ui*strength;n.y+=(sy*gate+6*response)*ui*strength;
+  n.height+=1.2*ui*response*strength;
+  n.rot+=(sr*gate+(i%2?1:-1)*.24*response)*Math.PI/180*strength;
+ });
+}
+
 var printers={},plans={};
 labels.record=['Source record','LN-0248','Verified'];labels.note=['Next action','Review ready','12 Oct'];
 var contentIds=['hero','counts','gate','rule','bars','npl','record','note'];
@@ -134,12 +149,13 @@ function buds(g,plates,F){
   var rand=R.stream(F.ctx.seed,'buds/'+n.id+'/'+n.generation),axis=Math.atan2(n.y-hub.y,n.x-hub.x),copy=budCopy[n.contentId||n.id];var turn=rand()*.5-.25;
   for(var i=0;i<3;i++){
    var delay=.7+i*.8+rand()*1.4,duration=4+rand()*2.1,size=.90+rand()*.16,a=axis+(i-1)*.92+turn;
-   var age=n.birthAge-delay,appear=smooth(age/.55),finish=smooth((age-duration)/.55),lineFade=1-finish;
+   var age=n.birthAge-delay,appear=smooth(age/.9),finish=smooth((age-duration)/.55),lineFade=1-finish;
    if(age<0||lineFade<=0)continue;
    var w=(i===1?94:112)*U*size,h=(i===1?44:52)*U*size;
    var edge=1/Math.max(Math.abs(Math.cos(a))/(n.w/2),Math.abs(Math.sin(a))/(n.h/2));
    var distance=edge+Math.abs(Math.cos(a))*w/2+Math.abs(Math.sin(a))*h/2+16*U;
-   var x=n.x+Math.cos(a)*distance*(.82+.18*appear),y=n.y+Math.sin(a)*distance*(.82+.18*appear);
+   var rest=settle(age),travel=4*U*rest,drift=smooth(age/1.4)*Math.sin(age*.75+i)*.7*U;
+   var x=n.x+Math.cos(a)*(distance-travel),y=n.y+Math.sin(a)*(distance-travel)+drift;
    x=Math.max(w/2+8,Math.min(F.W-w/2-8,x));y=Math.max(h/2+8,Math.min(F.H-h/2-8,y));
    g.save();g.globalAlpha=appear*lineFade*.35;g.strokeStyle=I.ink3;g.lineWidth=.65*U;g.beginPath();g.moveTo(n.x,n.y);g.quadraticCurveTo((n.x+x)/2-4*U,(n.y+y)/2+6*U,x,y);g.stroke();
    var alpha=appear*(1-finish);
@@ -198,5 +214,5 @@ function parentCards(g,plates,F){if(F.ctx.reduced||!+F.P.refresh)return;var I=K.
   var w=108*U,h=48*U,dist=n.w/2+w*.7+12*U,x=Math.max(w/2+8,Math.min(F.W-w/2-8,n.x+Math.cos(e.angle)*dist)),y=Math.max(h/2+8,Math.min(F.H-h/2-8,n.y+Math.sin(e.angle)*dist));
   g.save();g.globalAlpha=a*.3;g.strokeStyle=I.ink3;g.lineWidth=.7;g.beginPath();g.moveTo(n.x,n.y);g.lineTo(x,y);g.stroke();g.globalAlpha=a;layer(g,x,y,w,h,F);g.textAlign='center';g.textBaseline='middle';g.fillStyle=I.ink2;g.font='400 '+10*U+'px Geist';g.fillText(copy[0],x,y-8*U);g.fillStyle=I.ink;g.font='500 '+12*U+'px Geist';g.fillText(copy[1],x,y+10*U);g.restore();
  });}
-window.EXPLORE_WIDGETS={lifeState:lifeState,planFor:planFor,parentCards:parentCards,buds:buds,renew:renew,backdrop:backdrop,print:print,info:info,short:function(id){return {record:['Source record','LN-0248'],note:['Next action','12 Oct'],hero:['Portfolio','€200.4M'],counts:['Calendar','Oct 2026'],gate:['Queue','12 ready'],rule:['Library','24 records'],bars:['Volume','€200.4M'],npl:['Coverage','92.4%']}[id];},blur:blur,stack:stack,route:route};
+window.EXPLORE_WIDGETS={settle:settle,buoyancy:buoyancy,lifeState:lifeState,planFor:planFor,parentCards:parentCards,buds:buds,renew:renew,backdrop:backdrop,print:print,info:info,short:function(id){return {record:['Source record','LN-0248'],note:['Next action','12 Oct'],hero:['Portfolio','€200.4M'],counts:['Calendar','Oct 2026'],gate:['Queue','12 ready'],rule:['Library','24 records'],bars:['Volume','€200.4M'],npl:['Coverage','92.4%']}[id];},blur:blur,stack:stack,route:route};
 })();

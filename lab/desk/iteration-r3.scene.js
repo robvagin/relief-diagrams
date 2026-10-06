@@ -141,6 +141,7 @@
     if(EX.mode==='archive'&&!EX.renew&&!ctx.reduced&&+P.refresh)nodes.forEach(function(n){if(n.shape!=='sheet')return;var j=['hero','counts','gate','rule','bars','npl'].indexOf(n.id),u=((t-7-j*6)%48+48)%48;n.life=1;if(u<.65){n.life=1-smooth(u/.65);n.y+=18*ui*(1-n.life);}else if(u<.95){n.life=0;}else if(u<1.75){n.life=smooth((u-.95)/.8);n.y-=18*ui*(1-n.life);}if(u>=.95&&u<2.4)n.refresh={u:u-.95,old:0};});
     EXPLORE_WIDGETS.renew(nodes,ctx,t);
     nodes.forEach(function(n){if(n.shape==='sheet')n.rot=(Math.PI/90)*Math.tanh(n.rot/.10);});
+    EXPLORE_WIDGETS.buoyancy(nodes,ctx,t);
     EXPLORE_WIDGETS.route(nodes,ctx,yaw,t);
     nodes.forEach(function(n){n.x+=area.x;n.y+=area.y;});
     return nodes;
