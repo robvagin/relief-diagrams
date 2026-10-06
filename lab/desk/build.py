@@ -152,10 +152,12 @@ def build(scene, ver, title):
     for fn in CORE_JS[scene]:
         parts.append(script(rd('lab', 'desk', '_core', fn), 'lab/desk/_core/' + fn))
     if scene == 'desk' and ver in ('v4', 'v5', 'v6', 'v7', 'v8', 'v9'):
-        parts.append(script(rd('lab', 'desk', 'explore-next-widgets.js' if ver == 'v9' else 'iteration-r2-widgets.js' if ver in ('v4','v5','v8') else 'iteration-widgets.js'), 'cached exploratory widgets'))
+        parts.append(script(rd('lab', 'desk', 'explore-next-widgets.js' if ver == 'v9' else 'iteration-r3-widgets.js' if ver=='v4' else 'iteration-r2-widgets.js' if ver in ('v5','v8') else 'iteration-widgets.js'), 'cached exploratory widgets'))
     parts.append(script(rd('lab', scene, ver + '.scene.js'), 'lab/%s/%s.scene.js' % (scene, ver)))
+    if scene=='desk' and ver=='v4':
+        parts.append(script(rd('lab','desk','narrative-r3.js'),'static narrative plane'))
     if scene == 'desk' and ver in ('v4', 'v5', 'v6', 'v7', 'v8', 'v9'):
-        parts.append(script(rd('lab', 'desk', 'explore-next.scene.js' if ver == 'v9' else 'iteration-r2.scene.js' if ver in ('v4','v5','v8') else 'iteration.scene.js'), 'shared exploration renderer'))
+        parts.append(script(rd('lab', 'desk', 'explore-next.scene.js' if ver == 'v9' else 'iteration-r3.scene.js' if ver=='v4' else 'iteration-r2.scene.js' if ver in ('v5','v8') else 'iteration.scene.js'), 'shared exploration renderer'))
     out = (page.replace('{{TITLE}}', 'RELIEF · ' + title)
                .replace('{{FONTS}}', fonts_css())
                .replace('{{PANEL_CSS}}', panel_css())
@@ -200,7 +202,7 @@ def param_of(d):
 def passport(scene, ver, title, html, score):
     rows = decls(('lab', 'desk', '_core', 'app.js'), ('lab', scene, ver + '.scene.js'), ('lab', 'desk', '_core', CORE_JS[scene][-1]))
     if scene == 'desk' and ver in ('v4', 'v5', 'v6', 'v7', 'v8', 'v9'):
-        rows += decls(('lab', 'desk', 'explore-next.scene.js' if ver == 'v9' else 'iteration-r2.scene.js' if ver in ('v4','v5','v8') else 'iteration.scene.js'))
+        rows += decls(('lab', 'desk', 'explore-next.scene.js' if ver == 'v9' else 'iteration-r3.scene.js' if ver=='v4' else 'iteration-r2.scene.js' if ver in ('v5','v8') else 'iteration.scene.js'))
     seen, params = set(), []
     for d in rows:
         if d[0] not in seen:
