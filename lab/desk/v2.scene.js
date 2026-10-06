@@ -96,18 +96,18 @@
         o.env = n.env === 'settle' ? window.RELIEF.motion.settle(t, tEnd + 1.2, +P.settle) : 1;
         return o;
       });
-      var links = [];
-      M.stems.forEach(function (s) { var ids=s.ids.filter(function(id){return id.indexOf('-j')<0;});links=links.concat(ORG.chainLinks(pos,ids,'thread',{alpha:.28})); });
-      // Contextual stage satellites share one smooth life envelope with their link.
-      [0,1,2].forEach(function(j){
-        var parent=nodes.filter(function(n){return n.id==='st'+j;})[0],c=parent.data;
-        var phase=(t+j*5)%28,life=ctx.reduced?1:Math.pow(Math.sin(Math.PI*phase/28),2);
-        var w=parent.w*.42,angle=-.6+j*1.2,d=parent.w*.65+w*.35;
-        var x=parent.x+Math.cos(angle)*d,y=parent.y+Math.sin(angle)*d,id='stage-detail-'+j;
-        var label=j===1?'Share':'Loans',value=j===1?K.pct(c.value/D().breakdown.value):String(c.count);
-        nodes.push({id:id,shape:'disc',x:x,y:y,w:w*(.12+.88*life),h:w*(.12+.88*life),z:parent.z+.1,env:0,life:life,hit:life>.15,compactValue:value,info:[c.label,label+': '+value],print:function(g,F,I,ww,hh,n){g.save();Wd.W.bead(label,value)(g,F,I,ww,hh,n);g.restore();}});
-        links.push({a:parent.id,b:id,kind:'thread',alpha:.28*life});
+      var by={};nodes.forEach(function(n){by[n.id]=n;});
+      var anchor=by.stages,S=Math.min(F.W,F.H),hub=by.hub;anchor.compactValue='3';by.agents.compactValue='5';
+      anchor.x=hub.x-.045*S;anchor.y=hub.y-.23*S;pos.stages={x:anchor.x,y:anchor.y};var axis=-Math.PI/2,breath=ctx.reduced?0:Math.sin(t*.32)*.055;
+      // Three stages grow from a single short stem, in one gentle fan of the same plant.
+      [0,1,2].forEach(function(j){var n=by['st'+j],a=axis+(j-1)*.82+breath,r=S*(.095+j*.006)+n.w*.36;
+        n.compactValue=K.eur(n.data.value,0);n.w*=.80;n.h=n.w;n.x=anchor.x+Math.cos(a)*r;n.y=anchor.y+Math.sin(a)*r;
+        pos[n.id]={x:n.x,y:n.y};
       });
+      var ag=by.agents;ag.x=Math.max(S*.16,hub.x-.40*S);ag.y=hub.y+.06*S;pos.agents={x:ag.x,y:ag.y};
+      [0,1,2,3,4].forEach(function(j){var n=by['ag'+j],a=1.15+j*.43+breath*.7,dist=S*(.12+(j%2)*.008);n.compactValue=n.data.id;n.x=ag.x+Math.cos(a)*dist;n.y=ag.y+Math.sin(a)*dist;pos[n.id]={x:n.x,y:n.y};});
+      var links=[];
+      M.stems.forEach(function(s){if(s.ids.length===6&&s.ids[0]==='agents'){[0,1,2,3,4].forEach(function(j){links=links.concat(ORG.chainLinks(pos,['agents','ag'+j],'thread',{alpha:.24}));});return;}var ids=s.ids.filter(function(id){return id.indexOf('-j')<0;});links=links.concat(ORG.chainLinks(pos,ids,'thread',{alpha:.28,bend:.08}));});
       return {
         root: 'hub', nodes: nodes, links: links, key: 'plant',
         floor: function (g, Fr) {

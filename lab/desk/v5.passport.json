@@ -3,7 +3,7 @@
   "title": "Desk · Deep orbit",
   "blurb": "RELIEF lab variant: desk, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "6cef65a0380b90cc7ca0d0f3f90ab42dcca57ec8e2fb6a42b21674671fc64d1a",
+  "engineHash": "7c7c5dd62ab858555fc33cc6dd9409baa56adc6dd8d089e4b47313e3ce0f0299",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -383,15 +383,6 @@
       "min": 0,
       "max": 1,
       "step": 1
-    },
-    {
-      "id": "refreshWeight",
-      "label": "Refresh weight",
-      "type": "number",
-      "default": 1,
-      "min": 0,
-      "max": 2,
-      "step": 0.01
     }
   ],
   "presets": [],

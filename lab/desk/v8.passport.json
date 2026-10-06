@@ -3,7 +3,7 @@
   "title": "Desk · Renewal",
   "blurb": "RELIEF lab variant: desk, own light §7.2–7.4 until the rail lands",
   "version": "0.1.0",
-  "engineHash": "395b129f9103454566e91d4642e38b7f53dc462586c6fd11b748ff404799f23e",
+  "engineHash": "9157ff9fad68053ec3730cccfcbe7c882dbb2e25d73a6237780bc45eb0f18102",
   "kind": "engine",
   "contract": {
     "embed": {
@@ -383,15 +383,6 @@
       "min": 0,
       "max": 1,
       "step": 1
-    },
-    {
-      "id": "refreshWeight",
-      "label": "Refresh weight",
-      "type": "number",
-      "default": 1,
-      "min": 0,
-      "max": 2,
-      "step": 0.01
     }
   ],
   "presets": [],
