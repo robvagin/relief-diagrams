@@ -27,7 +27,7 @@
         var sh = Wd.SHEETS.filter(function (s) { return s.id === it.sheet; })[0];
         var area = unit * unit * sh.w, w = Math.sqrt(area * sh.ar), h = w / sh.ar;
         if (it.id === 'hero') { w *= 1.05; h *= 1.05; }
-        if(EX.letter){var ar=Math.max(1.12,Math.min(1.65,w/h));w=S*(.205+(i%3)*.012);h=w/ar;}
+        if(EX.letter){var ar=Math.max(1.12,Math.min(1.65,w/h));var sizes={hero:.255,counts:.225,gate:.195,rule:.175,bars:.235,npl:.205};w=Math.max(76,S*sizes[it.id]);h=w/ar;}
         chain.push({ id: it.id, parent: 'hub', rest: [dx, dy], amp: it.amp });
         nodes.push({ id: it.id, shape: 'sheet', w: w, h: h, z: it.z, rot0: ((i % 2 ? 1 : -1) * (0.5 + (i % 3) * 0.25)), print: sh.print, info: sh.info(),
           env: it.id === 'hero' ? 'settle' : 1 });
@@ -53,7 +53,7 @@
         nodes.push({ id: 'agents', shape: 'disc', w: 0.06 * S, h: 0.06 * S, z: 2, print: Wd.W.bead('agents', '5'), info: ['Five agents', 'one model of record'] });
         links.push({ a: 'hub', b: 'agents', kind: 'thread', bend: 0.2 });
         A.forEach(function (ag, j) {
-          var aa = a + (j - 2) * 0.62, dd = 0.11 * S + (j % 2) * 0.045 * S, r = 0.032 * S;
+          var aa = a + (j - 2) * 0.62, dd = 0.11 * S + (j % 2) * 0.045 * S, r = [.035,.045,.055,.031,.040][j] * S;
           var nd = { id: 'ag' + j, shape: 'disc', w: 2 * r, h: 2 * r, z: 1, data: ag, state: states[j], info: [ag.id + ' · ' + ag.name, ag.job, 'state: ' + states[j]] };
           nd.print = Wd.W.agent(nd);
           chain.push({ id: 'ag' + j, parent: 'agents', rest: [Math.cos(aa) * dd, Math.sin(aa) * dd], amp: 5 });
@@ -62,7 +62,7 @@
         });
       }
     });
-    nodes.forEach(function(n){if(n.shape==='sheet'){if(n.id==='counts'||n.id==='rule'){n.w*=1.35;n.h*=1.35;}n.print=EXPLORE_WIDGETS.print(n.id,EX.mode);n.info=EXPLORE_WIDGETS.info(n.id);}});
+    nodes.forEach(function(n){if(n.shape==='sheet'){n.print=EXPLORE_WIDGETS.print(n.id,EX.mode);n.info=EXPLORE_WIDGETS.info(n.id);}});
     var M = { cx: cx, cy: cy, chain: chain, nodes: nodes, links: links };
     nodes[0].fixed = true;
     return ORG.fitModel(ORG.relax(M, 0.012 * S), F, null, 1.15);
@@ -220,20 +220,21 @@
     DISCS.set(key,cv);if(DISCS.size>40)DISCS.delete(DISCS.keys().next().value);return cv;
   }
   function texture(n,F) {
-    var compact=n.baseW*.85<105, bucket=compact?Math.round(n.baseW*.85/8)*8:0;
+    var compact=n.baseW<150, bucket=compact?Math.max(48,Math.round(n.baseW/4)*4):0;
     var key=[n.contentId||n.id,n.sample,(n.w/n.h).toFixed(6),bucket,F.ctx.theme,F.P.accent,+F.P.temp].join('|'),cached=S.textures.get(key);
     if(cached)return cached;
     var w=480,h=Math.round(w*n.h/n.w),cv=document.createElement('canvas');cv.width=w;cv.height=h;
     var g=cv.getContext('2d');g.fillStyle=R.color.css(F.tn.plate);g.fillRect(0,0,w,h);
     g.translate(w/2,h/2);g.scale(2,2);
     if(compact){
-      var scale=240/bucket,lines=EXPLORE_WIDGETS.short(n.contentId||n.id).slice(),max=216;
+      var scale=240/bucket,lines=EXPLORE_WIDGETS.short(n.contentId||n.id).slice(),max=208;
       if((n.contentId||n.id)!=='counts')lines[1]=n.info[1];
-      g.textAlign='center';g.textBaseline='middle';g.fillStyle=R.color.css(F.T.ink);
+      g.textAlign='left';g.textBaseline='middle';
       lines.slice(0,2).forEach(function(line,i){
-        var text=String(line);g.font='400 '+(i?12:10)*scale+'px Geist,system-ui';
-        while(text.length&&g.measureText(text+'…').width>max)text=text.slice(0,-1);
-        if(text!==String(line))text+='…';g.fillText(text,0,(i?9:-9)*scale);
+        var text=String(line),px=(i?Math.max(12,Math.min(19,bucket*.135)):Math.max(9,Math.min(11,bucket*.078)))*scale;
+        g.font='400 '+px+'px Geist,system-ui';
+        if(g.measureText(text).width>max){px*=max/g.measureText(text).width;g.font='400 '+px+'px Geist,system-ui';}
+        g.fillStyle=R.color.css(i?F.T.ink:F.T.ink2);g.fillText(text,-104,(i?9:-11)*scale);
       });
     }else n.print(g,Object.assign({},F,{ui:1}),K.inks(F),240,h/2,n);
     S.textures.set(key,cv);if(S.textures.size>24)S.textures.delete(S.textures.keys().next().value);return cv;
@@ -247,7 +248,7 @@
     else {
       g.imageSmoothingQuality='high';
       var cv=texture(n,F),r=n.refresh;
-      if(EX.stack==='all'||n.id==='rule'||n.id==='counts')EXPLORE_WIDGETS.stack(g,n,F);
+      // Single sheets only; all visible shadows belong to actual receiving cards.
       var fog=EX.mode==='orbit'?smooth((-n.depth-.12)/.65)*.70:0;
       if(fog>0){var blurred=EXPLORE_WIDGETS.blur(cv);g.drawImage(cv,-n.w/2,-n.h/2,n.w,n.h);g.globalAlpha=fog*(n.life==null?1:n.life);g.drawImage(blurred,-n.w/2,-n.h/2,n.w,n.h);g.globalAlpha=n.life==null?1:n.life;if(!r){g.restore();return;}}
       if(!r)g.drawImage(cv,-n.w/2,-n.h/2,n.w,n.h);
