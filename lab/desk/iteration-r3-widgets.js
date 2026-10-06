@@ -43,7 +43,7 @@ function print(id,mode){return function(g,F,I,w,h,n){
   values.forEach(function(v,i){g.fillStyle=i===11?I.acc:I.ink3;g.fillRect(l+i*iw/12,yy-v*hh,iw/12-5,v*hh);});text('Oct',l,b+7,9);text('Sep',r,b+7,9,'right');
  }
 };}
-function blur(cv){if(blurred.has(cv))return blurred.get(cv);var b=document.createElement('canvas');b.width=cv.width;b.height=cv.height;var g=b.getContext('2d');g.filter='blur(2px)';g.drawImage(cv,0,0);blurred.set(cv,b);return b;}
+function blur(cv){if(blurred.has(cv))return blurred.get(cv);var b=document.createElement('canvas');b.width=cv.width;b.height=cv.height;var g=b.getContext('2d');g.drawImage(cv,0,0);RELIEF_SOFT.blur(b,2);blurred.set(cv,b);return b;}
 var layerCache=new Map();
 function layer(g,x,y,w,h,F){
  var key=F.ctx.theme+'/'+(h/w).toFixed(3),cv=layerCache.get(key);
@@ -58,7 +58,7 @@ var stackMasks=new Map();
 function stackMask(F){
  var key=F.ctx.theme,cv=stackMasks.get(key);if(cv)return cv;
  cv=document.createElement('canvas');cv.width=cv.height=128;var q=cv.getContext('2d');
- q.filter='blur(4px)';q.fillStyle=R.color.css(F.tn.shadow,.10);q.fillRect(16,16,96,96);stackMasks.set(key,cv);return cv;
+ q.fillStyle=R.color.css(F.tn.shadow,.10);q.fillRect(16,16,96,96);RELIEF_SOFT.blur(cv,4);stackMasks.set(key,cv);return cv;
 }
 function stack(g,n,F){
  var hub=F.hub||{x:F.W/2,y:F.H*.52},dx=hub.x-n.x,dy=hub.y-n.y,len=Math.hypot(dx,dy)||1;

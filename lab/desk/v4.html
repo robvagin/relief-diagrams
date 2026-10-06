@@ -2650,7 +2650,7 @@ function print(id,mode){return function(g,F,I,w,h,n){
   values.forEach(function(v,i){g.fillStyle=i===11?I.acc:I.ink3;g.fillRect(l+i*iw/12,yy-v*hh,iw/12-5,v*hh);});text('Oct',l,b+7,9);text('Sep',r,b+7,9,'right');
  }
 };}
-function blur(cv){if(blurred.has(cv))return blurred.get(cv);var b=document.createElement('canvas');b.width=cv.width;b.height=cv.height;var g=b.getContext('2d');g.filter='blur(2px)';g.drawImage(cv,0,0);blurred.set(cv,b);return b;}
+function blur(cv){if(blurred.has(cv))return blurred.get(cv);var b=document.createElement('canvas');b.width=cv.width;b.height=cv.height;var g=b.getContext('2d');g.drawImage(cv,0,0);RELIEF_SOFT.blur(b,2);blurred.set(cv,b);return b;}
 var layerCache=new Map();
 function layer(g,x,y,w,h,F){
  var key=F.ctx.theme+'/'+(h/w).toFixed(3),cv=layerCache.get(key);
@@ -2665,7 +2665,7 @@ var stackMasks=new Map();
 function stackMask(F){
  var key=F.ctx.theme,cv=stackMasks.get(key);if(cv)return cv;
  cv=document.createElement('canvas');cv.width=cv.height=128;var q=cv.getContext('2d');
- q.filter='blur(4px)';q.fillStyle=R.color.css(F.tn.shadow,.10);q.fillRect(16,16,96,96);stackMasks.set(key,cv);return cv;
+ q.fillStyle=R.color.css(F.tn.shadow,.10);q.fillRect(16,16,96,96);RELIEF_SOFT.blur(cv,4);stackMasks.set(key,cv);return cv;
 }
 function stack(g,n,F){
  var hub=F.hub||{x:F.W/2,y:F.H*.52},dx=hub.x-n.x,dy=hub.y-n.y,len=Math.hypot(dx,dy)||1;
@@ -2829,6 +2829,35 @@ window.EXPLORE_WIDGETS={settle:settle,buoyancy:buoyancy,lifeState:lifeState,plan
 window.RELIEF_EXPLORE={variant:"v4",mode:"orbit",name:"Letter ensemble",letter:true,renew:true,stack:"selective"};
 </script>
 <script>
+/* cached cross-browser blur */
+/* Cached raster blur, independent of CanvasRenderingContext2D.filter support. */
+(function(){'use strict';
+function pass(src,dst,w,h,r,horizontal){
+ var outer=horizontal?h:w,inner=horizontal?w:h,stride=horizontal?4:w*4,div=2*r+1;
+ for(var line=0;line<outer;line++)for(var ch=0;ch<4;ch++){
+  var base=(horizontal?line*w*4:line*4)+ch,sum=0;
+  for(var k=-r;k<=r;k++)if(k>=0&&k<inner)sum+=src[base+k*stride];
+  for(var x=0;x<inner;x++){
+   dst[base+x*stride]=sum/div;
+   var remove=x-r,add=x+r+1;if(remove>=0)sum-=src[base+remove*stride];if(add<inner)sum+=src[base+add*stride];
+  }
+ }
+}
+function blur(cv,sigma){
+ if(!(sigma>0))return cv;
+ var w=cv.width,h=cv.height,g=cv.getContext('2d'),im=g.getImageData(0,0,w,h),d=im.data,a=new Float32Array(d.length),b=new Float32Array(d.length);
+ for(var i=0;i<d.length;i+=4){var alpha=d[i+3]/255;a[i]=d[i]*alpha;a[i+1]=d[i+1]*alpha;a[i+2]=d[i+2]*alpha;a[i+3]=d[i+3];}
+ // Three box convolutions approximate Gaussian sigma; transparent outside bounds.
+ var low=Math.floor(Math.sqrt(4*sigma*sigma+1));if(low%2===0)low--;low=Math.max(1,low);
+ var high=low+2,m=Math.round((12*sigma*sigma-3*low*low-12*low-9)/(-4*low-4));
+ for(var n=0;n<3;n++){var r=((n<m?low:high)-1)/2;pass(a,b,w,h,r,true);pass(b,a,w,h,r,false);}
+ for(var i=0;i<d.length;i+=4){var alpha=a[i+3];d[i+3]=alpha;if(alpha>.01){d[i]=a[i]*255/alpha;d[i+1]=a[i+1]*255/alpha;d[i+2]=a[i+2]*255/alpha;}else d[i]=d[i+1]=d[i+2]=0;}
+ g.putImageData(im,0,0);return cv;
+}
+window.RELIEF_SOFT={blur:blur};
+})();
+</script>
+<script>
 /* static narrative plane */
 /* Real HTML narrative surface; the same geometry participates in Canvas lighting and export. */
 (function(){'use strict';var R=RELIEF,root=null,lastKey='',maskCache=new Map();
@@ -2844,7 +2873,7 @@ function copy(g,p){var compact=p.h<300,scale=compact?1:Math.min(1,p.h/340),pad=c
  if(compact){groups[0].size=9;groups[0].y=12;groups[1].size=24;groups[1].y=32;groups[1].text='See the whole picture.';groups[2].size=13;groups[2].y=92;groups[3].size=10;groups[3].y=p.h-25;}
  return groups.map(function(row){var px=row.size*scale,lines=[];g.font=row.weight+' '+px+'px Geist,system-ui';row.text.split('\n').forEach(function(par){var line='';par.split(' ').forEach(function(word){var next=line?line+' '+word:word;if(line&&g.measureText(next).width>w){lines.push(line);line=word;}else line=next;});lines.push(line);});return Object.assign({},row,{x:pad,y:row.y*scale,size:px,leading:px*(row.tag==='h2'?1.08:1.42),lines:lines});});
 }
-function mask(F){var key=F.ctx.theme,cv=maskCache.get(key);if(cv)return cv;cv=document.createElement('canvas');cv.width=cv.height=192;var g=cv.getContext('2d');g.filter='blur(14px)';g.fillStyle=R.color.css(F.tn.shadow,.24);g.fillRect(32,32,128,128);maskCache.set(key,cv);return cv;}
+function mask(F){var key=F.ctx.theme,cv=maskCache.get(key);if(cv)return cv;cv=document.createElement('canvas');cv.width=cv.height=192;var g=cv.getContext('2d');g.fillStyle=R.color.css(F.tn.shadow,.24);g.fillRect(32,32,128,128);RELIEF_SOFT.blur(cv,14);maskCache.set(key,cv);return cv;}
 function ground(g,n,F){if(!n||!(F.L.dens>0))return;var off=R.light.offset(F.L,n.x,n.y,n.z,0);g.save();g.globalAlpha=Math.min(.5,F.L.dens*1.7);g.drawImage(mask(F),n.x+off[0]-.75*n.w,n.y+off[1]-.75*n.h,n.w*1.5,n.h*1.5);g.restore();}
 function mount(n,F,rows){if(F.ctx.capture)return;if(!root){root=document.createElement('article');root.id='narrative-panel';root.setAttribute('aria-label','Portfolio overview');root.style.cssText='position:absolute;z-index:2;box-sizing:border-box;font-family:Geist,system-ui;cursor:text;user-select:text;pointer-events:auto;overflow:hidden';F.ctx.canvas.parentElement.appendChild(root);}
  root.hidden=!n;if(!n)return;var p=n.box,key=[p.x,p.y,p.w,p.h,F.ctx.theme,F.P.temp].join('/');if(key===lastKey)return;lastKey=key;
@@ -3142,9 +3171,9 @@ window.RELIEF_STORY={layout:layout,geometry:geometry,ground:ground,paint:paint,c
     var key=n.kind+'|'+softness+'|'+F.ctx.theme;
     if(!S.shadows)S.shadows=new Map();if(S.shadows.has(key))return S.shadows.get(key);
     var cv=document.createElement('canvas');cv.width=cv.height=192;var g=cv.getContext('2d');
-    g.filter='blur('+softness+'px)';g.fillStyle=R.color.css(F.tn.shadow,.36);
+    g.fillStyle=R.color.css(F.tn.shadow,.36);
     if(n.kind==='circle'){g.beginPath();g.arc(96,96,64,0,TAU);g.fill();}else g.fillRect(32,32,128,128);
-    S.shadows.set(key,cv);return cv;
+    RELIEF_SOFT.blur(cv,softness);S.shadows.set(key,cv);return cv;
   }
   function receiverShadow(g,n,plates,F) {
     if(!(+F.P.dens>0)||(n.life!=null&&n.life<.01))return;

@@ -282,9 +282,9 @@
     var key=n.kind+'|'+softness+'|'+F.ctx.theme;
     if(!S.shadows)S.shadows=new Map();if(S.shadows.has(key))return S.shadows.get(key);
     var cv=document.createElement('canvas');cv.width=cv.height=192;var g=cv.getContext('2d');
-    g.filter='blur('+softness+'px)';g.fillStyle=R.color.css(F.tn.shadow,.36);
+    g.fillStyle=R.color.css(F.tn.shadow,.36);
     if(n.kind==='circle'){g.beginPath();g.arc(96,96,64,0,TAU);g.fill();}else g.fillRect(32,32,128,128);
-    S.shadows.set(key,cv);return cv;
+    RELIEF_SOFT.blur(cv,softness);S.shadows.set(key,cv);return cv;
   }
   function receiverShadow(g,n,plates,F) {
     if(!(+F.P.dens>0)||(n.life!=null&&n.life<.01))return;
