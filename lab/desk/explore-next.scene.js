@@ -281,16 +281,16 @@
   }
   function receiverShadow(g,n,plates,F) {
     if(!(+F.P.dens>0)||(n.life!=null&&n.life<.01))return;
-    plates.forEach(function(o){
+    plates.filter(function(o){return o.z>n.z&&Math.abs(o.x-n.x)<=(o.w+n.w)*.55&&Math.abs(o.y-n.y)<=(o.h+n.h)*.55;}).sort(function(a,b){return a.z-b.z;}).slice(0,3).forEach(function(o){
       if(o.z<=n.z||Math.abs(o.x-n.x)>(o.w+n.w)*.55||Math.abs(o.y-n.y)>(o.h+n.h)*.55)return;
       g.save();g.translate(n.x,n.y);g.rotate(n.rot);outline(g,n);g.clip();g.rotate(-n.rot);g.translate(-n.x,-n.y);
-      g.globalAlpha=Math.min(.7,+F.P.dens*2)*(o.life==null?1:o.life)*(n.life==null?1:n.life);g.translate(o.x+3*F.ui,o.y+5*F.ui);g.rotate(o.rot);
-      g.drawImage(shadowSprite(o,F),-.8*o.w,-.8*o.h,1.6*o.w,1.6*o.h);g.restore();
+      g.globalAlpha=Math.min(.7,+F.P.dens*2)/(1+Math.abs(o.z-n.z)/(45*F.ui))*(o.life==null?1:o.life)*(n.life==null?1:n.life);g.translate(o.x+3*F.ui,o.y+5*F.ui);g.rotate(o.rot);
+      g.imageSmoothingQuality='low';g.drawImage(shadowSprite(o,F),-.8*o.w,-.8*o.h,1.6*o.w,1.6*o.h);g.restore();
     });
   }
   function connectors(g,plates,F,receiver) {
     var by={};plates.forEach(function(n){by[n.id]=n;});
-    g.lineWidth=Math.max(.6,F.lineW*.75);g.strokeStyle=R.color.css(F.T.ink2,.55);
+    g.lineWidth=Math.max(.6,F.lineW*.75);g.strokeStyle=R.color.css(F.T.ink2,.40);
     S.links.forEach(function(l){var a=by[l.a],b=by[l.b];
       if(receiver){var pad=Math.hypot(b.x-a.x,b.y-a.y)*.2+8,ex=Math.hypot(receiver.w,receiver.h)/2;
         if(Math.max(a.x,b.x)+pad<receiver.x-ex||Math.min(a.x,b.x)-pad>receiver.x+ex||Math.max(a.y,b.y)+pad<receiver.y-ex||Math.min(a.y,b.y)-pad>receiver.y+ex)return;}
@@ -300,7 +300,14 @@
   }
   function draw(ctx) {
     var nodes=world(ctx,R.motion.time(ctx)),G=graph(ctx,nodes),zoom=G.view.zoom,g=ctx.g,ui=R.ui(ctx.W,ctx.H),P=ctx.P;
-    var T=R.tokens(ctx.theme,P.accent),tn=R.material.tints(T,+P.temp||0),L=R.light.state(P,ctx.W,ctx.H,ui);
+    var T=Object.assign({},R.tokens(ctx.theme,P.accent));
+    // Quiet monochrome presentation; do not mutate shared tokens used by older variants.
+    T.accent=T.ink2.slice();
+    function neutral(v){var m=(v[0]+v[1]+v[2])/3;return [m,m,m];}
+    T.shadowTint=neutral(T.shadowTint);T.lightTint=neutral(T.lightTint);
+    if(ctx.theme!=='night'){T.ground=R.color.mix(neutral(T.ground),T.lightTint,.38);T.plate=R.color.mix(neutral(T.plate),T.lightTint,.48);}
+    T.groundY=R.color.lum(T.ground);
+    var tn=R.material.tints(T,+P.temp||0),L=R.light.state(P,ctx.W,ctx.H,ui);
     // Zero local contact is deliberate: there is no nearby desk under these papers.
     L.contact=0;
     var F={ctx:ctx,P:P,W:ctx.W,H:ctx.H,ui:ui,T:T,tn:tn,L:L,lineW:R.lineW(ui),tsec:R.motion.time(ctx)};

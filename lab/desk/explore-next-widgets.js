@@ -51,12 +51,24 @@ function layer(g,x,y,w,h,F){
  }
  var pad=w/12;g.drawImage(cv,x-w/2-pad,y-h/2-pad,w+2*pad,h+2*pad);
 }
+var stackMasks=new Map();
+function stackMask(F){
+ var key=F.ctx.theme,cv=stackMasks.get(key);if(cv)return cv;
+ cv=document.createElement('canvas');cv.width=cv.height=128;var q=cv.getContext('2d');
+ q.filter='blur(4px)';q.fillStyle=R.color.css(F.tn.shadow,.22);q.fillRect(16,16,96,96);stackMasks.set(key,cv);return cv;
+}
 function stack(g,n,F){
  var hub=F.hub||{x:F.W/2,y:F.H*.52},dx=hub.x-n.x,dy=hub.y-n.y,len=Math.hypot(dx,dy)||1;
- var c=Math.cos(n.rot),s=Math.sin(n.rot),step=6*F.ui;
- var ux=(dx*c+dy*s)/len,uy=(-dx*s+dy*c)/len;
- for(var j=2;j>=1;j--){var shrink=1-j*.018,x=ux*j*step,y=uy*j*step,w=n.w*shrink,h=n.h*shrink;g.fillStyle=R.color.css(F.tn.plate);g.fillRect(x-w/2,y-h/2,w,h);g.fillStyle=R.color.css(F.tn.shadow,j===2?.025:.012);g.fillRect(x-w/2,y-h/2,w,h);}
- layer(g,0,0,n.w,n.h,F);
+ var c=Math.cos(n.rot),s=Math.sin(n.rot),step=7*F.ui;
+ var ux=(dx*c+dy*s)/len,uy=(-dx*s+dy*c)/len,mask=stackMask(F);
+ for(var j=2;j>=1;j--){
+  var shrink=1-j*.018,x=ux*j*step,y=uy*j*step,w=n.w*shrink,h=n.h*shrink;
+  g.fillStyle=R.color.css(F.tn.plate);g.fillRect(x-w/2,y-h/2,w,h);
+  // Only the exposed receiving sheet gets shadow from the sheet immediately above it.
+  var next=1-(j-1)*.018,nw=n.w*next,nh=n.h*next,nx=ux*(j-1)*step,ny=uy*(j-1)*step;
+  g.save();g.beginPath();g.rect(x-w/2,y-h/2,w,h);g.clip();g.imageSmoothingQuality='low';
+  g.drawImage(mask,nx-nw*2/3,ny-nh*2/3,nw*4/3,nh*4/3);g.restore();
+ }
 }
 function smooth(x){x=Math.max(0,Math.min(1,x));return x*x*x*(10+x*(-15+6*x));}
 var printers={},orders={};
